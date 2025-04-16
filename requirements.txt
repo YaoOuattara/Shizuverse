@@ -1,0 +1,24 @@
+# Core frameworks
+Flask==2.3.2
+Flask-SocketIO==5.3.6
+Flask-Cors==3.0.10
+
+# SocketIO server backend
+eventlet==0.33.3
+
+# Database + Migrations
+SQLAlchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic==1.12.0
+
+# Auth & Security
+PyJWT==2.8.0
+itsdangerous==2.1.2
+bcrypt==4.0.1
+
+# Utilities
+python-dotenv==1.0.1
+
+# Linting / Dev tools (optional for deployment, good for dev)
+black==24.2.0
+flake8==6.1.0
