@@ -11,3 +11,4 @@ from .rating import Rating
 from .chat import ChatSession, ChatMessage
 from .achievement import Achievement
 from .notification import Notification
+from .service_provider import ServiceProvider

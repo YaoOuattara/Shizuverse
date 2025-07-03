@@ -6,7 +6,7 @@ from .provider import provider_bp
 from .chat import chat_bp
 from .socket_chat import socket_chat_bp
 
-all_routes = [
+all_blueprints = [  # <- changed from all_routes
     (client_bp, "/client"),
     (provider_bp, "/provider"),
     (chat_bp, "/api/chat"),
