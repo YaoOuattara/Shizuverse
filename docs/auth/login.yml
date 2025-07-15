@@ -1,0 +1,31 @@
+tags:
+  - Auth
+parameters:
+  - name: body
+    in: body
+    required: true
+    schema:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+responses:
+  200:
+    description: Login successful
+    schema:
+      type: object
+      properties:
+        message:
+          type: string
+        user_id:
+          type: integer
+        user_type:
+          type: string
+  401:
+    description: Unauthorized
+

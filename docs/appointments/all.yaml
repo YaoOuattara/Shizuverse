@@ -1,0 +1,20 @@
+tags:
+  - Appointments
+summary: Get all appointments
+responses:
+  200:
+    description: A list of appointments
+    schema:
+      type: object
+      properties:
+        appointments:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              service:
+                type: string
+              time:
+                type: string
