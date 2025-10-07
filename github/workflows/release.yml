@@ -1,0 +1,35 @@
+# Create Release workflow file
+cat << 'EOF' > .github/workflows/release.yml
+name: Release - Docker Build & Push
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  docker-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: \${{ github.actor }}
+          password: \${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker image
+        run: |
+          IMAGE_NAME=ghcr.io/\${{ github.repository }}/shizu-backend
+          docker build -t \$IMAGE_NAME:\${GITHUB_REF_NAME} -t \$IMAGE_NAME:latest .
+
+      - name: Push Docker image
+        run: |
+          IMAGE_NAME=ghcr.io/\${{ github.repository }}/shizu-backend
+          docker push \$IMAGE_NAME:\${GITHUB_REF_NAME}
+          docker push \$IMAGE_NAME:latest
+EOF
