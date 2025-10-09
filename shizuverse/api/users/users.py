@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
-from models import db
-from models.user import User
+from shizuverse.models import db
+from shizuverse.models.user import User
 
 users_bp = Blueprint('users', __name__)
 

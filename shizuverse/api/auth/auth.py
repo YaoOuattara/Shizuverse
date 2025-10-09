@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flasgger import swag_from
-from models import db
-from models.user import User
+from shizuverse.models import db
+from shizuverse.models.user import User
 from flask_login import login_user
 
 auth_bp = Blueprint('auth', __name__)

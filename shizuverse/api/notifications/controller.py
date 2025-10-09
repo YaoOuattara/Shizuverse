@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from models.user import User
+from shizuverse.models.user import User
 from flask_login import login_user
 from werkzeug.security import check_password_hash
 

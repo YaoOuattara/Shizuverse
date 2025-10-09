@@ -1,5 +1,5 @@
 from flask import jsonify
-from models import Service
+from shizuverse.models.service import Service
 
 def get_appointments():
     services = Service.query.limit(10).all()

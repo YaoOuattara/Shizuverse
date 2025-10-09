@@ -1,5 +1,5 @@
 from flask import jsonify
-from models.user import User
+from shizu.models.user import User
 
 def get_all_users():
     users = User.query.all()

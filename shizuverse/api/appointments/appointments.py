@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
-from models import db
-from models.appointment import Appointment
+from shizuverse.models import db
+from shizuverse.models.appointment import Appointment
 from datetime import datetime
 
 appointments_bp = Blueprint('appointments', __name__)
