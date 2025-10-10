@@ -1,4 +1,4 @@
-from models import db
+from shizuverse.models import db
 
 class ServiceProvider(db.Model):
     __tablename__ = 'service_providers'
