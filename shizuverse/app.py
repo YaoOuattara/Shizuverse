@@ -4,34 +4,45 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # --- Top Level: Env Config ---
 from dotenv import load_dotenv
-import os
 import logging
 
-load_dotenv()
-
-ENV = os.getenv('ENV', 'local')
-if ENV == 'production':
-    DATABASE_URL = os.getenv('REMOTE_DATABASE_URL')
+# --- Smart environment loading ---
+# Load .env ONLY when running locally. Render injects its own env vars.
+if os.getenv("RENDER") is None:
+    load_dotenv()
+    logging.info("Loaded local .env file")
 else:
-    DATABASE_URL = os.getenv('LOCAL_DATABASE_URL')
+    logging.info("Running on Render — skipping .env loading")
+
+# --- Determine environment and pick the correct DB ---
+ENV = os.getenv('ENV', 'local')
+
+# Prefer Render's DATABASE_URL if available
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+if not DATABASE_URL:
+    # Fallback to local or remote .env-based vars if missing
+    if ENV == 'production':
+        DATABASE_URL = os.getenv('REMOTE_DATABASE_URL')
+    else:
+        DATABASE_URL = os.getenv('LOCAL_DATABASE_URL')
 
 if not DATABASE_URL:
     logging.error("DATABASE_URL is not set")
-    exit(1)
+    sys.exit(1)
 
-# Fix old-style URI if needed
+# Normalize URI scheme if needed
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-os.environ['DATABASE_URL'] = DATABASE_URL  # Set it globally
+# Set globally for SQLAlchemy and Flask
+os.environ['DATABASE_URL'] = DATABASE_URL
 
 # --- Gevent Monkey Patch Early ---
 from gevent import monkey
 monkey.patch_all()
 
 # --- Imports ---
-import sys
-import logging
 from flask import Flask, jsonify, render_template, request, redirect, url_for
 from flask_cors import CORS
 from flask_login import LoginManager, current_user
@@ -69,7 +80,7 @@ def create_app():
 
     Swagger(app)
 
-    # Config
+    # --- Flask Config ---
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
     app.config['BABEL_DEFAULT_LOCALE'] = os.getenv('BABEL_DEFAULT_LOCALE', 'fr')
     app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -160,7 +171,9 @@ if __name__ == '__main__':
     logger.info(f"Running server on port {port}")
     socketio.run(app, host='0.0.0.0', port=port, debug=True)
 
+
 # For Flask CLI (e.g. flask db upgrade)
 def create_app_flask_app():
     app, _ = create_app()
     return app
+
