@@ -170,10 +170,19 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5050))
     logger.info(f"Running server on port {port}")
     socketio.run(app, host='0.0.0.0', port=port, debug=True)
+else:
+    # ✅ Expose Flask app for Gunicorn (Render)
+    result = create_app()
+    if not result:
+        raise RuntimeError("Flask app failed to initialize on import.")
+    app, socketio = result
 
 
 # For Flask CLI (e.g. flask db upgrade)
 def create_app_flask_app():
     app, _ = create_app()
     return app
-
+              
+              
+              
+              
