@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block title %}Edit Service{% endblock %}
+{% block content %}
+<h2>Edit Service</h2>
+<form method="POST">
+    <input type="text" name="category" value="{{ service.category }}"><br>
+    <textarea name="description_fr">{{ description_fr }}</textarea><br>
+    <textarea name="description_en">{{ description_en }}</textarea><br>
+    <input type="text" name="price_range" value="{{ service.price_range }}"><br>
+    <button type="submit">Save</button>
+</form>
+{% endblock %}
