@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container text-center py-5">
+  <h1 class="display-4">Welcome to Shizuverse</h1>
+  <p class="lead mt-3">Connecting clients and service providers with ease.</p>
+  <a href="{{ url_for('auth.login') }}" class="btn btn-primary mt-4">Get Started</a>
+</div>
+{% endblock %}
