@@ -40,6 +40,8 @@ class Service(db.Model):
     is_priority = db.Column(db.Boolean, default=False)
 
     subcategory_id = db.Column(db.Integer, db.ForeignKey('service_subcategories.id'), nullable=False)
+    
+    featured = db.Column(db.Boolean, default=False)
 
     # ✅ Properly declared FK to ServiceProvider
     provider_id = db.Column(db.Integer, db.ForeignKey("service_providers.id"), nullable=True)
@@ -48,4 +50,4 @@ class Service(db.Model):
         return f"<Service {self.name}>"
 
 # ✅ Import to make sure relationships resolve at migration/runtime
-from models.service_provider import ServiceProvider
+from shizuverse.models.service_provider import ServiceProvider
