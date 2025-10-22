@@ -1,3 +1,5 @@
+# shizuverse/app.py
+
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -43,19 +45,22 @@ from gevent import monkey
 monkey.patch_all()
 
 # --- Imports ---
-from flask import Flask, jsonify, render_template, request, redirect, url_for
+from flask import Flask, render_template, redirect, url_for
 from flask_cors import CORS
 from flask_login import LoginManager, current_user
 from flask_babel import Babel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import joinedload
 from flask_socketio import SocketIO
 from flask_migrate import Migrate
 from flasgger import Swagger
 
-# --- Local Modules ---
-from routes.socket_chat import create_socket_instance, socket_chat_bp
-from api import api_bp as api_blueprint
+# --- Absolute local imports (no relative/namespace confusion) ---
+from shizuverse.routes.socket_chat import create_socket_instance, socket_chat_bp
+from shizuverse.api import api_bp as api_blueprint
+from shizuverse.models import db, User
+from shizuverse.models.service_models import Service, ServiceCategory, ServiceSubcategory
 
 # --- Logging ---
 logging.basicConfig(
@@ -69,8 +74,8 @@ def create_app():
     logger.info("Starting Flask app creation")
 
     try:
-        from models import User, db, Service, ServiceCategory
-        from routes import all_blueprints, auth_bp
+        # force-load routes index (builds all_blueprints, auth_bp)
+        from shizuverse.routes import all_blueprints, auth_bp
         logger.info("Modules imported successfully")
     except ImportError as e:
         logger.error(f"Import error: {e}")
@@ -125,17 +130,40 @@ def create_app():
     # --- Routes ---
     @app.route('/')
     def home():
+        """
+        Homepage: show a handful of featured, active services.
+        NOTE:
+          - Our Service has `featured` and `is_active`
+          - Category is via Service.subcategory.category_id (no Service.category_id)
+          - We removed the old `available` flag.
+        """
         if current_user.is_authenticated:
             return redirect(url_for(f'{current_user.user_type}.dashboard'))
 
         try:
-            featured_services = Service.query.filter_by(featured=True, available=True).join(
-                ServiceCategory, Service.category_id == ServiceCategory.id
-            ).limit(8).all()
+            featured_services = (
+                Service.query
+                .filter_by(featured=True, is_active=True)
+                .join(Service.subcategory)  # -> ServiceSubcategory
+                .join(ServiceCategory, Service.subcategory.category_id == ServiceCategory.id)
+                .options(joinedload(Service.subcategory))
+                .limit(8)
+                .all()
+            )
             logger.info(f"Fetched {len(featured_services)} featured services")
         except SQLAlchemyError as e:
             logger.error(f"Failed to fetch featured services: {e}")
             featured_services = []
+
+        # Fallback mini landing page if templates aren’t present
+        if not app.jinja_env.list_templates():
+            return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Shizuverse</title></head>
+<body>
+  <h1>Welcome to Shizuverse</h1>
+  <p>Featured services loaded: {len(featured_services)}</p>
+  <p><a href="/apidocs">API Docs</a> · <a href="/api/services">/api/services</a></p>
+</body></html>"""
 
         testimonials = [
             {'name': 'Sarah M.', 'image': url_for('static', filename='img/testimonials/user1.jpg'), 'rating': 5,
@@ -156,6 +184,11 @@ def create_app():
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             return {'status': 'unhealthy', 'error': str(e)}, 500
+
+    # Temporary schema diag (helpful while stabilizing; remove later)
+    @app.route('/diag/schema')
+    def diag_schema():
+        return {'service_columns': list(Service.__table__.columns.keys())}
 
     return app, socketio
 
@@ -182,7 +215,4 @@ else:
 def create_app_flask_app():
     app, _ = create_app()
     return app
-              
-              
-              
-              
+
