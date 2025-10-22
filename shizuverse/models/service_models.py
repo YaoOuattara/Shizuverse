@@ -1,7 +1,5 @@
-# models/service_models.py
-
-from .db import db
-
+# shizuverse/models/service_models.py
+from shizuverse.models import db
 
 class ServiceCategory(db.Model):
     __tablename__ = 'service_categories'
@@ -10,7 +8,9 @@ class ServiceCategory(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.String(255))
 
-    subcategories = db.relationship('ServiceSubcategory', backref='category', cascade="all, delete-orphan")
+    subcategories = db.relationship(
+        'ServiceSubcategory', backref='category', cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<ServiceCategory {self.name}>"
@@ -22,8 +22,12 @@ class ServiceSubcategory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
 
-    category_id = db.Column(db.Integer, db.ForeignKey('service_categories.id'), nullable=False)
-    services = db.relationship('Service', backref='subcategory', cascade="all, delete-orphan")
+    category_id = db.Column(
+        db.Integer, db.ForeignKey('service_categories.id'), nullable=False
+    )
+    services = db.relationship(
+        'Service', backref='subcategory', cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<ServiceSubcategory {self.name}>"
@@ -36,18 +40,24 @@ class Service(db.Model):
     name = db.Column(db.String(150), nullable=False)
     description = db.Column(db.Text, nullable=True)
     professional_required = db.Column(db.String(100), nullable=True)
-    is_active = db.Column(db.Boolean, default=True)
-    is_priority = db.Column(db.Boolean, default=False)
 
-    subcategory_id = db.Column(db.Integer, db.ForeignKey('service_subcategories.id'), nullable=False)
-    
-    featured = db.Column(db.Boolean, default=False)
+    # use the new flags you’re relying on elsewhere
+    is_active = db.Column(db.Boolean, default=True, nullable=False, index=True)
+    is_priority = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    featured = db.Column(db.Boolean, default=False, nullable=False, index=True)
 
-    # ✅ Properly declared FK to ServiceProvider
-    provider_id = db.Column(db.Integer, db.ForeignKey("service_providers.id"), nullable=True)
+    subcategory_id = db.Column(
+        db.Integer, db.ForeignKey('service_subcategories.id'), nullable=False
+    )
+
+    # Optional provider link
+    provider_id = db.Column(
+        db.Integer, db.ForeignKey("service_providers.id"), nullable=True
+    )
 
     def __repr__(self):
         return f"<Service {self.name}>"
 
-# ✅ Import to make sure relationships resolve at migration/runtime
-from shizuverse.models.service_provider import ServiceProvider
+# ensure ServiceProvider is registered before mappers are configured
+from shizuverse.models.service_provider import ServiceProvider  # noqa: E402
+
