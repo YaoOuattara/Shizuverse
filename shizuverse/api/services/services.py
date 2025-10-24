@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from shizuverse.models import db
-from shizuverse.models.service import Service
+from shizuverse.models.service_models import Service
 
 services_bp = Blueprint('services', __name__)
 
