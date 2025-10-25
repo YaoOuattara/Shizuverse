@@ -3,7 +3,8 @@ import csv, os
 from shizuverse.app import create_app
 from shizuverse.models import db, ServiceCategory, ServiceSubcategory, Service
 
-CSV_FILE = "data/Re-Prioritized_Services.csv"  # adjust if needed
+CSV_FILE =
+"data/prioritized_services.csv"  # adjust if needed
 
 def seed_services():
     app, _ = create_app()  # create_app returns (app, socketio)
