@@ -2,6 +2,8 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from shizuverse.models import db
 
+# Import the association model so we can reference its table in `secondary`
+from shizuverse.models.service_provider import ServiceProvider  # noqa: F401
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -13,16 +15,24 @@ class User(UserMixin, db.Model):
     preferred_language = db.Column(db.String(10), default='fr')
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
 
-    # ✅ Correct M2M to Service through the association table
+    # ✅ Proper many-to-many: User ↔ Service via service_providers
     services = db.relationship(
         'Service',
         secondary='service_providers',
-        backref=db.backref('providers', lazy='dynamic'),
+        primaryjoin=id == db.foreign(ServiceProvider.user_id),
+        secondaryjoin=db.foreign(ServiceProvider.service_id) == db.text('services.id'),
         lazy='dynamic',
+        backref=db.backref('providers', lazy='dynamic')
     )
 
-    # Appointments: explicit FK on the Appointment model
-    appointments = db.relationship('Appointment', backref='client_user', foreign_keys='Appointment.client_id')
+    # Appointments user->client side; adjust if you also need provider side later
+    appointments = db.relationship(
+        'Appointment',
+        backref='client_user',
+        foreign_keys='Appointment.client_id'
+    )
+
+    # No ChatMessage backref here (avoid cycles)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -32,4 +42,3 @@ class User(UserMixin, db.Model):
 
     def __repr__(self):
         return f"<User {self.email}>"
-
