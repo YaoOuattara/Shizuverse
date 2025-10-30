@@ -40,3 +40,4 @@ class ServiceProvider(db.Model):
 
     def __repr__(self) -> str:
         return f"<ServiceProvider user_id={self.user_id} service_id={self.service_id}>"
+
