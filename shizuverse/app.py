@@ -216,3 +216,18 @@ else:
 def create_app_flask_app():
     app, _ = create_app()
     return app
+
+
+
+
+
+
+# --- inside create_app() ---
+try:
+    # ✅ absolute imports from the package so metadata is populated
+    from shizuverse.models import User, db, Service, ServiceCategory
+    from routes import all_blueprints, auth_bp
+    logger.info("Modules imported successfully")
+except ImportError as e:
+    logger.error(f"Import error: {e}")
+    return None

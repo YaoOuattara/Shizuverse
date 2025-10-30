@@ -2,6 +2,7 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from shizuverse.models import db
 
+
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
 
@@ -12,10 +13,16 @@ class User(UserMixin, db.Model):
     preferred_language = db.Column(db.String(10), default='fr')
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
 
-    services = db.relationship('Service', backref='provider_user', lazy=True)
-    appointments = db.relationship('Appointment', backref='client_user', foreign_keys='Appointment.client_id')
+    # ✅ Correct M2M to Service through the association table
+    services = db.relationship(
+        'Service',
+        secondary='service_providers',
+        backref=db.backref('providers', lazy='dynamic'),
+        lazy='dynamic',
+    )
 
-    # REMOVED: messages = db.relationship('ChatMessage', ...) ✅
+    # Appointments: explicit FK on the Appointment model
+    appointments = db.relationship('Appointment', backref='client_user', foreign_keys='Appointment.client_id')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
