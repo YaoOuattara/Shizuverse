@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 # ── Load .env locally (Render injects env vars) ────────────────────────────────
 if os.getenv("RENDER") is None:
-    load_dotenv()
-    logging.info("Loaded local .env file")
+load_dotenv()
+logging.info("Loaded local .env file")
 else:
     logging.info("Running on Render — skipping .env loading")
 
@@ -53,8 +53,6 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-
 def create_app():
     """Application factory that returns (app, socketio)."""
     app = Flask(__name__, template_folder="templates", static_folder="static")
