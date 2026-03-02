@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from flask_babel import _
 from shizuverse.models import ServiceProvider, Service, db
+
 provider_bp = Blueprint('provider', __name__)
 @provider_bp.route('/dashboard')
 @login_required

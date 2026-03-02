@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import login_required, current_user
 from flask_babel import _
-from models import Service, Appointment, ServiceProvider, Notification, db
+from shizuverse.models import Service, Appointment, ServiceProvider, Notification, db
 from datetime import datetime
 
 client_bp = Blueprint('client', __name__)

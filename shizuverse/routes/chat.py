@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from utils.chatbot import ChatBotService
-from models import ChatSession, ChatMessage, db
+from shizuverse.models import ChatSession, ChatMessage, db
 from datetime import datetime
 
 chat_bp = Blueprint('chat', __name__)
