@@ -2,6 +2,9 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from shizuverse.models import db
 
+# Import the association class so SQLAlchemy knows the secondary table exists
+from shizuverse.models.service_provider import ServiceProvider  # noqa: F401
+
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
 
@@ -12,10 +15,19 @@ class User(UserMixin, db.Model):
     preferred_language = db.Column(db.String(10), default='fr')
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
 
-    services = db.relationship('Service', backref='provider_user', lazy=True)
-    appointments = db.relationship('Appointment', backref='client_user', foreign_keys='Appointment.client_id')
+    # ✅ Proper many-to-many: User ↔ Service via service_providers
+    services = db.relationship(
+        'Service',
+        secondary='service_providers',  # table name provided by ServiceProvider.__tablename__
+        lazy='dynamic',
+        backref=db.backref('providers', lazy='dynamic')
+    )
 
-    # REMOVED: messages = db.relationship('ChatMessage', ...) ✅
+    appointments = db.relationship(
+        'Appointment',
+        backref='client_user',
+        foreign_keys='Appointment.client_id'
+    )
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -25,4 +37,3 @@ class User(UserMixin, db.Model):
 
     def __repr__(self):
         return f"<User {self.email}>"
-
