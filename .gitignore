@@ -5,3 +5,7 @@ __pycache__/
 .env
 .env
 .env
+
+# macOS
+.DS_Store
+shizuverse/.DS_Store

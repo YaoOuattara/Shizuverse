@@ -1,0 +1,42 @@
+
+
+services:
+  db:
+    image: postgres:15
+    container_name: shizu_db
+    environment:
+      POSTGRES_USER: shizu
+      POSTGRES_PASSWORD: shizu
+      POSTGRES_DB: shizuverse
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shizu -d shizuverse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build: .
+    container_name: shizu_backend
+    command: python -m shizuverse.app
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://shizu:shizu@db:5432/shizuverse
+      - SECRET_KEY=dev-secret-key
+      - PORT=8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    restart: unless-stopped
+
+volumes:
+  db_data:
+
