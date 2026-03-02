@@ -1,5 +1,4 @@
-from app import create_app
-
+from shizuverse.app import create_app
 def create_flask_app():
-    app, _ = create_app()
-    return app
+app, _ = create_app()
+return app
