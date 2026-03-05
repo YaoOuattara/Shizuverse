@@ -1,10 +1,10 @@
 from flask import Blueprint, request, jsonify
 from shizuverse.models import db, Service, ServiceSubcategory, ServiceCategory
+from .controller import appointments_payload
 
-services_bp = Blueprint("services_api", __name__)
+services_bp = Blueprint("services", __name__)
 
 def _svc_to_dict(s: Service):
-    # fetch names via relationships (avoid N+1 with join below)
     sub = s.subcategory
     cat = sub.category if sub else None
     return {
@@ -23,17 +23,17 @@ def _svc_to_dict(s: Service):
 def list_services():
     q = Service.query
 
-    # filter: featured=true|false
+    # featured=true|false
     feat = request.args.get("featured")
     if feat is not None:
-        val = feat.lower() in {"1","true","yes"}
+        val = feat.lower() in {"1", "true", "yes"}
         q = q.filter(Service.featured == val)
 
     # only active by default unless include_inactive=true
-    if request.args.get("include_inactive", "false").lower() not in {"1","true","yes"}:
+    if request.args.get("include_inactive", "false").lower() not in {"1", "true", "yes"}:
         q = q.filter(Service.is_active.is_(True))
 
-    # join to eager-load names
+    # eager-ish join for names & stable sort
     q = (
         q.join(ServiceSubcategory, Service.subcategory_id == ServiceSubcategory.id)
          .join(ServiceCategory, ServiceSubcategory.category_id == ServiceCategory.id)
@@ -42,4 +42,8 @@ def list_services():
 
     items = [_svc_to_dict(s) for s in q.all()]
     return jsonify({"count": len(items), "items": items})
+
+@services_bp.route("/appointments/", methods=["GET"])
+def list_appointments():
+    return jsonify(appointments_payload())
 
