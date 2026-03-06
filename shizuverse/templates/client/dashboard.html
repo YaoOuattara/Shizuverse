@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head><title>Client Dashboard</title></head>
+<body>
+<h1>Welcome, {{ current_user.email }}</h1>
+<h2>Upcoming Appointments</h2>
+{% if upcoming_appointments %}
+  <ul>
+  {% for apt in upcoming_appointments %}
+    <li>{{ apt.appointment_date }} - {{ apt.status }}</li>
+  {% endfor %}
+  </ul>
+{% else %}
+  <p>No upcoming appointments.</p>
+{% endif %}
+<a href="/client/appointments">View All Appointments</a> |
+<a href="/auth/logout">Logout</a>
+</body>
+</html>

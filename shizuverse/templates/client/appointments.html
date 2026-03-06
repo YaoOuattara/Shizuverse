@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head><title>My Appointments</title></head>
+<body>
+<h1>All Appointments</h1>
+{% if appointments %}
+  <ul>
+  {% for apt in appointments %}
+    <li>{{ apt.appointment_date }} - {{ apt.status }} - {{ apt.notes }}</li>
+  {% endfor %}
+  </ul>
+{% else %}
+  <p>No appointments found.</p>
+{% endif %}
+<a href="/client/dashboard">Back to Dashboard</a> |
+<a href="/auth/logout">Logout</a>
+</body>
+</html>
