@@ -1,1 +1,3 @@
-# Appointments package - blueprint defined in appointments.py
+from .appointments import appointments_bp
+
+__all__ = ["appointments_bp"]
