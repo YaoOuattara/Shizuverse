@@ -51,3 +51,4 @@ python-socketio==5.13.0
 zope.event==5.1.1
 zope.interface==7.2
 
+Flask-Limiter==3.5.0

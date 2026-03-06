@@ -29,6 +29,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from flask_socketio import SocketIO
 from flask_migrate import Migrate
 from flasgger import Swagger
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from shizuverse.models import db, User
 from shizuverse.models.service_models import Service, ServiceCategory, ServiceSubcategory
@@ -56,6 +58,9 @@ def create_app():
     Migrate(app, db)
     CORS(app)
     Babel(app)
+
+    limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
+    limiter.limit("10 per minute")(app.view_functions.get("auth.login", lambda: None))
 
     login_manager = LoginManager()
     login_manager.init_app(app)
