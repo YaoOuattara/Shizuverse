@@ -55,6 +55,7 @@ def status():
     if current_user.is_authenticated:
         return jsonify({
             'authenticated': True,
+            'id': current_user.id,
             'email': current_user.email,
             'user_type': current_user.user_type,
             'preferred_language': current_user.preferred_language
