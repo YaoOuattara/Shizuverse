@@ -1,0 +1,866 @@
+"use client";
+/**
+ * Admin Providers Page
+ * 
+ * Providers list with verification status management, status chips, and detail drawer.
+ * Uses centralized admin store.
+ */
+
+import { useState, useMemo } from "react";
+import AdminLayout from "./AdminLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Search,
+  Star,
+  Phone,
+  Mail,
+  MapPin,
+  CheckCircle2,
+  Pause,
+  Play,
+  User,
+  Loader2,
+  Banknote,
+  ShieldCheck,
+  ShieldX,
+  ShieldAlert,
+  Clock,
+  Shield,
+  Eye,
+  EyeOff,
+  FileText,
+  Camera,
+  Users,
+  XCircle,
+  AlertTriangle,
+} from "lucide-react";
+import { type AdminProvider, type VerificationStatus } from "@/data/adminStore";
+import { useAdminProviders, type ApiProvider } from "@/hooks/useAdminApi";
+import { adminApi } from "@/lib/api";
+import { formatMoney } from "@/lib/currency";
+import { useToast } from "@/hooks/use-toast";
+
+type VerificationFilterTab = 'all' | 'submitted' | 'approved' | 'rejected' | 'suspended';
+
+const verificationTabs: { value: VerificationFilterTab; label: string; icon: typeof Shield }[] = [
+  { value: 'all', label: 'All', icon: User },
+  { value: 'submitted', label: 'Submitted', icon: Clock },
+  { value: 'approved', label: 'Approved', icon: ShieldCheck },
+  { value: 'rejected', label: 'Rejected', icon: ShieldX },
+  { value: 'suspended', label: 'Suspended', icon: ShieldAlert },
+];
+
+const rejectionReasons = [
+  { value: 'incomplete_documents', label: 'Incomplete Documents' },
+  { value: 'invalid_id', label: 'Invalid ID Proof' },
+  { value: 'poor_quality_photos', label: 'Poor Quality Photos' },
+  { value: 'reference_issue', label: 'Reference Verification Failed' },
+  { value: 'policy_violation', label: 'Policy Violation' },
+  { value: 'other', label: 'Other Reason' },
+];
+
+const suspensionReasons = [
+  { value: 'customer_complaints', label: 'Multiple Customer Complaints' },
+  { value: 'policy_violation', label: 'Policy Violation' },
+  { value: 'quality_issues', label: 'Service Quality Issues' },
+  { value: 'fraud_suspected', label: 'Suspected Fraudulent Activity' },
+  { value: 'inactive', label: 'Extended Inactivity' },
+  { value: 'other', label: 'Other Reason' },
+];
+
+const getVerificationBadge = (status: VerificationStatus) => {
+  const styles: Record<VerificationStatus, string> = {
+    draft: "bg-muted text-muted-foreground",
+    submitted: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+    approved: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
+    rejected: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+    suspended: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+  };
+  const labels: Record<VerificationStatus, string> = {
+    draft: "Draft",
+    submitted: "Submitted",
+    approved: "Approved",
+    rejected: "Rejected",
+    suspended: "Suspended",
+  };
+  return (
+    <Badge className={styles[status]}>
+      {labels[status]}
+    </Badge>
+  );
+};
+
+export default function AdminProviders() {
+  const { toast } = useToast();
+  const { providers: apiProviders, loading: providersLoading } = useAdminProviders();
+  const providers = useMemo<AdminProvider[]>(
+    () =>
+      apiProviders.map((p: ApiProvider): AdminProvider => ({
+        id: String(p.id),
+        name: p.name,
+        email: p.email,
+        phone: "",
+        services: [],
+        serviceArea: p.address || "",
+        rating: 0,
+        reviewCount: 0,
+        status: "active",
+        joinedAt: p.created_at || "",
+        totalBookings: 0,
+        completedBookings: 0,
+        revenue: 0,
+        verificationStatus: p.verified ? "approved" : "submitted",
+        listed: p.verified,
+        hasIdProof: false,
+        hasWorkPhoto: false,
+        hasReference: false,
+      })),
+    [apiProviders]
+  );
+  
+  const [searchQuery, setSearchQuery] = useState("");
+  const [verificationFilter, setVerificationFilter] = useState<VerificationFilterTab>("all");
+  const [selectedProvider, setSelectedProvider] = useState<AdminProvider | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("incomplete_documents");
+  const [customRejectionNote, setCustomRejectionNote] = useState("");
+  
+  // Modal states
+  const [suspendModalOpen, setSuspendModalOpen] = useState(false);
+  const [suspensionReason, setSuspensionReason] = useState("customer_complaints");
+  const [suspensionNote, setSuspensionNote] = useState("");
+  const [unlistModalOpen, setUnlistModalOpen] = useState(false);
+  const [unlistReason, setUnlistReason] = useState("");
+
+  const tabCounts = useMemo(() => {
+    return {
+      all: providers.length,
+      submitted: providers.filter(p => p.verificationStatus === 'submitted').length,
+      approved: providers.filter(p => p.verificationStatus === 'approved').length,
+      rejected: providers.filter(p => p.verificationStatus === 'rejected').length,
+      suspended: providers.filter(p => p.verificationStatus === 'suspended').length,
+    };
+  }, [providers]);
+
+  const filteredProviders = useMemo(() => {
+    return providers.filter((provider) => {
+      const matchesSearch =
+        searchQuery === "" ||
+        provider.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        provider.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        provider.services.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      const matchesVerification = 
+        verificationFilter === "all" || 
+        provider.verificationStatus === verificationFilter;
+
+      return matchesSearch && matchesVerification;
+    });
+  }, [providers, searchQuery, verificationFilter]);
+
+  const handleToggleStatus = async (providerId: string, currentStatus: AdminProvider["status"]) => {
+    setIsUpdating(true);
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    const newStatus = currentStatus === "active" ? "paused" : "active";
+
+    if (selectedProvider?.id === providerId) {
+      setSelectedProvider(prev => prev ? { ...prev, status: newStatus } : null);
+    }
+
+    toast({
+      title: "Status Updated",
+      description: `Provider is now ${newStatus}.`,
+    });
+    setIsUpdating(false);
+  };
+
+  const handleApprove = async (providerId: string) => {
+    setIsUpdating(true);
+    try {
+      await adminApi.verifyProvider(Number(providerId));
+    } catch (err) {
+      console.error("Failed to verify provider:", err);
+    }
+
+    if (selectedProvider?.id === providerId) {
+      setSelectedProvider(prev => prev ? { 
+        ...prev, 
+        verificationStatus: 'approved',
+        listed: true,
+        reviewedAt: new Date().toISOString().split('T')[0],
+      } : null);
+    }
+
+    toast({
+      title: "Provider Approved",
+      description: "Provider has been approved and listed.",
+    });
+    setIsUpdating(false);
+  };
+
+  const handleReject = async (providerId: string) => {
+    setIsUpdating(true);
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    const fullReason = customRejectionNote
+      ? `${rejectionReasons.find(r => r.value === rejectionReason)?.label}: ${customRejectionNote}`
+      : rejectionReasons.find(r => r.value === rejectionReason)?.label || rejectionReason;
+
+    if (selectedProvider?.id === providerId) {
+      setSelectedProvider(prev => prev ? { 
+        ...prev, 
+        verificationStatus: 'rejected',
+        listed: false,
+        reviewedAt: new Date().toISOString().split('T')[0],
+        rejectionReason: fullReason,
+      } : null);
+    }
+
+    toast({
+      title: "Application Rejected",
+      description: "Provider application has been rejected.",
+      variant: "destructive",
+    });
+    setCustomRejectionNote("");
+    setIsUpdating(false);
+  };
+
+  const handleSuspend = async () => {
+    if (!selectedProvider) return;
+    
+    setIsUpdating(true);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    const fullReason = suspensionNote
+      ? `${suspensionReasons.find(r => r.value === suspensionReason)?.label}: ${suspensionNote}`
+      : suspensionReasons.find(r => r.value === suspensionReason)?.label || suspensionReason;
+
+    setSelectedProvider(prev => prev ? {
+      ...prev, 
+      verificationStatus: 'suspended',
+      listed: false,
+      reviewedAt: new Date().toISOString().split('T')[0],
+      rejectionReason: fullReason,
+    } : null);
+
+    toast({
+      title: "Provider Suspended",
+      description: `Provider has been suspended. Reason: ${fullReason}`,
+      variant: "destructive",
+    });
+    
+    setSuspendModalOpen(false);
+    setSuspensionNote("");
+    setIsUpdating(false);
+  };
+
+  const handleToggleListed = async (providerId: string, currentListed: boolean) => {
+    if (currentListed) {
+      setUnlistReason("");
+      setUnlistModalOpen(true);
+      return;
+    }
+    
+    setIsUpdating(true);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    if (selectedProvider?.id === providerId) {
+      setSelectedProvider(prev => prev ? { ...prev, listed: true } : null);
+    }
+
+    toast({
+      title: "Provider Listed",
+      description: "Provider is now visible to clients.",
+    });
+    setIsUpdating(false);
+  };
+
+  const handleUnlist = async () => {
+    if (!selectedProvider) return;
+    
+    setIsUpdating(true);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    setSelectedProvider(prev => prev ? { ...prev, listed: false } : null);
+
+    toast({
+      title: "Provider Unlisted",
+      description: unlistReason 
+        ? `Provider is now hidden from clients. Reason: ${unlistReason}`
+        : "Provider is now hidden from clients.",
+    });
+    
+    setUnlistModalOpen(false);
+    setUnlistReason("");
+    setIsUpdating(false);
+  };
+
+  const openSuspendModal = () => {
+    setSuspensionReason("customer_complaints");
+    setSuspensionNote("");
+    setSuspendModalOpen(true);
+  };
+
+  return (
+    <AdminLayout title="Providers">
+      <div className="space-y-4">
+        {/* Verification Status Tabs */}
+        <ScrollArea className="w-full">
+          <div className="flex gap-1 pb-2" data-testid="verification-tabs">
+            {verificationTabs.map(({ value, label, icon: Icon }) => (
+              <Button
+                key={value}
+                variant={verificationFilter === value ? "default" : "outline"}
+                size="sm"
+                onClick={() => setVerificationFilter(value)}
+                className="shrink-0"
+                data-testid={`tab-${value}`}
+              >
+                <Icon className="h-4 w-4 mr-1.5" />
+                {label}
+                {tabCounts[value] > 0 && (
+                  <span className="ml-1.5 text-xs bg-background/20 px-1.5 py-0.5 rounded-full">
+                    {tabCounts[value]}
+                  </span>
+                )}
+              </Button>
+            ))}
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
+
+        {/* Search */}
+        <Card>
+          <CardContent className="py-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search providers by name, email, or service..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-providers"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Providers List */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">
+              Providers ({filteredProviders.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {providersLoading ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin opacity-50" />
+                <p>Loading providers...</p>
+              </div>
+            ) : filteredProviders.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No providers found</p>
+              </div>
+            ) : (
+              <div className="divide-y" data-testid="providers-list">
+                {filteredProviders.map((provider) => (
+                  <button
+                    key={provider.id}
+                    className="w-full p-3 hover-elevate text-left"
+                    onClick={() => setSelectedProvider(provider)}
+                    data-testid={`provider-row-${provider.id}`}
+                  >
+                    <div className="space-y-2">
+                      {/* Name & Rating */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{provider.name}</p>
+                          <div className="flex items-center gap-0.5 text-sm">
+                            <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                            <span className="text-muted-foreground">{provider.rating || "-"}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Service Area */}
+                      <p className="text-xs text-muted-foreground">{provider.serviceArea}</p>
+                      
+                      {/* Status Chips Row */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Verification Status */}
+                        {getVerificationBadge(provider.verificationStatus)}
+                        
+                        {/* Listed Status (only for approved) */}
+                        {provider.verificationStatus === 'approved' && (
+                          <Badge 
+                            variant="outline"
+                            className={`text-xs ${provider.listed 
+                              ? "border-emerald-500/50 text-emerald-700 dark:text-emerald-400"
+                              : "border-muted"
+                            }`}
+                          >
+                            {provider.listed ? (
+                              <><Eye className="h-3 w-3 mr-1" /> Listed</>
+                            ) : (
+                              <><EyeOff className="h-3 w-3 mr-1" /> Unlisted</>
+                            )}
+                          </Badge>
+                        )}
+                        
+                        {/* Operational Status */}
+                        <Badge 
+                          className={`text-xs ${provider.status === "active" 
+                            ? "bg-emerald-100/50 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400"
+                            : "bg-amber-100/50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400"
+                          }`}
+                        >
+                          {provider.status === "active" ? "Active" : "Paused"}
+                        </Badge>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Provider Detail Sheet */}
+      <Sheet open={!!selectedProvider} onOpenChange={(open) => !open && setSelectedProvider(null)}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Provider Details</SheetTitle>
+            <SheetDescription>
+              ID: {selectedProvider?.id}
+            </SheetDescription>
+          </SheetHeader>
+
+          {selectedProvider && (
+            <div className="space-y-6 mt-6">
+              {/* Status Chips */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {getVerificationBadge(selectedProvider.verificationStatus)}
+                {selectedProvider.verificationStatus === 'approved' && (
+                  <Badge 
+                    variant="outline"
+                    className={selectedProvider.listed 
+                      ? "border-emerald-500 text-emerald-700 dark:text-emerald-400"
+                      : "border-muted"
+                    }
+                  >
+                    {selectedProvider.listed ? (
+                      <><Eye className="h-3 w-3 mr-1" /> Listed</>
+                    ) : (
+                      <><EyeOff className="h-3 w-3 mr-1" /> Unlisted</>
+                    )}
+                  </Badge>
+                )}
+                <Badge 
+                  className={selectedProvider.status === "active" 
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+                    : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                  }
+                >
+                  {selectedProvider.status === "active" ? "Active" : "Paused"}
+                </Badge>
+              </div>
+
+              {/* Rejection Reason (if applicable) */}
+              {selectedProvider.verificationStatus === 'rejected' && selectedProvider.rejectionReason && (
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                    Rejection Reason
+                  </h4>
+                  <p className="text-sm bg-red-50 dark:bg-red-950/30 p-3 rounded-md">
+                    {selectedProvider.rejectionReason}
+                  </p>
+                </div>
+              )}
+
+              {/* Verification Checklist */}
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm text-muted-foreground">Verification Documents</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    {selectedProvider.hasIdProof ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className={selectedProvider.hasIdProof ? "" : "text-muted-foreground"}>
+                      ID Proof
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    {selectedProvider.hasWorkPhoto ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <Camera className="h-4 w-4 text-muted-foreground" />
+                    <span className={selectedProvider.hasWorkPhoto ? "" : "text-muted-foreground"}>
+                      Work Photos
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    {selectedProvider.hasReference ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <span className={selectedProvider.hasReference ? "" : "text-muted-foreground"}>
+                      References
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Provider Info */}
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm text-muted-foreground">Contact</h4>
+                <div className="space-y-2">
+                  <p className="font-medium text-lg">{selectedProvider.name}</p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span>{selectedProvider.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <span>{selectedProvider.phone}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <span>{selectedProvider.serviceArea}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Services */}
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm text-muted-foreground">Services</h4>
+                <div className="flex flex-wrap gap-1">
+                  {selectedProvider.services.map((service) => (
+                    <Badge key={service} variant="secondary" className="text-xs">
+                      {service}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm text-muted-foreground">Performance</h4>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="text-center p-3 rounded-md bg-muted/50">
+                    <Star className="h-4 w-4 mx-auto mb-1 text-amber-500" />
+                    <p className="text-lg font-bold">{selectedProvider.rating || "-"}</p>
+                    <p className="text-xs text-muted-foreground">Rating</p>
+                  </div>
+                  <div className="text-center p-3 rounded-md bg-muted/50">
+                    <CheckCircle2 className="h-4 w-4 mx-auto mb-1 text-emerald-500" />
+                    <p className="text-lg font-bold">{selectedProvider.completedBookings}</p>
+                    <p className="text-xs text-muted-foreground">Completed</p>
+                  </div>
+                  <div className="text-center p-3 rounded-md bg-muted/50">
+                    <Banknote className="h-4 w-4 mx-auto mb-1 text-emerald-500" />
+                    <p className="text-lg font-bold">{formatMoney(selectedProvider.revenue)}</p>
+                    <p className="text-xs text-muted-foreground">Revenue</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Timestamps */}
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <p>Joined: {selectedProvider.joinedAt}</p>
+                {selectedProvider.submittedAt && (
+                  <p>Application submitted: {selectedProvider.submittedAt}</p>
+                )}
+                {selectedProvider.reviewedAt && (
+                  <p>Last reviewed: {selectedProvider.reviewedAt}</p>
+                )}
+              </div>
+
+              {/* Verification Actions */}
+              {selectedProvider.verificationStatus === 'submitted' && (
+                <div className="space-y-3 pt-4 border-t">
+                  <h4 className="font-medium text-sm text-muted-foreground">Review Application</h4>
+                  
+                  <Button
+                    className="w-full"
+                    onClick={() => handleApprove(selectedProvider.id)}
+                    disabled={isUpdating}
+                    data-testid="button-approve"
+                  >
+                    {isUpdating ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <ShieldCheck className="h-4 w-4 mr-2" />
+                    )}
+                    Approve Provider
+                  </Button>
+
+                  <div className="space-y-2">
+                    <Select value={rejectionReason} onValueChange={setRejectionReason}>
+                      <SelectTrigger data-testid="select-rejection-reason">
+                        <SelectValue placeholder="Rejection reason" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {rejectionReasons.map((reason) => (
+                          <SelectItem key={reason.value} value={reason.value}>
+                            {reason.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    
+                    <Textarea
+                      value={customRejectionNote}
+                      onChange={(e) => setCustomRejectionNote(e.target.value)}
+                      placeholder="Additional notes (optional)..."
+                      rows={2}
+                      data-testid="textarea-rejection-note"
+                    />
+                    
+                    <Button
+                      variant="destructive"
+                      className="w-full"
+                      onClick={() => handleReject(selectedProvider.id)}
+                      disabled={isUpdating}
+                      data-testid="button-reject"
+                    >
+                      {isUpdating ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <ShieldX className="h-4 w-4 mr-2" />
+                      )}
+                      Reject Application
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Approved Provider Actions */}
+              {selectedProvider.verificationStatus === 'approved' && (
+                <div className="space-y-3 pt-4 border-t">
+                  <h4 className="font-medium text-sm text-muted-foreground">Manage Provider</h4>
+                  
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => handleToggleListed(selectedProvider.id, selectedProvider.listed)}
+                    disabled={isUpdating}
+                    data-testid="button-toggle-listed"
+                  >
+                    {isUpdating ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : selectedProvider.listed ? (
+                      <EyeOff className="h-4 w-4 mr-2" />
+                    ) : (
+                      <Eye className="h-4 w-4 mr-2" />
+                    )}
+                    {selectedProvider.listed ? "Unlist Provider" : "List Provider"}
+                  </Button>
+
+                  <Button
+                    variant={selectedProvider.status === "active" ? "outline" : "default"}
+                    className="w-full"
+                    onClick={() => handleToggleStatus(selectedProvider.id, selectedProvider.status)}
+                    disabled={isUpdating}
+                    data-testid="button-toggle-status"
+                  >
+                    {isUpdating ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : selectedProvider.status === "active" ? (
+                      <Pause className="h-4 w-4 mr-2" />
+                    ) : (
+                      <Play className="h-4 w-4 mr-2" />
+                    )}
+                    {selectedProvider.status === "active" ? "Pause Operations" : "Resume Operations"}
+                  </Button>
+
+                  <Button
+                    variant="destructive"
+                    className="w-full"
+                    onClick={openSuspendModal}
+                    disabled={isUpdating}
+                    data-testid="button-suspend"
+                  >
+                    <ShieldAlert className="h-4 w-4 mr-2" />
+                    Suspend Provider
+                  </Button>
+                </div>
+              )}
+
+              {/* Rejected -> Can re-approve */}
+              {selectedProvider.verificationStatus === 'rejected' && (
+                <div className="space-y-3 pt-4 border-t">
+                  <h4 className="font-medium text-sm text-muted-foreground">Actions</h4>
+                  <Button
+                    className="w-full"
+                    onClick={() => handleApprove(selectedProvider.id)}
+                    disabled={isUpdating}
+                    data-testid="button-reapprove"
+                  >
+                    {isUpdating ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <ShieldCheck className="h-4 w-4 mr-2" />
+                    )}
+                    Approve Provider
+                  </Button>
+                </div>
+              )}
+
+              {/* Suspended -> Can reinstate */}
+              {selectedProvider.verificationStatus === 'suspended' && (
+                <div className="space-y-3 pt-4 border-t">
+                  <h4 className="font-medium text-sm text-muted-foreground">Actions</h4>
+                  <Button
+                    className="w-full"
+                    onClick={() => handleApprove(selectedProvider.id)}
+                    disabled={isUpdating}
+                    data-testid="button-reinstate"
+                  >
+                    {isUpdating ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <ShieldCheck className="h-4 w-4 mr-2" />
+                    )}
+                    Reinstate Provider
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Suspend Provider Modal */}
+      <Dialog open={suspendModalOpen} onOpenChange={setSuspendModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Suspend Provider</DialogTitle>
+            <DialogDescription>
+              This will suspend the provider and remove them from the marketplace. Please provide a reason.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Suspension Reason</Label>
+              <Select value={suspensionReason} onValueChange={setSuspensionReason}>
+                <SelectTrigger data-testid="select-suspension-reason">
+                  <SelectValue placeholder="Select reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  {suspensionReasons.map((reason) => (
+                    <SelectItem key={reason.value} value={reason.value}>
+                      {reason.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="suspension-note">Additional Notes (optional)</Label>
+              <Textarea
+                id="suspension-note"
+                value={suspensionNote}
+                onChange={(e) => setSuspensionNote(e.target.value)}
+                placeholder="Add details about the suspension..."
+                rows={3}
+                data-testid="textarea-suspension-note"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSuspendModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleSuspend}
+              disabled={isUpdating}
+              data-testid="button-confirm-suspend"
+            >
+              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Suspend Provider
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unlist Provider Modal */}
+      <Dialog open={unlistModalOpen} onOpenChange={setUnlistModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unlist Provider</DialogTitle>
+            <DialogDescription>
+              This will hide the provider from the marketplace. They will remain approved but not visible to clients.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="unlist-reason">Reason (optional)</Label>
+              <Textarea
+                id="unlist-reason"
+                value={unlistReason}
+                onChange={(e) => setUnlistReason(e.target.value)}
+                placeholder="Why are you unlisting this provider?"
+                rows={3}
+                data-testid="textarea-unlist-reason"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUnlistModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUnlist}
+              disabled={isUpdating}
+              data-testid="button-confirm-unlist"
+            >
+              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Unlist Provider
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </AdminLayout>
+  );
+}

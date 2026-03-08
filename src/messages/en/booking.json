@@ -1,0 +1,13 @@
+{
+  "title": "Book Service",
+  "name": "Name",
+  "phone": "Phone Number",
+  "location": "Location",
+  "date": "Preferred Date",
+  "notes": "Notes (Optional)",
+  "submit": "Book Now",
+  "serviceNotFound": "Service not found.",
+  "successTitle": "Booking Confirmed",
+  "successMessage": "Thank you for booking with us.",
+  "missingFields": "Please fill in all required fields."
+}

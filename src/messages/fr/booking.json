@@ -1,0 +1,11 @@
+{
+  "title": "Réserver un service",
+  "name": "Nom",
+  "phone": "Numéro de téléphone",
+  "location": "Lieu",
+  "date": "Date souhaitée",
+  "notes": "Remarques (optionnel)",
+  "submit": "Réserver maintenant",
+  "serviceNotFound": "Service introuvable."
+}
+
