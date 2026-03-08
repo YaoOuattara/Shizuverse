@@ -1,0 +1,101 @@
+
+=== 2026-03-08 Session 3 ===
+- Created Flask admin blueprint: shizuverse/api/admin.py
+  Endpoints: GET /api/admin/stats, /bookings, /providers, /services
+             PATCH /api/admin/bookings/<id>/status, /providers/<id>/verify
+- Fixed import bug: models/__init__.py db instance (not models/db.py)
+- Fixed blueprint registration: api/__init__.py (not shizuverse/__init__.py)
+- Deployed to Render staging - LIVE at https://shizu-verse.onrender.com/api/admin/
+- Created src/lib/api.ts - Flask API client
+- Created src/hooks/useAdminApi.ts - useAdminStats, useAdminBookings, useAdminProviders, useAdminServices
+- Wired AdminOverview KPI cards to real API (liveStats overlay on mockKpis)
+- Added green live banner to Overview showing real API data
+
+=== 2026-03-08 Session 4 ===
+- Wired AdminBookings.tsx to useAdminBookings() hook
+  - ApiBooking mapped to AdminBooking shape via useMemo (defaults: currency XOF, paymentStatus unpaid, etc.)
+  - handleUpdateStatus calls adminApi.updateBookingStatus() — real PATCH /api/admin/bookings/<id>/status
+  - Other mutations (cancel, reschedule, assign, notes) are local-state only (API endpoints pending)
+  - Kept useAdminStore for providers/reviews/services (needed by assign modal, quote engine, review display)
+  - Added loading spinner while fetching
+- Wired AdminProviders.tsx to useAdminProviders() hook
+  - ApiProvider mapped to AdminProvider shape via useMemo (verified: bool → verificationStatus approved/submitted)
+  - handleApprove calls adminApi.verifyProvider() — real PATCH /api/admin/providers/<id>/verify
+  - Other mutations (reject, suspend, list/unlist) are local-state only
+  - useAdminStore removed entirely from this file
+  - Added loading spinner while fetching
+- Wired AdminServices.tsx to useAdminServices() hook
+  - adaptApiService maps price→basePrice, duration→durationMins
+  - Services loaded into local useState via useEffect so add/edit/delete/toggle mutations keep working visually
+  - handleReset restores from latest API snapshot
+  - bookings still from useAdminStore for booking-count guard on delete
+  - Added loading spinner while fetching
+- All three files compile with zero TypeScript errors (pre-existing error in booking/[serviceId]/page.tsx is unrelated)
+
+NEXT: New chat - continue build plan:
+  Step 5: Fix pre-existing TS error in src/app/[locale]/booking/[serviceId]/page.tsx
+  Step 6: Build client booking pages (source in ~/Downloads/Booking-Display/client/src/)
+  Step 7: Build provider dashboard
+  Step 8: Real admin auth (replace localStorage shizu_admin_mode)
+
+=== 2026-03-08 Session 5 ===
+- Completed Step 5: Fixed TS1128 in src/app/[locale]/booking/[serviceId]/page.tsx
+  - Was raw JSX with bare `...` on line 3 and wrong import path @/src/actions/submitBooking
+  - Rewrote as proper async Next.js 15 page with params: Promise<{locale, serviceId}>
+- Completed Step 6: Ported client booking pages from ~/Downloads/Booking-Display/client/src/
+  Components updated (all already existed in target, updated with "use client" + useTranslations):
+  - src/components/BookingCard.tsx — added "use client", useTranslations("bookingCard")
+  - src/components/ReviewModal.tsx — added "use client", useTranslations("reviewModal")
+  - src/components/ProviderProfileModal.tsx — added "use client", useTranslations("providerProfileModal")
+  - src/components/BookingModal.tsx — added "use client", useTranslations("bookingModal")
+    Fixed Zod v4 breaking change: required_error → message on z.date()
+    Fixed PricingSuggestion shape: removed .mode/.suggestedPrice/.breakdown.basePrice/.breakdown.multipliers.*
+    Now uses .suggestedQuote/.suggestedMin/.suggestedMax/breakdown (BreakdownItem[])
+    Fixed react-hook-form resolver type variance: removed .default() from enum fields
+    Fixed implicit any on Calendar disabled callback
+  - src/app/[locale]/bookings/page.tsx — created from ClientDashboard.tsx
+    "use client", useTranslations("bookingsPage"), mock data kept with todo annotations
+  Translation keys added to src/messages/en.json and src/messages/fr.json:
+    bookingCard, reviewModal, providerProfileModal, bookingsPage, bookingModal namespaces
+  tsc --noEmit: 0 new errors (12 pre-existing errors in other files unchanged)
+
+NEXT:
+  Step 7: Provider dashboard ← completed below
+  Step 8: Real admin auth (replace localStorage shizu_admin_mode)
+
+=== 2026-03-08 Session 6 ===
+- Completed Step 7: Provider dashboard
+
+Flask backend:
+- Added provider_bp = Blueprint('provider', __name__) to shizuverse/api/admin.py
+  Endpoints: GET /api/provider/bookings?provider_id=<id>
+             PATCH /api/provider/bookings/<id>/status (confirmed/completed/cancelled)
+- Registered provider_bp in api/__init__.py at url_prefix="/provider"
+- Installed recharts via npm
+
+New files created in frontend:
+- src/data/mockProviderBookings.ts — ProviderBooking type + 8 mock bookings
+- src/lib/scheduleConflicts.ts — checkScheduleConflicts, formatConflictWarning
+- src/lib/achievementThresholds.ts — ACHIEVEMENT_THRESHOLDS constants
+- src/components/DateRangeFilter.tsx — "use client" + useTranslations("dateRangeFilter")
+- src/components/UpcomingSchedule.tsx — "use client" + useTranslations("upcomingSchedule")
+- src/components/RevenueBreakdown.tsx — "use client" + useTranslations("revenueBreakdown") + recharts
+- src/components/AchievementBadges.tsx — "use client" + useTranslations("achievementBadges")
+- src/hooks/useProviderApi.ts — useProviderBookings(), adaptApiBooking()
+
+Updated existing files:
+- src/components/ProviderBookingCard.tsx — added "use client" + useTranslations("providerBookingCard")
+- src/components/StatusTabs.tsx — added "use client" + useTranslations("statusTabs")
+- src/lib/api.ts — added providerApi.getBookings(), providerApi.updateBookingStatus()
+- src/app/[locale]/provider/page.tsx — full port from ProviderDashboard.tsx
+  wouter useLocation → useRouter from next/navigation
+  All mock data with localStorage persistence retained
+  todo annotation: replace with useProviderBookings() when auth context available
+- src/messages/en.json + fr.json — added 7 new namespaces:
+  providerBookingCard, statusTabs, upcomingSchedule, revenueBreakdown,
+  achievementBadges, dateRangeFilter, providerDashboard
+
+tsc --noEmit: 0 new errors (same 12 pre-existing errors in unrelated files)
+
+NEXT:
+  Step 8: Real admin auth (replace localStorage shizu_admin_mode)
