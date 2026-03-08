@@ -1,9 +1,8 @@
 from flask import Blueprint, jsonify, request
+from shizuverse.models import db, User
 from shizuverse.models.appointment import Appointment
 from shizuverse.models.service_provider import ServiceProvider
 from shizuverse.models.service_models import Service
-from shizuverse.models.user import User
-from shizuverse.models.db import db
 from datetime import datetime, timedelta
 
 admin_bp = Blueprint('admin', __name__)
