@@ -1,13 +1,51 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
+from functools import wraps
 from shizuverse.models import db, User
 from shizuverse.models.appointment import Appointment
 from shizuverse.models.service_provider import ServiceProvider
 from shizuverse.models.service_models import Service
 from datetime import datetime, timedelta
+import jwt
+import os
 
 admin_bp = Blueprint('admin', __name__)
 
+
+def require_admin_token(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Missing token'}), 401
+        token = auth_header[7:]
+        try:
+            jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Invalid token'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
+@admin_bp.route('/login', methods=['POST'])
+def admin_login():
+    data = request.get_json() or {}
+    password = data.get('password', '')
+    expected = os.environ.get('ADMIN_PASSWORD', 'admin')
+    if password != expected:
+        return jsonify({'error': 'Invalid password'}), 401
+    payload = {
+        'sub': 'admin',
+        'iat': datetime.utcnow(),
+        'exp': datetime.utcnow() + timedelta(hours=8),
+    }
+    token = jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm='HS256')
+    return jsonify({'token': token})
+
+
 @admin_bp.route('/bookings', methods=['GET'])
+@require_admin_token
 def get_bookings():
     status = request.args.get('status')
     query = Appointment.query
@@ -29,6 +67,7 @@ def get_bookings():
     return jsonify(result)
 
 @admin_bp.route('/bookings/<int:booking_id>/status', methods=['PATCH'])
+@require_admin_token
 def update_booking_status(booking_id):
     data = request.get_json()
     appointment = Appointment.query.get_or_404(booking_id)
@@ -37,6 +76,7 @@ def update_booking_status(booking_id):
     return jsonify({'success': True, 'status': appointment.status})
 
 @admin_bp.route('/providers', methods=['GET'])
+@require_admin_token
 def get_providers():
     status = request.args.get('status')
     providers = ServiceProvider.query.all()
@@ -58,6 +98,7 @@ def get_providers():
     return jsonify(result)
 
 @admin_bp.route('/providers/<int:provider_id>/verify', methods=['PATCH'])
+@require_admin_token
 def verify_provider(provider_id):
     sp = ServiceProvider.query.get_or_404(provider_id)
     sp.verified = True
@@ -65,6 +106,7 @@ def verify_provider(provider_id):
     return jsonify({'success': True})
 
 @admin_bp.route('/services', methods=['GET'])
+@require_admin_token
 def get_services():
     services = Service.query.all()
     result = []
@@ -120,6 +162,7 @@ def update_provider_booking_status(booking_id):
     return jsonify({'success': True, 'status': appointment.status})
 
 @admin_bp.route('/stats', methods=['GET'])
+@require_admin_token
 def get_stats():
     total = Appointment.query.count()
     pending = Appointment.query.filter_by(status='pending').count()
