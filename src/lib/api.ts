@@ -1,3 +1,5 @@
+import { getAdminToken } from "./adminAuth";
+
 const BASE_URL = process.env.NEXT_PUBLIC_FLASK_API_URL || "https://shizu-verse.onrender.com";
 
 async function apiFetch(path: string, options: RequestInit = {}) {
@@ -10,6 +12,17 @@ async function apiFetch(path: string, options: RequestInit = {}) {
   return res.json();
 }
 
+function adminFetch(path: string, options: RequestInit = {}) {
+  const token = getAdminToken();
+  return apiFetch(path, {
+    ...options,
+    headers: {
+      ...(options.headers as Record<string, string>),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+}
+
 export const providerApi = {
   getBookings: (providerId?: number) =>
     apiFetch(`/api/provider/bookings${providerId ? `?provider_id=${providerId}` : ""}`),
@@ -18,14 +31,16 @@ export const providerApi = {
 };
 
 export const adminApi = {
-  getStats: () => apiFetch("/api/admin/stats"),
-  getBookings: (status?: string) => apiFetch(`/api/admin/bookings${status ? `?status=${status}` : ""}`),
+  login: (password: string) =>
+    apiFetch("/api/admin/login", { method: "POST", body: JSON.stringify({ password }) }),
+  getStats: () => adminFetch("/api/admin/stats"),
+  getBookings: (status?: string) => adminFetch(`/api/admin/bookings${status ? `?status=${status}` : ""}`),
   updateBookingStatus: (id: number, status: string) =>
-    apiFetch(`/api/admin/bookings/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
-  getProviders: (status?: string) => apiFetch(`/api/admin/providers${status ? `?status=${status}` : ""}`),
+    adminFetch(`/api/admin/bookings/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  getProviders: (status?: string) => adminFetch(`/api/admin/providers${status ? `?status=${status}` : ""}`),
   verifyProvider: (id: number) =>
-    apiFetch(`/api/admin/providers/${id}/verify`, { method: "PATCH" }),
-  getServices: () => apiFetch("/api/admin/services"),
+    adminFetch(`/api/admin/providers/${id}/verify`, { method: "PATCH" }),
+  getServices: () => adminFetch("/api/admin/services"),
 };
 
 export default apiFetch;

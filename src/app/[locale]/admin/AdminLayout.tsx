@@ -1,19 +1,10 @@
 "use client";
-"use client";
-/**
- * Admin Layout Component
- * 
- * Main layout wrapper for admin pages with drawer navigation.
- * Mobile-first design with Exit Admin functionality.
- */
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useAdminMode } from "@/hooks/useAdminMode";
+import { usePathname, useRouter, useParams } from "next/navigation";
+import { isAdminAuthenticated, clearAdminToken } from "@/lib/adminAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetContent,
@@ -29,7 +20,6 @@ import {
   MessageSquare,
   Banknote,
   Shield,
-  ChevronLeft,
   Menu,
   LogOut,
 } from "lucide-react";
@@ -51,17 +41,26 @@ const navItems = [
 
 export default function AdminLayout({ children, title }: AdminLayoutProps) {
   const location = usePathname();
-  const { isAdminMode, exitAdmin } = useAdminMode();
   const router = useRouter();
+  const params = useParams();
+  const locale = params?.locale ?? "en";
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
-    if (!isAdminMode) {
-      router.push("/en/admin/access");
+    if (!isAdminAuthenticated()) {
+      router.push(`/${locale}/admin/login`);
+    } else {
+      setAuthenticated(true);
     }
-  }, [isAdminMode, router]);
+  }, [locale, router]);
 
-  if (!isAdminMode) return null;
+  if (!authenticated) return null;
+
+  const handleLogout = () => {
+    clearAdminToken();
+    router.push(`/${locale}/admin/login`);
+  };
 
   const NavContent = () => (
     <div className="flex flex-col h-full">
@@ -105,7 +104,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
           className="w-full justify-start gap-2 text-destructive hover:text-destructive"
           onClick={() => {
             setDrawerOpen(false);
-            exitAdmin();
+            handleLogout();
           }}
           data-testid="button-exit-admin"
         >

@@ -16,6 +16,16 @@
     "forgotPassword": "Mot de passe oublié ?",
     "adminLogin": "Connexion administrateur"
   },
+  "adminLogin": {
+    "title": "Connexion administrateur",
+    "description": "Entrez le mot de passe administrateur pour accéder au panneau.",
+    "passwordLabel": "Mot de passe",
+    "passwordPlaceholder": "Mot de passe admin",
+    "submit": "Se connecter",
+    "submitting": "Connexion...",
+    "errorInvalid": "Mot de passe invalide. Veuillez réessayer.",
+    "errorNetwork": "Erreur réseau. Veuillez réessayer."
+  },
   "booking": {
     "title": "Réserver un service",
     "selectDate": "Sélectionnez une date",

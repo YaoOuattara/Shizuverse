@@ -16,6 +16,16 @@
     "forgotPassword": "Forgot your password?",
     "adminLogin": "Admin Login"
   },
+  "adminLogin": {
+    "title": "Admin Login",
+    "description": "Enter the admin password to access the panel.",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Admin password",
+    "submit": "Login",
+    "submitting": "Logging in...",
+    "errorInvalid": "Invalid password. Please try again.",
+    "errorNetwork": "Network error. Please try again."
+  },
   "booking": {
     "title": "Book a Service",
     "selectDate": "Select a date",
