@@ -1,8 +1,10 @@
 // src/app/[locale]/service/[id]/page.tsx
 
 import { getTranslations } from 'next-intl/server';
-import { services } from '@/src/data/services'; // hypothetical service data
 import { Metadata } from 'next';
+
+// Placeholder until real service data source is wired
+const services: { id: string; name: string; description: string }[] = [];
 
 type Params = {
   params: {
