@@ -22,7 +22,7 @@ Currency: **CFA (XOF)**. Primary locale: **fr-CI**.
 
 ## Admin Panel
 URL: `localhost:3000/en/admin` (also `/fr/admin`)
-Auth: localStorage flag `shizu_admin_mode` (temporary — Step 8 replaces this with real auth)
+Auth: JWT token in localStorage (`shizu_admin_token`) — login at `/[locale]/admin/login`
 
 ### 6 sections
 | Section   | File                          | Status         |
@@ -81,9 +81,8 @@ Must use `useTranslations()` and support both locales.
 New section for providers to view their bookings, update availability, see earnings.
 Will need new Flask endpoints and a new hook file.
 
-### Step 8 — Real admin auth
-Replace localStorage `shizu_admin_mode` with session-based auth.
-Flask will need a `/api/admin/login` endpoint with JWT or session cookies.
+### Step 8 — Real admin auth ✅ Done
+JWT token auth. POST /api/admin/login (ADMIN_PASSWORD env var). @require_admin_token on all admin routes.
 
 ## Session Workflow
 - Always read CLAUDE.md at the start of each session
@@ -93,6 +92,27 @@ Flask will need a `/api/admin/login` endpoint with JWT or session cookies.
 - Prefer surgical edits over full rewrites — keep existing UI and just swap data sources
 - For client-facing pages: always use useTranslations() and never hardcode strings
 - Commit to git and push to staging branch after completing each major step
+
+## Rate Limit Optimization
+- Batch related tasks in one prompt — never ask for one file at a time
+- Always specify the full scope upfront: "do X, Y, Z then commit"
+- Prefer writing complete files over incremental edits when creating new pages
+- Run tsc --noEmit only ONCE after all files in a step are written, not after each file
+- Use background tasks (ctrl+b) for long bash commands like git add -A
+- When rate limit is near, finish current file, run tsc, commit, then stop cleanly
+- Priority order if interrupted mid-step: 1) save current file 2) run tsc 3) commit what works 4) note what's left in journal
+
+## Pre-built Prompts for Next Sessions
+When starting a new session, use exactly:
+"Read CLAUDE.md. Continue from journal.txt last entry. [specific task]."
+
+Remaining work after MVP:
+- Wire /bookings page to real client API (currently uses mock data)
+- Wire /provider page to real provider API (currently uses mock data)
+- Set ADMIN_PASSWORD env var on Render
+- Deploy frontend to Vercel or Render
+- Payment integration (Wave, Orange Money)
+- Push backend to git and deploy updated Flask with JWT auth
 
 ## Conventions
 - Components: PascalCase, `.tsx`
