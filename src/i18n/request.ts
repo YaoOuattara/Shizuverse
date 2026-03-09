@@ -11,14 +11,18 @@ export default getRequestConfig(async ({requestLocale}) => {
     : DEFAULT_LOCALE;
 
   const base = (await import(`../messages/${resolved}.json`)).default;
-  
-  let booking = {};
-  let services = {};
-  try { booking = (await import(`../messages/${resolved}/booking.json`)).default; } catch {}
-  try { services = (await import(`../messages/${resolved}/services.json`)).default; } catch {}
+
+  let bookingOverride = null;
+  let servicesOverride = null;
+  try { bookingOverride = (await import(`../messages/${resolved}/booking.json`)).default; } catch {}
+  try { servicesOverride = (await import(`../messages/${resolved}/services.json`)).default; } catch {}
 
   return {
     locale: resolved,
-    messages: { ...base, booking, services }
+    messages: {
+      ...base,
+      ...(bookingOverride ? { booking: bookingOverride } : {}),
+      ...(servicesOverride ? { services: servicesOverride } : {}),
+    }
   };
 });

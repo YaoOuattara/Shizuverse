@@ -6,6 +6,8 @@
   "date": "Date souhaitée",
   "notes": "Remarques (optionnel)",
   "submit": "Réserver maintenant",
-  "serviceNotFound": "Service introuvable."
+  "serviceNotFound": "Service introuvable.",
+  "successTitle": "Réservation confirmée !",
+  "successMessage": "Votre réservation a bien été soumise. Nous vous contacterons prochainement."
 }
 
