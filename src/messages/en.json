@@ -34,7 +34,9 @@
     "bookingHistory": "Booking History",
     "statusPending": "Pending",
     "statusConfirmed": "Confirmed",
-    "statusCompleted": "Completed"
+    "statusCompleted": "Completed",
+    "successTitle": "Booking Confirmed!",
+    "successMessage": "Your booking has been submitted successfully. We'll be in touch shortly."
   },
   "provider": {
     "dashboard": "Provider Dashboard",

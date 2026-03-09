@@ -34,7 +34,9 @@
     "bookingHistory": "Historique des réservations",
     "statusPending": "En attente",
     "statusConfirmed": "Confirmée",
-    "statusCompleted": "Terminée"
+    "statusCompleted": "Terminée",
+    "successTitle": "Réservation confirmée !",
+    "successMessage": "Votre réservation a bien été soumise. Nous vous contacterons prochainement."
   },
   "provider": {
     "dashboard": "Tableau de bord du fournisseur",
