@@ -4,11 +4,14 @@ const BASE_URL = process.env.NEXT_PUBLIC_FLASK_API_URL || "https://shizu-verse.o
 
 async function apiFetch(path: string, options: RequestInit = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {
-    credentials: "include",
     headers: { "Content-Type": "application/json", ...options.headers },
     ...options,
   });
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
+  if (!res.ok) {
+    let body = "";
+    try { body = await res.text(); } catch { /* ignore */ }
+    throw new Error(`API error ${res.status}: ${path} — ${body}`);
+  }
   return res.json();
 }
 

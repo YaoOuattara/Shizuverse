@@ -29,8 +29,10 @@ export default function AdminLoginPage() {
       setAdminToken(data.token);
       router.push(`/${locale}/admin`);
     } catch (err: unknown) {
-      const status = err instanceof Error && err.message.includes("401");
-      setError(status ? t("errorInvalid") : t("errorNetwork"));
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[AdminLogin] error:", msg);
+      const is401 = msg.includes("401");
+      setError(is401 ? t("errorInvalid") : `${t("errorNetwork")} (${msg})`);
     } finally {
       setSubmitting(false);
     }
