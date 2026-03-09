@@ -1,15 +1,12 @@
-// src/app/[locale]/booking/success/page.tsx
-
 import { getTranslations } from 'next-intl/server';
 
-type Params = {
-  params: {
-    locale: string;
-  };
-};
+interface Props {
+  params: Promise<{ locale: string }>;
+}
 
-export default async function BookingSuccessPage({ params }: Params) {
-  const t = await getTranslations({ locale: params.locale, namespace: 'booking' });
+export default async function BookingSuccessPage({ params }: Props) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'booking' });
 
   return (
     <main>

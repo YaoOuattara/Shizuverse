@@ -1,21 +1,15 @@
-// src/app/[locale]/service/[id]/page.tsx
-
 import { getTranslations } from 'next-intl/server';
 import { Metadata } from 'next';
 
 // Placeholder until real service data source is wired
 const services: { id: string; name: string; description: string }[] = [];
 
-type Params = {
-  params: {
-    locale: string;
-    id: string;
-  };
-};
+interface Props {
+  params: Promise<{ locale: string; id: string }>;
+}
 
-// 🧠 Metadata handler
-export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const { locale, id } = params;
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale, id } = await params;
   const t = await getTranslations({ locale, namespace: 'services' });
 
   const service = services.find((s) => s.id === id);
@@ -34,9 +28,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
-// 🌐 Page component
-export default async function ServicePage({ params }: Params) {
-  const { locale, id } = params;
+export default async function ServicePage({ params }: Props) {
+  const { locale, id } = await params;
   const t = await getTranslations({ locale, namespace: 'services' });
 
   const service = services.find((s) => s.id === id);
@@ -49,4 +42,3 @@ export default async function ServicePage({ params }: Params) {
     </main>
   );
 }
-
