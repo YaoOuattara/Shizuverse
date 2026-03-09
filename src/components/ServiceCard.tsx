@@ -1,9 +1,17 @@
-import { useTranslation } from "react-i18next";
+"use client";
+import { useTranslations } from "next-intl";
 
-const Home = () => {
-  const { t } = useTranslation();
+interface ServiceCardProps {
+  name: string;
+  description?: string;
+}
 
-  return <h1>{t("welcome")}</h1>;
-};
-
-export default Home;
+export default function ServiceCard({ name, description }: ServiceCardProps) {
+  const t = useTranslations("common");
+  return (
+    <div className="border rounded-lg p-4">
+      <h3 className="font-semibold">{name}</h3>
+      {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
+    </div>
+  );
+}

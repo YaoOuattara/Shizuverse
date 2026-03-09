@@ -1,10 +1,11 @@
+"use client";
 import { useTranslations, useLocale } from "next-intl";
 import { ServiceCard } from "./ServiceCard";
 import { services } from "@/data/services";
 
 export const ServiceList = () => {
   const t = useTranslations("services");
-  const locale = useLocale();
+  const locale = useLocale() as "en" | "fr";
 
   return (
     <div className="p-6">
@@ -23,4 +24,3 @@ export const ServiceList = () => {
     </div>
   );
 };
-

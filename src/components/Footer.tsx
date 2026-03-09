@@ -1,9 +1,11 @@
-import { useTranslation } from "react-i18next";
+"use client";
+import { useTranslations } from "next-intl";
 
-const Home = () => {
-  const { t } = useTranslation();
-
-  return <h1>{t("welcome")}</h1>;
-};
-
-export default Home;
+export default function Footer() {
+  const t = useTranslations("common");
+  return (
+    <footer className="border-t py-4 text-center text-sm text-muted-foreground">
+      {t("appName")} © {new Date().getFullYear()}
+    </footer>
+  );
+}
