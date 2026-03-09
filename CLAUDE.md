@@ -9,6 +9,7 @@ Currency: **CFA (XOF)**. Primary locale: **fr-CI**.
 - **Frontend**: Next.js 15 (App Router), TypeScript, Tailwind CSS, shadcn/ui, Zustand
 - **Backend**: Flask API deployed on Render
 - **Production API**: https://shizu-verse.onrender.com
+- **Frontend (Vercel)**: https://client-sigma-gilt.vercel.app
 - **Dev**: `npm run dev` → localhost:3000
 
 ## i18n — CRITICAL RULES
@@ -110,7 +111,7 @@ Remaining work after MVP:
 - Wire /bookings page to real client API (currently uses mock data)
 - Wire /provider page to real provider API (currently uses mock data)
 - Set ADMIN_PASSWORD env var on Render
-- Deploy frontend to Vercel or Render
+- Set NEXT_PUBLIC_FLASK_API_URL on Vercel dashboard (points to https://shizu-verse.onrender.com)
 - Payment integration (Wave, Orange Money)
 - Push backend to git and deploy updated Flask with JWT auth
 
