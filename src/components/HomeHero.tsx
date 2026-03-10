@@ -55,8 +55,28 @@ function BookingCardMockup() {
   );
 }
 
+const CONTENT = {
+  fr: {
+    headline: "Nous prenons le relais, vous respirez",
+    subtext:
+      "Trouvez des prestataires vérifiés pour le ménage, la plomberie, l'électricité et plus encore.",
+    cta1: "Réserver un service",
+    cta2: "Devenir prestataire",
+    trust: ["Prestataires vérifiés", "Paiement sécurisé", "Support 7j/7"],
+  },
+  en: {
+    headline: "We Take Over, So You Can Breathe",
+    subtext:
+      "Find verified professionals for cleaning, plumbing, electrical work and more.",
+    cta1: "Book a service",
+    cta2: "Become a provider",
+    trust: ["Verified providers", "Secure payment", "7-day support"],
+  },
+};
+
 export default function HomeHero() {
-  const locale = useLocale();
+  const locale = useLocale() as "en" | "fr";
+  const c = CONTENT[locale] ?? CONTENT.fr;
 
   return (
     <section
@@ -75,17 +95,13 @@ export default function HomeHero() {
             Abidjan · Côte d&apos;Ivoire
           </span>
 
-          {/* Headline */}
-          <h1 className="text-4xl md:text-5xl font-bold leading-tight">
-            Des services à domicile,{" "}
-            <span className="text-white/80">quand vous en avez besoin</span>
+          {/* Headline — fix 1: pure white, no span with reduced opacity */}
+          <h1 className="text-4xl md:text-5xl font-bold leading-tight text-white">
+            {c.headline}
           </h1>
 
           {/* Subtext */}
-          <p className="text-white/70 text-lg mt-4 max-w-lg">
-            Trouvez des prestataires vérifiés pour le ménage, la plomberie,
-            l&apos;électricité et plus encore.
-          </p>
+          <p className="text-white/70 text-lg mt-4 max-w-lg">{c.subtext}</p>
 
           {/* CTA buttons */}
           <div className="flex flex-wrap gap-4 mt-8">
@@ -93,19 +109,19 @@ export default function HomeHero() {
               href={`/${locale}/bookings`}
               className="bg-white text-[#0F3A7A] font-semibold px-6 py-3 rounded-xl hover:bg-gray-50 transition-colors"
             >
-              Réserver un service
+              {c.cta1}
             </Link>
             <Link
               href={`/${locale}/provider`}
               className="border border-white/40 text-white px-6 py-3 rounded-xl hover:bg-white/10 transition-colors"
             >
-              Devenir prestataire
+              {c.cta2}
             </Link>
           </div>
 
           {/* Trust row */}
           <div className="flex flex-wrap gap-4 mt-6 text-white/60 text-sm">
-            {["Prestataires vérifiés", "Paiement sécurisé", "Support 7j/7"].map((item) => (
+            {c.trust.map((item) => (
               <span key={item} className="flex items-center gap-1.5">
                 <CheckCircle className="h-3.5 w-3.5 text-white/50" />
                 {item}
@@ -114,8 +130,8 @@ export default function HomeHero() {
           </div>
         </div>
 
-        {/* Right column — booking card mockup */}
-        <div className="flex-[2] w-full">
+        {/* Right column — fix 2: hidden on mobile, centered */}
+        <div className="hidden md:flex flex-[2] w-full justify-center">
           <BookingCardMockup />
         </div>
       </div>

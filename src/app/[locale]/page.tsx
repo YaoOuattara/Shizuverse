@@ -1,19 +1,30 @@
 import Link from "next/link";
 import Image from "next/image";
+import {
+  Sparkles,
+  Wrench,
+  Zap,
+  Paintbrush,
+  Heart,
+  Dumbbell,
+  Shield,
+  Leaf,
+  type LucideIcon,
+} from "lucide-react";
 import Navbar from "@/components/Navbar";
 import HomeHero from "@/components/HomeHero";
 
 // ── Section 2: Services ────────────────────────────────────────────────────
 
-const SERVICES = [
-  { emoji: "🧹", name: "Ménage", desc: "Nettoyage professionnel" },
-  { emoji: "🔧", name: "Plomberie", desc: "Réparations & installations" },
-  { emoji: "⚡", name: "Électricité", desc: "Câblage & dépannage" },
-  { emoji: "🎨", name: "Peinture", desc: "Intérieur & extérieur" },
-  { emoji: "💆", name: "Bien-être", desc: "Massages & soins" },
-  { emoji: "🏋️", name: "Fitness", desc: "Coach à domicile" },
-  { emoji: "🛡️", name: "Sécurité", desc: "Installation & surveillance" },
-  { emoji: "🌿", name: "Jardinage", desc: "Entretien & aménagement" },
+const SERVICES: { Icon: LucideIcon; name: string; desc: string }[] = [
+  { Icon: Sparkles,   name: "Ménage",      desc: "Nettoyage professionnel" },
+  { Icon: Wrench,     name: "Plomberie",   desc: "Réparations & installations" },
+  { Icon: Zap,        name: "Électricité", desc: "Câblage & dépannage" },
+  { Icon: Paintbrush, name: "Peinture",    desc: "Intérieur & extérieur" },
+  { Icon: Heart,      name: "Bien-être",   desc: "Massages & soins" },
+  { Icon: Dumbbell,   name: "Fitness",     desc: "Coach à domicile" },
+  { Icon: Shield,     name: "Sécurité",    desc: "Installation & surveillance" },
+  { Icon: Leaf,       name: "Jardinage",   desc: "Entretien & aménagement" },
 ];
 
 function ServicesGrid({ locale }: { locale: string }) {
@@ -26,17 +37,17 @@ function ServicesGrid({ locale }: { locale: string }) {
         </p>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
-        {SERVICES.map((s) => (
+        {SERVICES.map(({ Icon, name, desc }) => (
           <Link
-            key={s.name}
+            key={name}
             href={`/${locale}/bookings`}
             className="bg-white rounded-2xl border border-gray-100 p-6 text-center hover:shadow-md hover:border-[#0F3A7A]/20 transition-all cursor-pointer group"
           >
-            <span className="text-4xl">{s.emoji}</span>
+            <Icon className="h-8 w-8 text-[#0F3A7A] mx-auto group-hover:scale-110 transition-transform" />
             <p className="font-semibold text-gray-800 mt-3 group-hover:text-[#0F3A7A] transition-colors">
-              {s.name}
+              {name}
             </p>
-            <p className="text-xs text-gray-400 mt-1">{s.desc}</p>
+            <p className="text-xs text-gray-400 mt-1">{desc}</p>
           </Link>
         ))}
       </div>
@@ -191,9 +202,9 @@ function Footer({ locale }: { locale: string }) {
           <Image
             src={locale === 'fr' ? '/FR Logo Shizu.PNG' : '/EN Logo Shizu.PNG'}
             alt="Shizu"
-            width={80}
-            height={80}
-            className="rounded-lg"
+            width={100}
+            height={100}
+            className="rounded-xl mb-2"
           />
         </div>
 
