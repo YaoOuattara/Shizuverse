@@ -10,6 +10,7 @@ Currency: **CFA (XOF)**. Primary locale: **fr-CI**.
 - **Backend**: Flask API deployed on Render
 - **Production API**: https://shizu-verse.onrender.com
 - **Frontend (Vercel)**: https://client-sigma-gilt.vercel.app
+- **Admin login**: https://client-sigma-gilt.vercel.app/en/admin/login
 - **Dev**: `npm run dev` → localhost:3000
 
 ## i18n — CRITICAL RULES
@@ -22,8 +23,9 @@ Currency: **CFA (XOF)**. Primary locale: **fr-CI**.
 - All client-facing pages must support both locales
 
 ## Admin Panel
-URL: `localhost:3000/en/admin` (also `/fr/admin`)
-Auth: JWT token in localStorage (`shizu_admin_token`) — login at `/[locale]/admin/login`
+- **Local**: `localhost:3000/en/admin` (also `/fr/admin`)
+- **Production**: https://client-sigma-gilt.vercel.app/en/admin/login
+- Auth: JWT token in localStorage (`shizu_admin_token`) — login at `/[locale]/admin/login`
 
 ### 6 sections
 | Section   | File                          | Status         |
@@ -111,9 +113,15 @@ Remaining work after MVP:
 - Wire /bookings page to real client API (currently uses mock data)
 - Wire /provider page to real provider API (currently uses mock data)
 - Set ADMIN_PASSWORD env var on Render
-- Set NEXT_PUBLIC_FLASK_API_URL on Vercel dashboard (points to https://shizu-verse.onrender.com)
+- ~~Set NEXT_PUBLIC_FLASK_API_URL on Vercel dashboard~~ ✅ Done
 - Payment integration (Wave, Orange Money)
 - Push backend to git and deploy updated Flask with JWT auth
+- Fix Tailwind purge / styling on production (pages look unstyled)
+
+## Known Issues
+- Pages look minimal/unstyled on production — suspect Tailwind purge config
+- Admin login on production needs testing with password YaAllahShizu@1
+- /bookings and /provider pages still use mock data
 
 ## Conventions
 - Components: PascalCase, `.tsx`
