@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import HomeHero from "@/components/HomeHero";
 
@@ -181,26 +182,20 @@ const FOOTER_LINKS = {
   Entreprise: ["À propos", "Presse", "Carrières", "Contact"],
 };
 
-function HummingbirdIconWhite() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 3C9 3 6.5 5 6 8c-1.5 0-3 1-3 2.5 0 1 .6 1.8 1.5 2.2L3 16h3l1-2.5c.5.3 1 .5 1.5.5h1L10 17h2l1.5-3.5C16 13 18 10.5 18 8c0-2.8-2.7-5-6-5z" fill="white" fillOpacity="0.9"/>
-      <path d="M9.5 8.5c0 .8-.7 1.5-1.5 1.5S6.5 9.3 6.5 8.5 7.2 7 8 7s1.5.7 1.5 1.5z" fill="#0F3A7A"/>
-      <path d="M18 8c0 0 2-1 4-1-1.5 1-2 2.5-2 2.5" stroke="white" strokeOpacity="0.7" strokeWidth="1.5" strokeLinecap="round"/>
-    </svg>
-  );
-}
-
 function Footer({ locale }: { locale: string }) {
   return (
     <footer className="bg-[#0F3A7A] text-white py-10 px-6">
       <div className="max-w-5xl mx-auto">
         {/* Logo row */}
-        <div className="flex items-center gap-2 mb-2">
-          <HummingbirdIconWhite />
-          <span className="font-bold tracking-widest text-lg">SHIZU</span>
+        <div className="mb-10">
+          <Image
+            src={locale === 'fr' ? '/FR Logo Shizu.PNG' : '/EN Logo Shizu.PNG'}
+            alt="Shizu"
+            width={80}
+            height={80}
+            className="rounded-lg"
+          />
         </div>
-        <p className="text-white/50 text-sm mb-10">Nous Prenons Le Relais</p>
 
         {/* Link columns */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-8 mb-10">
