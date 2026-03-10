@@ -23,8 +23,8 @@ function BookingCardMockup() {
             <CheckCircle className="h-4 w-4 text-[#0F3A7A] ml-auto" />
           </div>
           <div className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-gray-400">
-            <span className="text-lg">🔧</span>
-            <span className="text-sm">Plomberie</span>
+            <span className="text-lg">👶</span>
+            <span className="text-sm">Nounou & Baby-sitting</span>
           </div>
         </div>
       </div>

@@ -4,10 +4,10 @@ import {
   Sparkles,
   Wrench,
   Zap,
-  Paintbrush,
-  Heart,
-  Dumbbell,
-  Shield,
+  Hammer,
+  Baby,
+  Scissors,
+  ChefHat,
   Leaf,
   type LucideIcon,
 } from "lucide-react";
@@ -16,38 +16,42 @@ import HomeHero from "@/components/HomeHero";
 
 // ── Section 2: Services ────────────────────────────────────────────────────
 
-const SERVICES: { Icon: LucideIcon; name: string; desc: string }[] = [
-  { Icon: Sparkles,   name: "Ménage",      desc: "Nettoyage professionnel" },
-  { Icon: Wrench,     name: "Plomberie",   desc: "Réparations & installations" },
-  { Icon: Zap,        name: "Électricité", desc: "Câblage & dépannage" },
-  { Icon: Paintbrush, name: "Peinture",    desc: "Intérieur & extérieur" },
-  { Icon: Heart,      name: "Bien-être",   desc: "Massages & soins" },
-  { Icon: Dumbbell,   name: "Fitness",     desc: "Coach à domicile" },
-  { Icon: Shield,     name: "Sécurité",    desc: "Installation & surveillance" },
-  { Icon: Leaf,       name: "Jardinage",   desc: "Entretien & aménagement" },
-];
-
 function ServicesGrid({ locale }: { locale: string }) {
+  const SERVICES: { icon: LucideIcon; name: string; desc: string; slug: string }[] = [
+    { icon: Sparkles, name: locale === 'fr' ? 'Ménage & Nettoyage'       : 'Cleaning',           desc: locale === 'fr' ? 'Nettoyage régulier ou ponctuel'        : 'Regular or one-time cleaning',     slug: 'menage' },
+    { icon: Wrench,   name: locale === 'fr' ? 'Plomberie'                : 'Plumbing',           desc: locale === 'fr' ? 'Réparations & installations'           : 'Repairs & installations',          slug: 'plomberie' },
+    { icon: Zap,      name: locale === 'fr' ? 'Électricité'              : 'Electrical',         desc: locale === 'fr' ? 'Dépannage & câblage'                   : 'Troubleshooting & wiring',         slug: 'electricite' },
+    { icon: Hammer,   name: locale === 'fr' ? 'Bricolage & Réparations'  : 'Handyman',           desc: locale === 'fr' ? 'Petits travaux, montage, réparations'  : 'Small jobs, assembly, repairs',    slug: 'bricolage' },
+    { icon: Baby,     name: locale === 'fr' ? 'Nounou & Baby-sitting'    : 'Childcare',          desc: locale === 'fr' ? 'Garde ponctuelle ou régulière'         : 'Occasional or regular care',       slug: 'nounou' },
+    { icon: Scissors, name: locale === 'fr' ? 'Beauté à domicile'        : 'Beauty at Home',     desc: locale === 'fr' ? 'Coiffure, manucure, soins'             : 'Hair, nails, beauty care',         slug: 'beaute' },
+    { icon: ChefHat,  name: locale === 'fr' ? 'Traiteur & Cuisine'       : 'Catering & Cooking', desc: locale === 'fr' ? 'Événements, repas à domicile'          : 'Events, home-cooked meals',        slug: 'traiteur' },
+    { icon: Leaf,     name: locale === 'fr' ? 'Jardinage & Piscine'      : 'Garden & Pool',      desc: locale === 'fr' ? 'Entretien de jardin et piscine'        : 'Garden and pool maintenance',      slug: 'jardinage' },
+  ];
+
   return (
     <section className="bg-gray-50 py-16 px-6">
       <div className="max-w-5xl mx-auto text-center mb-10">
-        <h2 className="text-2xl font-bold text-gray-900">Nos Services</h2>
+        <h2 className="text-2xl font-bold text-gray-900">
+          {locale === 'fr' ? 'Nos Services' : 'Our Services'}
+        </h2>
         <p className="text-gray-500 mt-2">
-          Des professionnels qualifiés pour chaque besoin
+          {locale === 'fr'
+            ? 'Des professionnels qualifiés pour chaque besoin'
+            : 'Qualified professionals for every need'}
         </p>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
-        {SERVICES.map(({ Icon, name, desc }) => (
+        {SERVICES.map((s) => (
           <Link
-            key={name}
-            href={`/${locale}/bookings`}
+            key={s.slug}
+            href={`/${locale}/bookings?service=${s.slug}`}
             className="bg-white rounded-2xl border border-gray-100 p-6 text-center hover:shadow-md hover:border-[#0F3A7A]/20 transition-all cursor-pointer group"
           >
-            <Icon className="h-8 w-8 text-[#0F3A7A] mx-auto group-hover:scale-110 transition-transform" />
+            <s.icon className="h-8 w-8 text-[#0F3A7A] mx-auto group-hover:scale-110 transition-transform" />
             <p className="font-semibold text-gray-800 mt-3 group-hover:text-[#0F3A7A] transition-colors">
-              {name}
+              {s.name}
             </p>
-            <p className="text-xs text-gray-400 mt-1">{desc}</p>
+            <p className="text-xs text-gray-400 mt-1">{s.desc}</p>
           </Link>
         ))}
       </div>
@@ -57,35 +61,35 @@ function ServicesGrid({ locale }: { locale: string }) {
 
 // ── Section 3: How It Works ────────────────────────────────────────────────
 
-const STEPS = [
-  {
-    n: 1,
-    title: "Choisissez un service",
-    desc: "Parcourez notre catalogue de services professionnels.",
-  },
-  {
-    n: 2,
-    title: "Réservez en ligne",
-    desc: "Sélectionnez une date et un créneau qui vous convient.",
-  },
-  {
-    n: 3,
-    title: "Confirmez les détails",
-    desc: "Recevez une confirmation et les coordonnées du prestataire.",
-  },
-  {
-    n: 4,
-    title: "Le prestataire arrive",
-    desc: "Profitez d'un service de qualité à domicile.",
-  },
-];
+function HowItWorks({ locale }: { locale: string }) {
+  const STEPS = [
+    {
+      n: 1,
+      title: locale === 'fr' ? "Choisissez un service"    : "Choose a service",
+      desc:  locale === 'fr' ? "Parcourez notre catalogue de services professionnels." : "Browse our catalogue of professional services.",
+    },
+    {
+      n: 2,
+      title: locale === 'fr' ? "Réservez en ligne"        : "Book online",
+      desc:  locale === 'fr' ? "Sélectionnez une date et un créneau qui vous convient." : "Pick a date and time slot that works for you.",
+    },
+    {
+      n: 3,
+      title: locale === 'fr' ? "Confirmez les détails"    : "Confirm the details",
+      desc:  locale === 'fr' ? "Recevez une confirmation et les coordonnées du prestataire." : "Receive confirmation and your provider's contact info.",
+    },
+    {
+      n: 4,
+      title: locale === 'fr' ? "Le prestataire arrive"    : "Provider arrives",
+      desc:  locale === 'fr' ? "Profitez d'un service de qualité à domicile." : "Enjoy quality service at your doorstep.",
+    },
+  ];
 
-function HowItWorks() {
   return (
     <section className="bg-white py-16 px-6">
       <div className="max-w-5xl mx-auto">
         <h2 className="text-2xl font-bold text-gray-900 text-center mb-12">
-          Comment ça marche
+          {locale === 'fr' ? 'Comment ça marche' : 'How It Works'}
         </h2>
         <div className="flex flex-col md:flex-row items-start gap-8">
           {STEPS.map((step, i) => (
@@ -109,14 +113,14 @@ function HowItWorks() {
 
 // ── Section 4: Trust Stats ─────────────────────────────────────────────────
 
-const STATS = [
-  { value: "500+", label: "Réservations effectuées" },
-  { value: "120+", label: "Prestataires actifs" },
-  { value: "4.8★", label: "Note moyenne" },
-  { value: "3", label: "Communes desservies" },
-];
+function TrustStats({ locale }: { locale: string }) {
+  const STATS = [
+    { value: "500+", label: locale === 'fr' ? "Réservations effectuées" : "Bookings completed" },
+    { value: "120+", label: locale === 'fr' ? "Prestataires actifs"     : "Active providers" },
+    { value: "4.8★", label: locale === 'fr' ? "Note moyenne"            : "Average rating" },
+    { value: "3",    label: locale === 'fr' ? "Communes desservies"     : "Districts served" },
+  ];
 
-function TrustStats() {
   return (
     <section className="bg-[#0F3A7A] py-14 px-6">
       <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
@@ -138,32 +142,34 @@ function TrustStats() {
 
 // ── Section 5: Provider CTA ────────────────────────────────────────────────
 
-const PROVIDER_BENEFITS = [
-  { emoji: "📱", title: "Gérez vos réservations", desc: "Tableau de bord simple et intuitif" },
-  { emoji: "💰", title: "Suivez vos revenus", desc: "Historique et statistiques détaillés" },
-  { emoji: "⭐", title: "Construisez votre réputation", desc: "Avis clients et badges de confiance" },
-  { emoji: "📈", title: "Développez votre activité", desc: "Accédez à plus de clients chaque jour" },
-];
-
 function ProviderCTA({ locale }: { locale: string }) {
+  const PROVIDER_BENEFITS = [
+    { emoji: "📱", title: locale === 'fr' ? "Gérez vos réservations"       : "Manage your bookings",       desc: locale === 'fr' ? "Tableau de bord simple et intuitif"    : "Simple, intuitive dashboard" },
+    { emoji: "💰", title: locale === 'fr' ? "Suivez vos revenus"           : "Track your earnings",        desc: locale === 'fr' ? "Historique et statistiques détaillés"  : "Detailed history & statistics" },
+    { emoji: "⭐", title: locale === 'fr' ? "Construisez votre réputation" : "Build your reputation",      desc: locale === 'fr' ? "Avis clients et badges de confiance"   : "Client reviews & trust badges" },
+    { emoji: "📈", title: locale === 'fr' ? "Développez votre activité"   : "Grow your business",         desc: locale === 'fr' ? "Accédez à plus de clients chaque jour" : "Reach more clients every day" },
+  ];
+
   return (
     <section className="bg-gray-50 py-16 px-6">
       <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-12 items-center">
         {/* Left */}
         <div className="flex-1">
           <h2 className="text-2xl font-bold text-gray-900">
-            Vous êtes prestataire de services ?
+            {locale === 'fr'
+              ? "Vous êtes prestataire de services ?"
+              : "Are you a service provider?"}
           </h2>
           <p className="text-gray-500 mt-3 leading-relaxed">
-            Rejoignez le réseau Shizuverse et développez votre clientèle à
-            Abidjan. Gérez vos réservations, suivez vos revenus et construisez
-            votre réputation en ligne.
+            {locale === 'fr'
+              ? "Rejoignez le réseau Shizuverse et développez votre clientèle à Abidjan. Gérez vos réservations, suivez vos revenus et construisez votre réputation en ligne."
+              : "Join the Shizuverse network and grow your client base in Abidjan. Manage bookings, track your earnings, and build your online reputation."}
           </p>
           <Link
             href={`/${locale}/provider`}
             className="inline-block mt-6 bg-[#0F3A7A] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#0d3068] transition-colors"
           >
-            Rejoindre Shizu
+            {locale === 'fr' ? "Rejoindre Shizu" : "Join Shizu"}
           </Link>
         </div>
 
@@ -187,13 +193,18 @@ function ProviderCTA({ locale }: { locale: string }) {
 
 // ── Section 6: Footer ──────────────────────────────────────────────────────
 
-const FOOTER_LINKS = {
-  Services: ["Ménage", "Plomberie", "Électricité", "Peinture"],
-  Plateforme: ["Comment ça marche", "Tarifs", "Prestataires", "Avis clients"],
-  Entreprise: ["À propos", "Presse", "Carrières", "Contact"],
-};
-
 function Footer({ locale }: { locale: string }) {
+  const FOOTER_LINKS = locale === 'fr'
+    ? {
+        Services:   ['Ménage & Nettoyage', 'Nounou & Baby-sitting', 'Beauté à domicile', 'Bricolage & Réparations', 'Traiteur & Cuisine', 'Jardinage & Piscine'],
+        Plateforme: ['Comment ça marche', 'Tarifs', 'Prestataires', 'Avis clients'],
+        Entreprise: ['À propos', 'Presse', 'Carrières', 'Contact'],
+      }
+    : {
+        Services:  ['Cleaning', 'Childcare', 'Beauty at Home', 'Handyman', 'Catering & Cooking', 'Garden & Pool'],
+        Platform:  ['How It Works', 'Pricing', 'Providers', 'Reviews'],
+        Company:   ['About', 'Press', 'Careers', 'Contact'],
+      };
   return (
     <footer className="bg-[#0F3A7A] text-white py-10 px-6">
       <div className="max-w-5xl mx-auto">
@@ -216,7 +227,7 @@ function Footer({ locale }: { locale: string }) {
                 {category}
               </p>
               <ul className="space-y-2">
-                {links.map((link) => (
+                {(links as string[]).map((link) => (
                   <li key={link}>
                     <a href="#" className="text-white/70 text-sm hover:text-white transition-colors">
                       {link}
@@ -230,7 +241,7 @@ function Footer({ locale }: { locale: string }) {
 
         {/* Bottom bar */}
         <div className="border-t border-white/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/40">
-          <p>© 2025 Shizuverse. Tous droits réservés.</p>
+          <p>© 2025 Shizuverse. {locale === 'fr' ? 'Tous droits réservés.' : 'All rights reserved.'}</p>
           <div className="flex gap-4">
             <Link href="/en" className="hover:text-white transition-colors">EN</Link>
             <Link href="/fr" className="hover:text-white transition-colors">FR</Link>
@@ -255,8 +266,8 @@ export default async function HomePage({
       <Navbar />
       <HomeHero />
       <ServicesGrid locale={locale} />
-      <HowItWorks />
-      <TrustStats />
+      <HowItWorks locale={locale} />
+      <TrustStats locale={locale} />
       <ProviderCTA locale={locale} />
       <Footer locale={locale} />
     </>

@@ -1,18 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
-
-function HummingbirdIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 3C9 3 6.5 5 6 8c-1.5 0-3 1-3 2.5 0 1 .6 1.8 1.5 2.2L3 16h3l1-2.5c.5.3 1 .5 1.5.5h1L10 17h2l1.5-3.5C16 13 18 10.5 18 8c0-2.8-2.7-5-6-5z" fill="#0F3A7A"/>
-      <path d="M9.5 8.5c0 .8-.7 1.5-1.5 1.5S6.5 9.3 6.5 8.5 7.2 7 8 7s1.5.7 1.5 1.5z" fill="white"/>
-      <path d="M18 8c0 0 2-1 4-1-1.5 1-2 2.5-2 2.5" stroke="#0F3A7A" strokeWidth="1.5" strokeLinecap="round"/>
-    </svg>
-  );
-}
 
 export default function Navbar() {
   const locale = useLocale();
@@ -30,8 +21,16 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
         {/* Logo */}
         <Link href={`/${locale}`} className="flex items-center gap-2">
-          <HummingbirdIcon />
-          <span className="font-bold text-[#0F3A7A] tracking-widest text-lg">SHIZU</span>
+          <Image
+            src={locale === 'fr' ? '/FR Logo Shizu.PNG' : '/EN Logo Shizu.PNG'}
+            alt="Shizu"
+            width={44}
+            height={44}
+            className="rounded-lg"
+          />
+          <span className="font-bold text-[#0F3A7A] tracking-widest text-lg hidden sm:block">
+            SHIZU
+          </span>
         </Link>
 
         {/* Desktop nav links */}
