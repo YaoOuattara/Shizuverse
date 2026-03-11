@@ -19,3 +19,4 @@ pip install -r requirements.txt
 Make sure your `.env` file is correctly configured in the environment settings.
 
 You're now ready to deploy!
+# Session 8 complete
