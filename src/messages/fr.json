@@ -339,5 +339,36 @@
     "failedRejectDesc": "Impossible de refuser la réservation. Veuillez réessayer.",
     "failedRescheduleTitle": "Échec de la reprogrammation",
     "failedRescheduleDesc": "Impossible de reprogrammer la réservation. Veuillez réessayer."
+  },
+  "providerRegister": {
+    "title": "Rejoindre Shizuverse en tant que prestataire",
+    "subtitle": "Développez votre clientèle à Abidjan. Remplissez vos informations et nous vous contacterons sous 24h.",
+    "fullName": "Nom complet",
+    "fullNamePlaceholder": "Kouassi Amon",
+    "phone": "WhatsApp / Téléphone",
+    "phonePlaceholder": "+225 07 00 00 00",
+    "serviceType": "Type de service",
+    "serviceTypePlaceholder": "Choisissez un service",
+    "zone": "Zone de travail",
+    "zonePlaceholder": "Choisissez une zone",
+    "experience": "Années d'expérience",
+    "experiencePlaceholder": "3",
+    "optional": "optionnel",
+    "submit": "Soumettre ma candidature",
+    "submittedTitle": "Candidature reçue !",
+    "submittedDesc": "Merci pour votre intérêt. Notre équipe examinera votre profil et vous contactera sous 24h.",
+    "backHome": "Retour à l'accueil",
+    "alreadyProvider": "Déjà inscrit ?",
+    "loginLink": "Accéder à votre tableau de bord",
+    "services": {
+      "cleaning": "Nettoyage",
+      "plumbing": "Plomberie",
+      "electrical": "Électricité",
+      "painting": "Peinture",
+      "moving": "Déménagement",
+      "carpentry": "Menuiserie",
+      "gardening": "Jardinage",
+      "security": "Sécurité"
+    }
   }
 }
