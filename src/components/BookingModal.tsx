@@ -22,7 +22,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from "@/components/ui/form";
 import {
   Select,
@@ -31,23 +30,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { CalendarIcon, Clock, MapPin, Zap, Check, ChevronsUpDown, Banknote, Loader2, User, Phone } from "lucide-react";
+import { Clock, Zap, Banknote, Loader2, User, Phone } from "lucide-react";
 import { format, parse } from "date-fns";
-import { cn } from "@/lib/utils";
 import type { BookingCardProps } from "./BookingCard";
 import {
   ZONES_LIST,
@@ -149,9 +133,6 @@ export default function BookingModal({
   preSelectedProvider,
 }: BookingModalProps) {
   const [availableProviders, setAvailableProviders] = useState<string[]>([]);
-  const [zoneOpen, setZoneOpen]     = useState(false);
-  const [dateOpen, setDateOpen]     = useState(false);
-  const [zoneSearch, setZoneSearch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEditMode = mode === "edit";
@@ -210,7 +191,6 @@ export default function BookingModal({
         timePreference: booking.timePreference || "anytime",
         notes:          booking.notes || "",
       });
-      setZoneSearch(booking.zone || "");
 
     } else if (!isEditMode && open && preSelectedProvider) {
       const service = serviceTypeOptions.find((s) => s.value === preSelectedProvider.serviceType);
@@ -227,7 +207,6 @@ export default function BookingModal({
         timePreference: "anytime",
         notes:          "",
       });
-      setZoneSearch("");
 
     } else if (!isEditMode && open) {
       form.reset({
@@ -242,7 +221,6 @@ export default function BookingModal({
         notes:          "",
       });
       setAvailableProviders([]);
-      setZoneSearch("");
     }
   }, [booking, open, form, isEditMode, preSelectedProvider]);
 
@@ -328,7 +306,6 @@ export default function BookingModal({
         onSubmit(newBooking);
         form.reset();
         setAvailableProviders([]);
-        setZoneSearch("");
         onOpenChange(false);
 
       } catch {
@@ -362,7 +339,6 @@ export default function BookingModal({
     onSubmit(bookingData);
     form.reset();
     setAvailableProviders([]);
-    setZoneSearch("");
     onOpenChange(false);
   };
 
@@ -370,7 +346,6 @@ export default function BookingModal({
     if (!isOpen) {
       form.reset();
       setAvailableProviders([]);
-      setZoneSearch("");
     }
     onOpenChange(isOpen);
   };
@@ -469,26 +444,23 @@ export default function BookingModal({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>{t("serviceType")}</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || undefined}>
-                    <FormControl>
-                      <SelectTrigger data-testid={`${testIdPrefix}-select-service-type`}>
-                        <SelectValue placeholder={t("serviceTypePlaceholder")} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent position="popper" sideOffset={4} className="z-[9999]">
+                  <FormControl>
+                    <select
+                      value={field.value || ""}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      data-testid={`${testIdPrefix}-select-service-type`}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <option value="" disabled>{t("serviceTypePlaceholder")}</option>
                       {isEditMode
                         ? serviceTypeOptions.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.value}
-                            </SelectItem>
+                            <option key={opt.value} value={opt.value}>{opt.value}</option>
                           ))
-                        : ABIDJAN_SERVICES.map((svc) => (
-                            <SelectItem key={svc.slug} value={svc.label}>
-                              {svc.label}
-                            </SelectItem>
+                        : ABIDJAN_SERVICES.map((s) => (
+                            <option key={s.slug} value={s.label}>{s.label}</option>
                           ))}
-                    </SelectContent>
-                  </Select>
+                    </select>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -539,36 +511,20 @@ export default function BookingModal({
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>{t("dateField")}</FormLabel>
-                  <Popover open={dateOpen} onOpenChange={setDateOpen}>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                          data-testid={`${testIdPrefix}-button-date-picker`}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {field.value ? format(field.value, "PPP") : <span>{t("datePlaceholder")}</span>}
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 z-[9999]" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={(date) => {
-                          field.onChange(date);
-                          setDateOpen(false);
-                        }}
-                        disabled={!isEditMode ? (date: Date) => date < new Date() : undefined}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <FormControl>
+                    <input
+                      type="date"
+                      min={new Date().toISOString().split("T")[0]}
+                      value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val) field.onChange(new Date(val + "T00:00:00"));
+                        else field.onChange(undefined);
+                      }}
+                      data-testid={`${testIdPrefix}-button-date-picker`}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -606,87 +562,30 @@ export default function BookingModal({
               control={form.control}
               name="zone"
               render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>{t("zoneField")}</FormLabel>
-                  <Popover open={zoneOpen} onOpenChange={setZoneOpen}>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={zoneOpen}
-                          className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
-                          data-testid={`${testIdPrefix}-combobox-zone`}
-                        >
-                          <span className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4" />
-                            {field.value
-                              ? ZONES_LIST.find((z) => z.value === field.value)?.label || field.value
-                              : t("zonePlaceholder")}
-                          </span>
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0 z-[9999]" align="start">
-                      <Command>
-                        <CommandInput
-                          placeholder={t("zoneSearch")}
-                          value={zoneSearch}
-                          onValueChange={setZoneSearch}
-                          data-testid={`${testIdPrefix}-input-zone-search`}
-                        />
-                        <CommandList>
-                          <CommandEmpty>
-                            {zoneSearch.trim() ? (
-                              <div
-                                className="p-2 cursor-pointer hover-elevate rounded-md"
-                                onClick={() => {
-                                  field.onChange(zoneSearch.trim());
-                                  setZoneOpen(false);
-                                }}
-                                data-testid={`${testIdPrefix}-button-zone-custom`}
-                              >
-                                {t("zoneCustom", { zone: zoneSearch.trim() })}
-                              </div>
-                            ) : (
-                              "No zones found."
-                            )}
-                          </CommandEmpty>
-                          <CommandGroup>
-                            {ZONES_LIST.filter(
-                              (zone) =>
-                                zone.label.toLowerCase().includes(zoneSearch.toLowerCase()) ||
-                                zone.value.toLowerCase().includes(zoneSearch.toLowerCase())
-                            ).map((zone) => (
-                              <CommandItem
-                                key={zone.value}
-                                value={zone.value}
-                                onSelect={() => {
-                                  field.onChange(zone.value);
-                                  setZoneSearch(zone.label);
-                                  setZoneOpen(false);
-                                }}
-                                data-testid={`${testIdPrefix}-zone-option-${zone.value}`}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    field.value === zone.value ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                {zone.label}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                  <FormDescription className="text-xs text-muted-foreground">
-                    {t("zoneDesc")}
-                  </FormDescription>
+                <FormItem>
+                  <FormLabel>{locale === "fr" ? "Localisation (Zone)" : "Location (Zone)"}</FormLabel>
+                  <FormControl>
+                    <div>
+                      <input
+                        list="zones-list"
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        placeholder={locale === "fr" ? "Sélectionnez ou saisissez une zone" : "Select or type a zone"}
+                        data-testid={`${testIdPrefix}-combobox-zone`}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      />
+                      <datalist id="zones-list">
+                        {ZONES_LIST.map((zone) => (
+                          <option key={zone.value} value={zone.label} />
+                        ))}
+                      </datalist>
+                    </div>
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {locale === "fr"
+                      ? "Sélectionnez une zone d'Abidjan ou saisissez un lieu personnalisé"
+                      : "Select an Abidjan zone or type a custom location"}
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
