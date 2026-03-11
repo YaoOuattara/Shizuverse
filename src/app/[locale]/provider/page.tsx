@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -31,7 +31,6 @@ import StatusTabs from "@/components/StatusTabs";
 import UpcomingSchedule from "@/components/UpcomingSchedule";
 import { checkScheduleConflicts, formatConflictWarning } from "@/lib/scheduleConflicts";
 import {
-  mockProviderBookings,
   providerServiceNames,
   type ProviderBooking,
   type ProviderBookingStatus,
@@ -66,6 +65,8 @@ export default function ProviderDashboard() {
   const t = useTranslations("providerDashboard");
   const { toast } = useToast();
   const router = useRouter();
+  const params = useParams();
+  const locale = (params?.locale as string) ?? "fr";
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -73,7 +74,7 @@ export default function ProviderDashboard() {
   const [showStats, setShowStats] = useState(true);
   const [filters, setFilters] = useState<DashboardFilters>(defaultFilters);
   // todo: replace with useProviderBookings() hook when auth context provides providerId
-  const [bookings, setBookings] = useState<ProviderBooking[]>(mockProviderBookings);
+  const [bookings, setBookings] = useState<ProviderBooking[]>([]);
 
   // Hydrate state from localStorage after mount (SSR-safe)
   useEffect(() => {
@@ -389,7 +390,7 @@ export default function ProviderDashboard() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => router.push("/provider/profile")}
+                onClick={() => router.push(`/${locale}/provider/profile`)}
                 data-testid="button-view-my-profile"
               >
                 <User className="mr-2 h-4 w-4" />
