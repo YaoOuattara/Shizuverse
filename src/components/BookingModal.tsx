@@ -150,6 +150,7 @@ export default function BookingModal({
 }: BookingModalProps) {
   const [availableProviders, setAvailableProviders] = useState<string[]>([]);
   const [zoneOpen, setZoneOpen]     = useState(false);
+  const [dateOpen, setDateOpen]     = useState(false);
   const [zoneSearch, setZoneSearch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -245,17 +246,19 @@ export default function BookingModal({
     }
   }, [booking, open, form, isEditMode, preSelectedProvider]);
 
-  const handleServiceTypeChange = (value: string) => {
-    form.setValue("serviceType", value);
+  // Sync provider list when service type changes (edit mode) or reset to pending (create mode)
+  const watchedServiceTypeForEffect = form.watch("serviceType");
+  useEffect(() => {
+    if (!open) return;
     if (isEditMode) {
       form.setValue("providerName", "");
-      const service = serviceTypeOptions.find((s) => s.value === value);
+      const service = serviceTypeOptions.find((s) => s.value === watchedServiceTypeForEffect);
       setAvailableProviders(service?.providers || []);
     } else {
-      // Create mode: no provider selection needed
       form.setValue("providerName", "pending");
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedServiceTypeForEffect, isEditMode, open]);
 
   const handleFormSubmit = async (data: BookingFormValues) => {
     // ── CREATE mode: call real Flask API ─────────────────────────────────────
@@ -467,7 +470,7 @@ export default function BookingModal({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>{t("serviceType")}</FormLabel>
-                  <Select onValueChange={handleServiceTypeChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger data-testid={`${testIdPrefix}-select-service-type`}>
                         <SelectValue placeholder={t("serviceTypePlaceholder")} />
@@ -537,15 +540,17 @@ export default function BookingModal({
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>{t("dateField")}</FormLabel>
-                  <Popover>
+                  <Popover open={dateOpen} onOpenChange={setDateOpen}>
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
+                          type="button"
                           variant="outline"
                           className={cn(
                             "w-full justify-start text-left font-normal",
                             !field.value && "text-muted-foreground"
                           )}
+                          onClick={() => setDateOpen(true)}
                           data-testid={`${testIdPrefix}-button-date-picker`}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
@@ -558,6 +563,7 @@ export default function BookingModal({
                         mode="single"
                         selected={field.value}
                         onSelect={field.onChange}
+                        onDayClick={() => setDateOpen(false)}
                         disabled={!isEditMode ? (date: Date) => date < new Date() : undefined}
                         initialFocus
                       />
