@@ -400,10 +400,10 @@ export default function BookingModal({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
-        className="sm:max-w-[540px] max-h-[90vh] flex flex-col gap-0 p-0"
+        className="sm:max-w-[540px] max-h-[90vh] flex flex-col p-0"
         data-testid={`modal-${testIdPrefix}-booking`}
       >
-        <DialogHeader className="px-6 pt-6 pb-2">
+        <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
           <DialogTitle>{modalTitle}</DialogTitle>
           {modalDescription && (
             <DialogDescription>{modalDescription}</DialogDescription>
@@ -411,7 +411,7 @@ export default function BookingModal({
         </DialogHeader>
 
         <Form {...form}>
-          <div className="flex-1 overflow-y-auto px-6 pb-2">
+          <div className="overflow-y-auto flex-1 px-6">
             <form id="booking-form" onSubmit={form.handleSubmit(handleFormSubmit)}>
             <div className="space-y-4 py-2">
             {/* ── Client info — create mode only ───────────────────────── */}
@@ -475,7 +475,7 @@ export default function BookingModal({
                         <SelectValue placeholder={t("serviceTypePlaceholder")} />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent position="popper" className="z-[200]">
+                    <SelectContent position="popper" sideOffset={4} className="z-[9999]">
                       {isEditMode
                         ? serviceTypeOptions.map((opt) => (
                             <SelectItem key={opt.value} value={opt.value}>
@@ -518,7 +518,7 @@ export default function BookingModal({
                           />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent position="popper" className="z-[200]">
+                      <SelectContent position="popper" className="z-[9999]">
                         {availableProviders.map((provider) => (
                           <SelectItem key={provider} value={provider}>
                             {provider}
@@ -556,7 +556,7 @@ export default function BookingModal({
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 z-[200]" align="start">
+                    <PopoverContent className="w-auto p-0 z-[9999]" align="start">
                       <Calendar
                         mode="single"
                         selected={field.value}
@@ -588,7 +588,7 @@ export default function BookingModal({
                         <SelectValue placeholder={t("timePlaceholder")} />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent position="popper" className="z-[200]">
+                    <SelectContent position="popper" className="z-[9999]">
                       {timeSlots.map((time) => (
                         <SelectItem key={time} value={time}>
                           {time}
@@ -629,7 +629,7 @@ export default function BookingModal({
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
-                    <PopoverContent className="w-full p-0 z-[200]" align="start">
+                    <PopoverContent className="w-full p-0 z-[9999]" align="start">
                       <Command>
                         <CommandInput
                           placeholder={t("zoneSearch")}
@@ -709,7 +709,7 @@ export default function BookingModal({
                           <SelectValue placeholder="Normal" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent position="popper" className="z-[200]">
+                      <SelectContent position="popper" className="z-[9999]">
                         {URGENCY_OPTIONS.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value}>
                             {opt.label}
@@ -737,7 +737,7 @@ export default function BookingModal({
                           <SelectValue placeholder="Anytime" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent position="popper" className="z-[200]">
+                      <SelectContent position="popper" className="z-[9999]">
                         {TIME_PREFERENCE_OPTIONS.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value}>
                             {opt.label}
@@ -820,7 +820,7 @@ export default function BookingModal({
           </div>
         </Form>
 
-        <DialogFooter className="px-6 py-4 border-t gap-2 sm:gap-0">
+        <DialogFooter className="px-6 py-4 border-t shrink-0 gap-2 sm:gap-0">
           <Button
             type="button"
             variant="outline"
