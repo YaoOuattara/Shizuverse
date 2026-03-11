@@ -45,7 +45,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Clock, MapPin, Zap, Check, ChevronsUpDown, Banknote } from "lucide-react";
+import { CalendarIcon, Clock, MapPin, Zap, Check, ChevronsUpDown, Banknote, Loader2, User, Phone } from "lucide-react";
 import { format, parse } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { BookingCardProps } from "./BookingCard";
@@ -59,68 +59,65 @@ import {
 } from "@/utils/pricingEngine";
 import { useAdminStore } from "@/data/adminStore";
 import { formatMoney } from "@/lib/currency";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+
+const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL || "https://shizu-verse.onrender.com";
+
+const SLUG_TO_CATEGORY: Record<string, string> = {
+  menage:     "MENAGE ET NETTOYAGE",
+  plomberie:  "BRICOLAGE ET PETITS TRAVAUX",
+  electricite:"BRICOLAGE ET PETITS TRAVAUX",
+  bricolage:  "BRICOLAGE ET PETITS TRAVAUX",
+  nounou:     "GARDE D'ENFANTS ET SOUTIEN SCOLAIRE",
+  beaute:     "BIEN-ETRE ET BEAUTE",
+  traiteur:   "FETES ET EVENEMENTS",
+  jardinage:  "JARDINAGE ET PISCINE",
+};
+
+// Keep legacy options for edit mode (existing mock bookings use these)
+const serviceTypeOptions = [
+  { value: "Wellness",   providers: ["Sarah Johnson"] },
+  { value: "Beauty",     providers: ["Michael Chen", "Lisa Park"] },
+  { value: "Healthcare", providers: ["Dr. Emily Wilson"] },
+  { value: "Fitness",    providers: ["Alex Rodriguez", "Maya Patel"] },
+];
+
+const serviceNames: Record<string, string> = {
+  Wellness:   "Massage Session",
+  Beauty:     "Beauty Treatment",
+  Healthcare: "Medical Consultation",
+  Fitness:    "Training Session",
+};
+
+const providerIdMap: Record<string, string> = {
+  "Sarah Johnson":    "provider-1",
+  "Michael Chen":     "provider-2",
+  "Dr. Emily Wilson": "provider-3",
+  "Alex Rodriguez":   "provider-4",
+  "Lisa Park":        "provider-5",
+  "Maya Patel":       "provider-6",
+};
+
+const timeSlots = [
+  "9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM",
+  "12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM",
+  "3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM",
+];
 
 const bookingFormSchema = z.object({
-  serviceType: z.string().min(1, "Service type is required"),
-  providerName: z.string().min(1, "Provider is required"),
-  date: z.date({ message: "Date is required" }),
-  time: z.string().min(1, "Time is required"),
-  zone: z.string().min(1, "Location is required"),
-  urgency: z.enum(['normal', 'under_24h', 'same_day']),
-  timePreference: z.enum(['anytime', 'morning', 'afternoon', 'evening']),
-  notes: z.string().optional(),
+  client_name:    z.string().optional(),
+  client_phone:   z.string().optional(),
+  serviceType:    z.string().min(1, "Service type is required"),
+  providerName:   z.string().min(1, "Provider is required"),
+  date:           z.date({ message: "Date is required" }),
+  time:           z.string().min(1, "Time is required"),
+  zone:           z.string().min(1, "Location is required"),
+  urgency:        z.enum(["normal", "under_24h", "same_day"]),
+  timePreference: z.enum(["anytime", "morning", "afternoon", "evening"]),
+  notes:          z.string().optional(),
 });
 
 type BookingFormValues = z.infer<typeof bookingFormSchema>;
-
-// todo: remove mock functionality - these will come from API
-const serviceTypeOptions = [
-  { value: "Wellness", providers: ["Sarah Johnson"] },
-  { value: "Beauty", providers: ["Michael Chen", "Lisa Park"] },
-  { value: "Healthcare", providers: ["Dr. Emily Wilson"] },
-  { value: "Fitness", providers: ["Alex Rodriguez", "Maya Patel"] },
-];
-
-const timeSlots = [
-  "9:00 AM",
-  "9:30 AM",
-  "10:00 AM",
-  "10:30 AM",
-  "11:00 AM",
-  "11:30 AM",
-  "12:00 PM",
-  "12:30 PM",
-  "1:00 PM",
-  "1:30 PM",
-  "2:00 PM",
-  "2:30 PM",
-  "3:00 PM",
-  "3:30 PM",
-  "4:00 PM",
-  "4:30 PM",
-  "5:00 PM",
-  "5:30 PM",
-  "6:00 PM",
-];
-
-// Map service types to service names
-const serviceNames: Record<string, string> = {
-  Wellness: "Massage Session",
-  Beauty: "Beauty Treatment",
-  Healthcare: "Medical Consultation",
-  Fitness: "Training Session",
-};
-
-// Map provider names to provider IDs - todo: remove mock functionality
-const providerIdMap: Record<string, string> = {
-  "Sarah Johnson": "provider-1",
-  "Michael Chen": "provider-2",
-  "Dr. Emily Wilson": "provider-3",
-  "Alex Rodriguez": "provider-4",
-  "Lisa Park": "provider-5",
-  "Maya Patel": "provider-6",
-};
 
 export interface BookingWithNotes extends BookingCardProps {
   notes?: string;
@@ -152,36 +149,47 @@ export default function BookingModal({
   preSelectedProvider,
 }: BookingModalProps) {
   const [availableProviders, setAvailableProviders] = useState<string[]>([]);
-  const [zoneOpen, setZoneOpen] = useState(false);
+  const [zoneOpen, setZoneOpen]     = useState(false);
   const [zoneSearch, setZoneSearch] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEditMode = mode === "edit";
   const { services } = useAdminStore();
-  const t = useTranslations("bookingModal");
+  const t      = useTranslations("bookingModal");
+  const locale = useLocale() as "en" | "fr";
+
+  const ABIDJAN_SERVICES = [
+    { label: locale === "fr" ? "Ménage & Nettoyage"     : "Cleaning",           slug: "menage" },
+    { label: locale === "fr" ? "Plomberie"              : "Plumbing",           slug: "plomberie" },
+    { label: locale === "fr" ? "Électricité"            : "Electrical",         slug: "electricite" },
+    { label: locale === "fr" ? "Bricolage & Réparations": "Handyman",           slug: "bricolage" },
+    { label: locale === "fr" ? "Nounou & Baby-sitting"  : "Childcare",          slug: "nounou" },
+    { label: locale === "fr" ? "Beauté à domicile"      : "Beauty at Home",     slug: "beaute" },
+    { label: locale === "fr" ? "Traiteur & Cuisine"     : "Catering",           slug: "traiteur" },
+    { label: locale === "fr" ? "Jardinage & Piscine"    : "Garden & Pool",      slug: "jardinage" },
+  ];
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
     defaultValues: {
-      serviceType: "",
-      providerName: "",
-      time: "",
-      zone: "",
-      urgency: "normal",
+      client_name:    "",
+      client_phone:   "",
+      serviceType:    "",
+      providerName:   isEditMode ? "" : "pending",
+      time:           "",
+      zone:           "",
+      urgency:        "normal",
       timePreference: "anytime",
-      notes: "",
+      notes:          "",
     },
   });
 
-  // Initialize form when booking changes (for edit mode) or when pre-selected provider is set
+  // Initialize form on open
   useEffect(() => {
     if (isEditMode && booking && open) {
-      // Set available providers for the service type
-      const service = serviceTypeOptions.find(
-        (s) => s.value === booking.serviceType
-      );
+      const service = serviceTypeOptions.find((s) => s.value === booking.serviceType);
       setAvailableProviders(service?.providers || []);
 
-      // Parse the date string to a Date object
       let parsedDate: Date;
       try {
         parsedDate = parse(booking.date, "MMM d, yyyy", new Date());
@@ -190,43 +198,47 @@ export default function BookingModal({
       }
 
       form.reset({
-        serviceType: booking.serviceType,
-        providerName: booking.providerName,
-        date: parsedDate,
-        time: booking.time,
-        zone: booking.zone || "",
-        urgency: booking.urgency || "normal",
+        client_name:    "",
+        client_phone:   "",
+        serviceType:    booking.serviceType,
+        providerName:   booking.providerName,
+        date:           parsedDate,
+        time:           booking.time,
+        zone:           booking.zone || "",
+        urgency:        booking.urgency || "normal",
         timePreference: booking.timePreference || "anytime",
-        notes: booking.notes || "",
+        notes:          booking.notes || "",
       });
       setZoneSearch(booking.zone || "");
+
     } else if (!isEditMode && open && preSelectedProvider) {
-      // Pre-fill form with selected provider from profile
-      const service = serviceTypeOptions.find(
-        (s) => s.value === preSelectedProvider.serviceType
-      );
+      const service = serviceTypeOptions.find((s) => s.value === preSelectedProvider.serviceType);
       setAvailableProviders(service?.providers || []);
 
       form.reset({
-        serviceType: preSelectedProvider.serviceType,
-        providerName: preSelectedProvider.name,
-        time: "",
-        zone: "",
-        urgency: "normal",
+        client_name:    "",
+        client_phone:   "",
+        serviceType:    preSelectedProvider.serviceType,
+        providerName:   "pending",
+        time:           "",
+        zone:           "",
+        urgency:        "normal",
         timePreference: "anytime",
-        notes: "",
+        notes:          "",
       });
       setZoneSearch("");
+
     } else if (!isEditMode && open) {
-      // Reset form for create mode without pre-selection
       form.reset({
-        serviceType: "",
-        providerName: "",
-        time: "",
-        zone: "",
-        urgency: "normal",
+        client_name:    "",
+        client_phone:   "",
+        serviceType:    "",
+        providerName:   "pending",
+        time:           "",
+        zone:           "",
+        urgency:        "normal",
         timePreference: "anytime",
-        notes: "",
+        notes:          "",
       });
       setAvailableProviders([]);
       setZoneSearch("");
@@ -235,25 +247,113 @@ export default function BookingModal({
 
   const handleServiceTypeChange = (value: string) => {
     form.setValue("serviceType", value);
-    form.setValue("providerName", "");
-    const service = serviceTypeOptions.find((s) => s.value === value);
-    setAvailableProviders(service?.providers || []);
+    if (isEditMode) {
+      form.setValue("providerName", "");
+      const service = serviceTypeOptions.find((s) => s.value === value);
+      setAvailableProviders(service?.providers || []);
+    } else {
+      // Create mode: no provider selection needed
+      form.setValue("providerName", "pending");
+    }
   };
 
-  const handleFormSubmit = (data: BookingFormValues) => {
+  const handleFormSubmit = async (data: BookingFormValues) => {
+    // ── CREATE mode: call real Flask API ─────────────────────────────────────
+    if (!isEditMode) {
+      // Manual validation for client fields (optional in schema, required in create UI)
+      if (!data.client_name || data.client_name.trim().length < 2) {
+        form.setError("client_name", { message: locale === "fr" ? "Nom requis (2 caractères minimum)" : "Name required (min. 2 characters)" });
+        return;
+      }
+      if (!data.client_phone || data.client_phone.trim().length < 8) {
+        form.setError("client_phone", { message: locale === "fr" ? "Numéro requis (8 chiffres minimum)" : "Phone required (min. 8 digits)" });
+        return;
+      }
+
+      // Combine date + time → ISO 8601
+      const dateObj = new Date(data.date);
+      const [timePart, meridiem] = data.time.split(" ");
+      let [hours, minutes] = timePart.split(":").map(Number);
+      if (meridiem === "PM" && hours !== 12) hours += 12;
+      if (meridiem === "AM" && hours === 12) hours = 0;
+      dateObj.setHours(hours, minutes, 0, 0);
+
+      const selectedService = ABIDJAN_SERVICES.find((s) => s.label === data.serviceType);
+      const slug = selectedService?.slug || "menage";
+
+      setIsSubmitting(true);
+      try {
+        const response = await fetch(`${FLASK_API}/api/bookings/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            client_name:      data.client_name.trim(),
+            client_phone:     data.client_phone.trim(),
+            client_location:  data.zone,
+            service_name:     data.serviceType,
+            service_slug:     slug,
+            appointment_date: dateObj.toISOString(),
+            notes:            data.notes || "",
+          }),
+        });
+
+        if (!response.ok) throw new Error("Booking failed");
+
+        const apiBooking = await response.json();
+
+        // Store phone for future booking lookups
+        localStorage.setItem("shizu_client_phone", data.client_phone.trim());
+
+        const newBooking: BookingWithNotes = {
+          id:           String(apiBooking.id),
+          serviceName:  apiBooking.service_name,
+          serviceType:  slug,
+          providerName: locale === "fr" ? "En attente d'assignation" : "Awaiting assignment",
+          providerId:   "pending",
+          date:         new Date(apiBooking.appointment_date).toLocaleDateString(
+            locale === "fr" ? "fr-FR" : "en-US",
+            { month: "short", day: "numeric", year: "numeric" }
+          ),
+          time:           data.time,
+          status:         "pending",
+          zone:           data.zone,
+          urgency:        data.urgency,
+          timePreference: data.timePreference,
+          notes:          data.notes,
+        };
+
+        onSubmit(newBooking);
+        form.reset();
+        setAvailableProviders([]);
+        setZoneSearch("");
+        onOpenChange(false);
+
+      } catch {
+        form.setError("root", {
+          message: locale === "fr"
+            ? "Erreur lors de la réservation. Veuillez réessayer."
+            : "Booking failed. Please try again.",
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // ── EDIT mode: local state update only ───────────────────────────────────
     const bookingData: BookingWithNotes = {
-      id: isEditMode && booking ? booking.id : `booking-${Date.now()}`,
-      serviceName: serviceNames[data.serviceType] || data.serviceType,
-      serviceType: data.serviceType,
-      providerId: isEditMode && booking ? booking.providerId : (providerIdMap[data.providerName] || `provider-${Date.now()}`),
+      id:           booking!.id,
+      serviceName:  serviceNames[data.serviceType] || data.serviceType,
+      serviceType:  data.serviceType,
+      providerId:   booking!.providerId,
       providerName: data.providerName,
-      date: format(data.date, "MMM d, yyyy"),
-      time: data.time,
-      status: isEditMode && booking ? booking.status : "pending",
-      zone: data.zone,
-      urgency: data.urgency,
+      date:         format(data.date, "MMM d, yyyy"),
+      time:         data.time,
+      status:       booking!.status,
+      zone:         data.zone,
+      urgency:      data.urgency,
       timePreference: data.timePreference,
-      notes: data.notes,
+      notes:        data.notes,
     };
 
     onSubmit(bookingData);
@@ -272,34 +372,32 @@ export default function BookingModal({
     onOpenChange(isOpen);
   };
 
-  const modalTitle = isEditMode ? t("editTitle") : t("createTitle");
-  const modalDescription = isEditMode ? t("editDesc") : t("createDesc");
-  const submitButtonText = isEditMode ? t("updateBooking") : t("submitRequest");
-  const testIdPrefix = isEditMode ? "edit" : "create";
+  const modalTitle       = isEditMode ? t("editTitle")     : t("createTitle");
+  const modalDescription = isEditMode ? t("editDesc")      : t("createDesc");
+  const testIdPrefix     = isEditMode ? "edit"             : "create";
 
   // Watch fields for real-time quote calculation
-  const watchedServiceType = form.watch("serviceType");
-  const watchedZone = form.watch("zone");
-  const watchedUrgency = form.watch("urgency");
-  const watchedTimePreference = form.watch("timePreference");
+  const watchedServiceType     = form.watch("serviceType");
+  const watchedZone            = form.watch("zone");
+  const watchedUrgency         = form.watch("urgency");
+  const watchedTimePreference  = form.watch("timePreference");
 
   const pricingSuggestion = (() => {
     if (!watchedServiceType || !watchedZone) return null;
-    const serviceName = serviceNames[watchedServiceType] || watchedServiceType;
-    const service = services.find(s => s.name === serviceName);
+    const svcName = serviceNames[watchedServiceType] || watchedServiceType;
+    const service = services.find((s) => s.name === svcName);
     if (!service) return null;
-
     return getPricingSuggestion(service, {
       zone: watchedZone,
       urgency: watchedUrgency,
-      timePreference: watchedTimePreference
+      timePreference: watchedTimePreference,
     });
   })();
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
-        className="sm:max-w-[500px]"
+        className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto"
         data-testid={`modal-${testIdPrefix}-booking`}
       >
         <DialogHeader>
@@ -314,29 +412,79 @@ export default function BookingModal({
             onSubmit={form.handleSubmit(handleFormSubmit)}
             className="space-y-4"
           >
+            {/* ── Client info — create mode only ───────────────────────── */}
+            {!isEditMode && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="client_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        {locale === "fr" ? "Votre nom *" : "Your name *"}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Kouassi Marie"
+                          {...field}
+                          data-testid="create-input-client-name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="client_phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1">
+                        <Phone className="h-3 w-3" />
+                        {locale === "fr" ? "Numéro de téléphone *" : "Phone number *"}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="+225 07 XX XX XX XX"
+                          type="tel"
+                          {...field}
+                          data-testid="create-input-client-phone"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
+
+            {/* ── Service type ─────────────────────────────────────────── */}
             <FormField
               control={form.control}
               name="serviceType"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>{t("serviceType")}</FormLabel>
-                  <Select
-                    onValueChange={handleServiceTypeChange}
-                    value={field.value}
-                  >
+                  <Select onValueChange={handleServiceTypeChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger
-                        data-testid={`${testIdPrefix}-select-service-type`}
-                      >
+                      <SelectTrigger data-testid={`${testIdPrefix}-select-service-type`}>
                         <SelectValue placeholder={t("serviceTypePlaceholder")} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {serviceTypeOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.value}
-                        </SelectItem>
-                      ))}
+                      {isEditMode
+                        ? serviceTypeOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.value}
+                            </SelectItem>
+                          ))
+                        : ABIDJAN_SERVICES.map((svc) => (
+                            <SelectItem key={svc.slug} value={svc.label}>
+                              {svc.label}
+                            </SelectItem>
+                          ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -344,43 +492,45 @@ export default function BookingModal({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="providerName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t("providerField")}</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                    disabled={availableProviders.length === 0}
-                  >
-                    <FormControl>
-                      <SelectTrigger
-                        data-testid={`${testIdPrefix}-select-provider`}
-                      >
-                        <SelectValue
-                          placeholder={
-                            availableProviders.length === 0
-                              ? t("selectServiceFirst")
-                              : t("providerPlaceholder")
-                          }
-                        />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {availableProviders.map((provider) => (
-                        <SelectItem key={provider} value={provider}>
-                          {provider}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* ── Provider — edit mode only ─────────────────────────────── */}
+            {isEditMode && (
+              <FormField
+                control={form.control}
+                name="providerName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("providerField")}</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={availableProviders.length === 0}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid={`${testIdPrefix}-select-provider`}>
+                          <SelectValue
+                            placeholder={
+                              availableProviders.length === 0
+                                ? t("selectServiceFirst")
+                                : t("providerPlaceholder")
+                            }
+                          />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {availableProviders.map((provider) => (
+                          <SelectItem key={provider} value={provider}>
+                            {provider}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
+            {/* ── Date ─────────────────────────────────────────────────── */}
             <FormField
               control={form.control}
               name="date"
@@ -399,11 +549,7 @@ export default function BookingModal({
                           data-testid={`${testIdPrefix}-button-date-picker`}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {field.value ? (
-                            format(field.value, "PPP")
-                          ) : (
-                            <span>{t("datePlaceholder")}</span>
-                          )}
+                          {field.value ? format(field.value, "PPP") : <span>{t("datePlaceholder")}</span>}
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
@@ -422,6 +568,7 @@ export default function BookingModal({
               )}
             />
 
+            {/* ── Time ─────────────────────────────────────────────────── */}
             <FormField
               control={form.control}
               name="time"
@@ -448,6 +595,7 @@ export default function BookingModal({
               )}
             />
 
+            {/* ── Zone (location) ──────────────────────────────────────── */}
             <FormField
               control={form.control}
               name="zone"
@@ -461,10 +609,7 @@ export default function BookingModal({
                           variant="outline"
                           role="combobox"
                           aria-expanded={zoneOpen}
-                          className={cn(
-                            "w-full justify-between",
-                            !field.value && "text-muted-foreground"
-                          )}
+                          className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
                           data-testid={`${testIdPrefix}-combobox-zone`}
                         >
                           <span className="flex items-center gap-2">
@@ -503,9 +648,10 @@ export default function BookingModal({
                             )}
                           </CommandEmpty>
                           <CommandGroup>
-                            {ZONES_LIST.filter((zone) =>
-                              zone.label.toLowerCase().includes(zoneSearch.toLowerCase()) ||
-                              zone.value.toLowerCase().includes(zoneSearch.toLowerCase())
+                            {ZONES_LIST.filter(
+                              (zone) =>
+                                zone.label.toLowerCase().includes(zoneSearch.toLowerCase()) ||
+                                zone.value.toLowerCase().includes(zoneSearch.toLowerCase())
                             ).map((zone) => (
                               <CommandItem
                                 key={zone.value}
@@ -539,6 +685,7 @@ export default function BookingModal({
               )}
             />
 
+            {/* ── Urgency + time preference ─────────────────────────────── */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -597,6 +744,7 @@ export default function BookingModal({
               />
             </div>
 
+            {/* ── Pricing estimate ──────────────────────────────────────── */}
             {pricingSuggestion && (
               <div className="bg-muted/30 p-4 rounded-lg space-y-3 border" data-testid="pricing-estimate-box">
                 <div className="flex items-center justify-between">
@@ -616,26 +764,25 @@ export default function BookingModal({
                     )}
                   </div>
                 </div>
-
                 <div className="space-y-1.5 pt-2 border-t border-dashed">
                   {pricingSuggestion.breakdown.map((item, i) => (
                     <div key={i} className="flex justify-between text-xs text-muted-foreground">
                       <span>{item.label}</span>
                       <span>
-                        {item.type === 'mult'
+                        {item.type === "mult"
                           ? `x${item.value.toFixed(2)}`
                           : formatMoney(item.result, "XOF")}
                       </span>
                     </div>
                   ))}
                 </div>
-
                 <p className="text-[10px] text-muted-foreground italic text-center">
                   {t("quoteDisclaimer")}
                 </p>
               </div>
             )}
 
+            {/* ── Notes ────────────────────────────────────────────────── */}
             <FormField
               control={form.control}
               name="notes"
@@ -655,17 +802,36 @@ export default function BookingModal({
               )}
             />
 
+            {/* ── Root error (API failure) ──────────────────────────────── */}
+            {form.formState.errors.root && (
+              <p className="text-sm font-medium text-destructive">
+                {form.formState.errors.root.message}
+              </p>
+            )}
+
             <DialogFooter className="gap-2 sm:gap-0">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => handleClose(false)}
+                disabled={isSubmitting}
                 data-testid={`${testIdPrefix}-button-cancel`}
               >
                 {t("cancel")}
               </Button>
-              <Button type="submit" data-testid={`${testIdPrefix}-button-submit`}>
-                {submitButtonText}
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                data-testid={`${testIdPrefix}-button-submit`}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {locale === "fr" ? "Envoi..." : "Sending..."}
+                  </>
+                ) : (
+                  isEditMode ? t("updateBooking") : t("submitRequest")
+                )}
               </Button>
             </DialogFooter>
           </form>
