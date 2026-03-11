@@ -259,6 +259,9 @@ export default function BookingModal({
       const selectedService = ABIDJAN_SERVICES.find((s) => s.label === data.serviceType);
       const slug = selectedService?.slug || "menage";
 
+      // Wake up Render if sleeping
+      fetch("https://shizu-verse.onrender.com/health").catch(() => {});
+
       setIsSubmitting(true);
       try {
         const response = await fetch("/api/bookings", {
@@ -731,7 +734,7 @@ export default function BookingModal({
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {locale === "fr" ? "Envoi..." : "Sending..."}
+                {locale === "fr" ? "Envoi... (peut prendre 30s)" : "Sending... (may take 30s)"}
               </>
             ) : (
               isEditMode ? t("updateBooking") : t("submitRequest")
