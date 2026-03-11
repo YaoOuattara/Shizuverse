@@ -54,9 +54,12 @@ def create_booking():
         service_name = service_name or service.name
         service_slug = service_slug or ""
 
-    # Parse date
+    # Parse date — strip timezone info so comparison with utcnow() is always naive
     try:
         apt_date = datetime.fromisoformat(data["appointment_date"])
+        if apt_date.tzinfo is not None:
+            from datetime import timezone
+            apt_date = apt_date.astimezone(timezone.utc).replace(tzinfo=None)
     except ValueError:
         return jsonify({"error": "Invalid appointment_date. Use ISO 8601 (e.g. 2025-06-15T10:00:00)"}), 400
 
