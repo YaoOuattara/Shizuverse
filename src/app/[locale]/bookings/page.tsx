@@ -30,6 +30,7 @@ import {
 } from "@/data/mockProviders";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslations, useLocale } from "next-intl";
+import { trackEvent } from "@/lib/analytics";
 
 // localStorage keys for persistence
 const STORAGE_KEYS = {
@@ -413,7 +414,7 @@ export default function BookingsPage() {
               </h1>
             </div>
             <Button
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={() => { setIsCreateModalOpen(true); trackEvent("booking_started"); }}
               data-testid="button-new-booking"
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -592,7 +593,7 @@ export default function BookingsPage() {
             </p>
             <Button
               className="mt-4"
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={() => { setIsCreateModalOpen(true); trackEvent("booking_started"); }}
               data-testid="button-create-first"
             >
               {t("createFirst")}

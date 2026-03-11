@@ -4,6 +4,7 @@ import {NextIntlClientProvider} from 'next-intl';
 import {notFound} from 'next/navigation';
 import {locales, type Locale, loadMessages} from '@/i18n';
 import LocaleSwitcher from '@/components/LocaleSwitcher';
+import AnalyticsProvider from '@/components/AnalyticsProvider';
 
 export function generateStaticParams() {
   return locales.map((locale) => ({locale}));
@@ -22,7 +23,9 @@ export default async function RootLayout({children, params}: Props) {
       <body>
         <NextIntlClientProvider locale={locale} messages={messages}>
           <LocaleSwitcher />
+          <AnalyticsProvider>
           {children}
+          </AnalyticsProvider>
         </NextIntlClientProvider>
       </body>
     </html>

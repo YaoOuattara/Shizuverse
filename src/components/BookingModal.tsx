@@ -43,6 +43,7 @@ import { useAdminStore } from "@/data/adminStore";
 import { formatMoney } from "@/lib/currency";
 import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/hooks/use-toast";
+import { trackEvent } from "@/lib/analytics";
 
 
 const SLUG_TO_CATEGORY: Record<string, string> = {
@@ -290,6 +291,27 @@ export default function BookingModal({
         // Store phone for future booking lookups
         localStorage.setItem("shizu_client_phone", data.client_phone.trim());
 
+        // Fetch AI confirmation summary (best-effort, non-blocking)
+        let aiSummary: string | null = null;
+        try {
+          const summaryRes = await fetch("/api/booking-summary", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              service_name:     data.serviceType,
+              zone:             data.zone,
+              appointment_date: dateObj.toISOString(),
+              locale,
+            }),
+          });
+          if (summaryRes.ok) {
+            const summaryData = await summaryRes.json();
+            aiSummary = summaryData.summary || null;
+          }
+        } catch {
+          // AI summary is optional — ignore errors
+        }
+
         const newBooking: BookingWithNotes = {
           id:           String(apiBooking.id),
           serviceName:  apiBooking.service_name,
@@ -308,12 +330,20 @@ export default function BookingModal({
           notes:          data.notes,
         };
 
+        trackEvent("booking_completed", {
+          service_name: data.serviceType,
+          service_slug: slug,
+          zone:         data.zone,
+          urgency:      data.urgency,
+          locale,
+        });
+
         onSubmit(newBooking);
         toast({
           title: locale === "fr" ? "Réservation envoyée !" : "Booking submitted!",
-          description: locale === "fr"
+          description: aiSummary ?? (locale === "fr"
             ? "Nous vous contacterons bientôt."
-            : "We will contact you soon.",
+            : "We will contact you soon."),
         });
         form.reset();
         setAvailableProviders([]);
