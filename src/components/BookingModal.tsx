@@ -42,6 +42,7 @@ import {
 import { useAdminStore } from "@/data/adminStore";
 import { formatMoney } from "@/lib/currency";
 import { useTranslations, useLocale } from "next-intl";
+import { useToast } from "@/hooks/use-toast";
 
 
 const SLUG_TO_CATEGORY: Record<string, string> = {
@@ -134,6 +135,7 @@ export default function BookingModal({
 
   const isEditMode = mode === "edit";
   const { services } = useAdminStore();
+  const { toast } = useToast();
   const t      = useTranslations("bookingModal");
   const locale = useLocale() as "en" | "fr";
 
@@ -307,6 +309,12 @@ export default function BookingModal({
         };
 
         onSubmit(newBooking);
+        toast({
+          title: locale === "fr" ? "Réservation envoyée !" : "Booking submitted!",
+          description: locale === "fr"
+            ? "Nous vous contacterons bientôt."
+            : "We will contact you soon.",
+        });
         form.reset();
         setAvailableProviders([]);
         onOpenChange(false);

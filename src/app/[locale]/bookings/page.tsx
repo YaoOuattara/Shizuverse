@@ -29,7 +29,7 @@ import {
   type Review,
 } from "@/data/mockProviders";
 import { useToast } from "@/hooks/use-toast";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 
 // localStorage keys for persistence
 const STORAGE_KEYS = {
@@ -51,6 +51,7 @@ function getStoredData<T>(key: string, fallback: T): T {
 
 export default function BookingsPage() {
   const t = useTranslations("bookingsPage");
+  const locale = useLocale();
 
   // Load saved filters from localStorage
   const savedFilters = getStoredData(STORAGE_KEYS.FILTERS, {
@@ -114,16 +115,49 @@ export default function BookingsPage() {
     localStorage.setItem(STORAGE_KEYS.REVIEWED_BOOKINGS, JSON.stringify(Array.from(reviewedBookings)));
   }, [reviewedBookings]);
 
-  // todo: remove mock functionality - replace with API fetch using useQuery
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const storedBookings = getStoredData<BookingCardProps[]>(STORAGE_KEYS.BOOKINGS, mockBookings);
-      setBookings(storedBookings);
-      setIsLoading(false);
-    }, 800);
+  const clientPhone = typeof window !== "undefined"
+    ? localStorage.getItem("shizu_client_phone")
+    : null;
 
-    return () => clearTimeout(timer);
-  }, []);
+  useEffect(() => {
+    const loadBookings = async () => {
+      setIsLoading(true);
+      try {
+        if (clientPhone) {
+          const res = await fetch(`/api/bookings?client_phone=${encodeURIComponent(clientPhone)}`);
+          const data = await res.json();
+          if (data.items && data.items.length > 0) {
+            const mapped = data.items.map((b: { id: number; service_name: string; service_slug: string; appointment_date: string; status: BookingStatus; notes?: string }) => ({
+              id: String(b.id),
+              serviceName: b.service_name,
+              serviceType: b.service_slug,
+              providerName: locale === "fr" ? "En attente d'assignation" : "Awaiting assignment",
+              providerId: "pending",
+              date: new Date(b.appointment_date).toLocaleDateString(
+                locale === "fr" ? "fr-FR" : "en-US",
+                { month: "short", day: "numeric", year: "numeric" }
+              ),
+              time: new Date(b.appointment_date).toLocaleTimeString(
+                locale === "fr" ? "fr-FR" : "en-US",
+                { hour: "2-digit", minute: "2-digit" }
+              ),
+              status: b.status,
+              notes: b.notes,
+            }));
+            setBookings(mapped);
+            setIsLoading(false);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load bookings:", e);
+      }
+      // Fallback to mock data if no phone or no bookings found
+      setBookings(getStoredData<BookingCardProps[]>(STORAGE_KEYS.BOOKINGS, mockBookings));
+      setIsLoading(false);
+    };
+    loadBookings();
+  }, [clientPhone, locale]);
 
   // Persist bookings to localStorage
   useEffect(() => {
