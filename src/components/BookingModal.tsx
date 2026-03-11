@@ -35,8 +35,6 @@ import { format, parse } from "date-fns";
 import type { BookingCardProps } from "./BookingCard";
 import {
   ZONES_LIST,
-  URGENCY_OPTIONS,
-  TIME_PREFERENCE_OPTIONS,
   getPricingSuggestion,
   type UrgencyLevel,
   type TimePreference,
@@ -537,21 +535,19 @@ export default function BookingModal({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>{t("timeField")}</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger data-testid={`${testIdPrefix}-select-time`}>
-                        <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-                        <SelectValue placeholder={t("timePlaceholder")} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent position="popper" className="z-[9999]">
-                      {timeSlots.map((time) => (
-                        <SelectItem key={time} value={time}>
-                          {time}
-                        </SelectItem>
+                  <FormControl>
+                    <select
+                      value={field.value || ""}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      data-testid={`${testIdPrefix}-select-time`}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <option value="" disabled>{t("timePlaceholder")}</option>
+                      {timeSlots.map((slot) => (
+                        <option key={slot} value={slot}>{slot}</option>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </select>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -602,20 +598,18 @@ export default function BookingModal({
                       <Zap className="h-3 w-3" />
                       {t("urgencyField")}
                     </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid={`${testIdPrefix}-select-urgency`}>
-                          <SelectValue placeholder="Normal" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent position="popper" className="z-[9999]">
-                        {URGENCY_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <select
+                        value={field.value}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        data-testid={`${testIdPrefix}-select-urgency`}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      >
+                        <option value="normal">{locale === "fr" ? "Normal (3+ jours)" : "Normal (3+ days)"}</option>
+                        <option value="under_24h">{locale === "fr" ? "Moins de 24h" : "Under 24h"}</option>
+                        <option value="same_day">{locale === "fr" ? "Même jour" : "Same day"}</option>
+                      </select>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -630,20 +624,19 @@ export default function BookingModal({
                       <Clock className="h-3 w-3" />
                       {t("timePreferenceField")}
                     </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid={`${testIdPrefix}-select-time-preference`}>
-                          <SelectValue placeholder="Anytime" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent position="popper" className="z-[9999]">
-                        {TIME_PREFERENCE_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <select
+                        value={field.value}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        data-testid={`${testIdPrefix}-select-time-preference`}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      >
+                        <option value="anytime">{locale === "fr" ? "Indifférent" : "Anytime"}</option>
+                        <option value="morning">{locale === "fr" ? "Matin" : "Morning"}</option>
+                        <option value="afternoon">{locale === "fr" ? "Après-midi" : "Afternoon"}</option>
+                        <option value="evening">{locale === "fr" ? "Soir" : "Evening"}</option>
+                      </select>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
