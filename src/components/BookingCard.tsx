@@ -25,7 +25,7 @@ import { useState } from "react";
 import { formatMoney } from "@/lib/currency";
 import { useTranslations } from "next-intl";
 
-export type BookingStatus = "confirmed" | "pending" | "cancelled" | "completed";
+export type BookingStatus = "confirmed" | "pending" | "cancelled" | "completed" | "under_review" | "assigned";
 export type QuoteStatus = 'none' | 'sent' | 'accepted' | 'declined' | 'expired';
 
 export interface BookingCardProps {
@@ -174,6 +174,8 @@ export default function BookingCard({
     pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
     cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
     completed: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+    under_review: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+    assigned: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
   };
 
   const statusLabels: Record<BookingStatus, string> = {
@@ -181,6 +183,8 @@ export default function BookingCard({
     pending: t("status.pending"),
     cancelled: t("status.cancelled"),
     completed: t("status.completed"),
+    under_review: t("status.under_review"),
+    assigned: t("status.assigned"),
   };
 
   const statusIcons: Record<BookingStatus, typeof Check> = {
@@ -188,6 +192,8 @@ export default function BookingCard({
     pending: CircleDashed,
     cancelled: XCircle,
     completed: CheckCircle2,
+    under_review: CircleDashed,
+    assigned: Check,
   };
 
   return (

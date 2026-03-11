@@ -74,9 +74,22 @@ import {
 
 const statusColors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  confirmed: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  under_review: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  assigned: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
+  confirmed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
   completed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
   cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+};
+
+const formatDate = (iso: string) => {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
 const paymentColors: Record<string, string> = {
@@ -107,7 +120,7 @@ const payoutStatusLabels: Record<string, string> = {
   failed: 'Failed',
 };
 
-const statusOptions = ["all", "pending", "confirmed", "completed", "cancelled"];
+const statusOptions = ["all", "pending", "under_review", "assigned", "confirmed", "completed", "cancelled"];
 
 const defaultTimeline = [
   { status: 'pending', label: 'Pending' },
@@ -117,11 +130,12 @@ const defaultTimeline = [
 
 const statusLabels: Record<string, string> = {
   pending: 'Pending',
+  under_review: 'Under Review',
+  assigned: 'Provider Assigned',
   confirmed: 'Confirmed',
   completed: 'Completed',
   cancelled: 'Cancelled',
   rescheduled: 'Rescheduled',
-  provider_assigned: 'Provider Assigned',
 };
 
 function StatusTimeline({ currentStatus, statusHistory, createdAt }: { 
@@ -241,7 +255,8 @@ export default function AdminBookings() {
         clientName: b.clientName,
         clientEmail: "",
         clientPhone: b.clientPhone,
-        providerName: "En attente",
+        providerName: b.providerName || "En attente",
+        providerPhone: b.providerPhone || undefined,
         providerId: "",
         serviceName: b.serviceName,
         serviceCategory: b.serviceSlug,
@@ -277,6 +292,11 @@ export default function AdminBookings() {
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState("");
   
+  // Inline assign state (for under_review rows)
+  const [assigningBookingId, setAssigningBookingId] = useState<string | null>(null);
+  const [inlineProviderName, setInlineProviderName] = useState("");
+  const [inlineProviderPhone, setInlineProviderPhone] = useState("");
+
   // Quote modal state
   const [quoteModalOpen, setQuoteModalOpen] = useState(false);
   const [quoteZone, setQuoteZone] = useState("");
@@ -330,6 +350,30 @@ export default function AdminBookings() {
       duration: 3000,
     });
     setIsUpdating(false);
+  };
+
+  const handleStatusChange = async (bookingId: string, newStatus: string, extra?: { provider_name?: string; provider_phone?: string }) => {
+    try {
+      if (newStatus === 'assigned' && extra?.provider_name) {
+        await adminApi.assignBooking(Number(bookingId), extra.provider_name, extra.provider_phone || '');
+      } else {
+        await adminApi.updateBookingStatusPut(Number(bookingId), newStatus);
+      }
+      if (selectedBooking?.id === bookingId) {
+        setSelectedBooking(prev => prev ? {
+          ...prev,
+          status: newStatus as AdminBooking['status'],
+          ...(extra?.provider_name ? { providerName: extra.provider_name, providerPhone: extra.provider_phone } : {}),
+        } : null);
+      }
+      setAssigningBookingId(null);
+      setInlineProviderName("");
+      setInlineProviderPhone("");
+      toast({ title: "Statut mis à jour", description: `Réservation → ${statusLabels[newStatus] || newStatus}` });
+    } catch (err) {
+      console.error("handleStatusChange error:", err);
+      toast({ title: "Erreur", description: "Impossible de mettre à jour le statut.", variant: "destructive" });
+    }
   };
 
   const handleCancelWithReason = async () => {
@@ -623,18 +667,24 @@ export default function AdminBookings() {
             ) : (
               <div className="divide-y" data-testid="bookings-list">
                 {filteredBookings.map((booking) => (
-                  <button
+                  <div
                     key={booking.id}
-                    className="w-full flex items-center justify-between gap-4 p-3 hover-elevate text-left"
-                    onClick={() => setSelectedBooking(booking)}
+                    className="w-full flex flex-col gap-2 p-3 hover-elevate cursor-pointer"
                     data-testid={`booking-row-${booking.id}`}
                   >
-                    <div className="min-w-0 flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2 sm:gap-4">
+                    {/* Main info row — click opens detail drawer */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className="min-w-0 flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2 sm:gap-4 text-left"
+                      onClick={() => setSelectedBooking(booking)}
+                      onKeyDown={(e) => e.key === 'Enter' && setSelectedBooking(booking)}
+                    >
                       <div>
                         <p className="font-medium text-sm truncate">{booking.clientName}</p>
                         <p className="text-xs text-muted-foreground">{booking.serviceName}</p>
                         <p className="text-xs text-muted-foreground sm:hidden">
-                          {booking.date} • {booking.time} • {formatMoney(booking.price, booking.currency)}
+                          {formatDate(booking.date)} • {formatMoney(booking.price, booking.currency)}
                         </p>
                       </div>
                       <div className="hidden sm:block">
@@ -642,19 +692,87 @@ export default function AdminBookings() {
                         <p className="text-xs text-muted-foreground">{formatMoney(booking.price, booking.currency)}</p>
                       </div>
                       <div className="hidden sm:block">
-                        <p className="text-sm">{booking.date}</p>
-                        <p className="text-xs text-muted-foreground">{booking.time}</p>
+                        <p className="text-sm">{formatDate(booking.date)}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(booking.createdAt)}</p>
                       </div>
                       <div className="flex items-center gap-1 sm:justify-end flex-wrap">
-                        <Badge className={`text-xs ${statusColors[booking.status]}`}>
-                          {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                        <Badge className={`text-xs ${statusColors[booking.status] || statusColors.pending}`}>
+                          {statusLabels[booking.status] || booking.status}
                         </Badge>
                         <Badge className={`text-xs ${paymentColors[booking.paymentStatus]}`}>
                           {paymentStatusLabels[booking.paymentStatus]}
                         </Badge>
                       </div>
                     </div>
-                  </button>
+
+                    {/* Inline action buttons — stop propagation so they don't open drawer */}
+                    <div className="flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+                      {booking.status === 'pending' && (
+                        <button
+                          className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                          onClick={() => handleStatusChange(booking.id, 'under_review')}
+                        >
+                          Examiner
+                        </button>
+                      )}
+                      {booking.status === 'under_review' && (
+                        <>
+                          {assigningBookingId === booking.id ? (
+                            <div className="flex flex-wrap gap-1 items-center">
+                              <input
+                                className="text-xs border rounded px-2 py-1 w-32"
+                                placeholder="Nom prestataire"
+                                value={inlineProviderName}
+                                onChange={(e) => setInlineProviderName(e.target.value)}
+                              />
+                              <input
+                                className="text-xs border rounded px-2 py-1 w-28"
+                                placeholder="Téléphone"
+                                value={inlineProviderPhone}
+                                onChange={(e) => setInlineProviderPhone(e.target.value)}
+                              />
+                              <button
+                                className="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700 disabled:opacity-50"
+                                disabled={!inlineProviderName.trim()}
+                                onClick={() => handleStatusChange(booking.id, 'assigned', { provider_name: inlineProviderName, provider_phone: inlineProviderPhone })}
+                              >
+                                Assigner
+                              </button>
+                              <button
+                                className="text-xs text-muted-foreground px-2 py-1 rounded border hover:bg-muted"
+                                onClick={() => setAssigningBookingId(null)}
+                              >
+                                Annuler
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              className="text-xs bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600"
+                              onClick={() => { setAssigningBookingId(booking.id); setInlineProviderName(""); setInlineProviderPhone(""); }}
+                            >
+                              Assigner prestataire
+                            </button>
+                          )}
+                        </>
+                      )}
+                      {booking.status === 'assigned' && (
+                        <button
+                          className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
+                          onClick={() => handleStatusChange(booking.id, 'confirmed')}
+                        >
+                          Confirmer
+                        </button>
+                      )}
+                      {booking.status === 'confirmed' && (
+                        <button
+                          className="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
+                          onClick={() => handleStatusChange(booking.id, 'completed')}
+                        >
+                          Terminé
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -1014,6 +1132,48 @@ export default function AdminBookings() {
                   </p>
                 )}
                 
+                {/* Under Review Actions */}
+                {selectedBooking.status === "under_review" && (
+                  <div className="space-y-2">
+                    <div className="space-y-2">
+                      <input
+                        className="w-full text-sm border rounded px-3 py-2"
+                        placeholder="Nom du prestataire"
+                        value={inlineProviderName}
+                        onChange={(e) => setInlineProviderName(e.target.value)}
+                      />
+                      <input
+                        className="w-full text-sm border rounded px-3 py-2"
+                        placeholder="Téléphone prestataire"
+                        value={inlineProviderPhone}
+                        onChange={(e) => setInlineProviderPhone(e.target.value)}
+                      />
+                      <Button
+                        className="w-full"
+                        disabled={!inlineProviderName.trim() || isUpdating}
+                        onClick={() => handleStatusChange(selectedBooking.id, 'assigned', { provider_name: inlineProviderName, provider_phone: inlineProviderPhone })}
+                      >
+                        <User className="h-4 w-4 mr-2" />
+                        Assigner le prestataire
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Assigned Actions */}
+                {selectedBooking.status === "assigned" && (
+                  <div className="space-y-2">
+                    <Button
+                      className="w-full"
+                      onClick={() => handleStatusChange(selectedBooking.id, 'confirmed')}
+                      disabled={isUpdating}
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Confirmer la réservation
+                    </Button>
+                  </div>
+                )}
+
                 {/* Cancelled - Read only */}
                 {selectedBooking.status === "cancelled" && (
                   <p className="text-sm text-muted-foreground text-center py-2">

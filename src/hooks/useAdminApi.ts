@@ -20,6 +20,8 @@ export interface ApiBooking {
   status: string;
   location: string;
   notes: string;
+  providerName: string;
+  providerPhone: string;
   createdAt: string;
 }
 

@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/select";
 import { Search, CalendarDays, Loader2, X, Plus } from "lucide-react";
 import {
-  mockBookings,
   serviceTypes,
   providerNames,
   bookingDates,
@@ -128,11 +127,11 @@ export default function BookingsPage() {
           const res = await fetch(`/api/bookings?client_phone=${encodeURIComponent(clientPhone)}`);
           const data = await res.json();
           if (data.items && data.items.length > 0) {
-            const mapped = data.items.map((b: { id: number; service_name: string; service_slug: string; appointment_date: string; status: BookingStatus; notes?: string }) => ({
+            const mapped = data.items.map((b: { id: number; service_name: string; service_slug: string; appointment_date: string; status: BookingStatus; notes?: string; provider_name?: string }) => ({
               id: String(b.id),
               serviceName: b.service_name,
               serviceType: b.service_slug,
-              providerName: locale === "fr" ? "En attente d'assignation" : "Awaiting assignment",
+              providerName: b.provider_name || (locale === "fr" ? "En attente d'assignation" : "Awaiting assignment"),
               providerId: "pending",
               date: new Date(b.appointment_date).toLocaleDateString(
                 locale === "fr" ? "fr-FR" : "en-US",
@@ -153,8 +152,8 @@ export default function BookingsPage() {
       } catch (e) {
         console.error("Failed to load bookings:", e);
       }
-      // Fallback to mock data if no phone or no bookings found
-      setBookings(getStoredData<BookingCardProps[]>(STORAGE_KEYS.BOOKINGS, mockBookings));
+      // No phone or no bookings from API — show empty state
+      setBookings(getStoredData<BookingCardProps[]>(STORAGE_KEYS.BOOKINGS, []));
       setIsLoading(false);
     };
     loadBookings();
@@ -218,6 +217,8 @@ export default function BookingsPage() {
       pending: t("pending"),
       cancelled: t("cancelled"),
       completed: t("completed"),
+      under_review: t("confirmed"),
+      assigned: t("confirmed"),
     };
 
     await new Promise((resolve) => setTimeout(resolve, 600));

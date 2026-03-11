@@ -73,7 +73,9 @@
       "confirmed": "Confirmée",
       "pending": "En attente",
       "cancelled": "Annulée",
-      "completed": "Terminée"
+      "completed": "Terminée",
+      "under_review": "En cours d'examen",
+      "assigned": "Prestataire assigné"
     }
   },
   "reviewModal": {

@@ -73,7 +73,9 @@
       "confirmed": "Confirmed",
       "pending": "Pending",
       "cancelled": "Cancelled",
-      "completed": "Completed"
+      "completed": "Completed",
+      "under_review": "Under Review",
+      "assigned": "Provider Assigned"
     }
   },
   "reviewModal": {

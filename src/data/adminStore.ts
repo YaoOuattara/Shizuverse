@@ -89,7 +89,7 @@ export interface AdminBooking {
   time: string;
   duration: string;
   address?: string;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  status: 'pending' | 'under_review' | 'assigned' | 'confirmed' | 'completed' | 'cancelled';
   price: number;
   currency: string;
   baseAmount: number;
