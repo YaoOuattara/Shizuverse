@@ -1,7 +1,7 @@
 from . import db
 from datetime import datetime
 
-VALID_STATUSES = ("pending", "confirmed", "cancelled", "completed")
+VALID_STATUSES = ['pending', 'under_review', 'assigned', 'confirmed', 'completed', 'cancelled']
 
 
 class ClientBooking(db.Model):
@@ -24,6 +24,11 @@ class ClientBooking(db.Model):
     notes            = db.Column(db.Text, nullable=True)
     created_at       = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Provider assignment fields (set when admin assigns a provider)
+    provider_name  = db.Column(db.String(100), nullable=True)
+    provider_phone = db.Column(db.String(20),  nullable=True)
+    reviewed_by    = db.Column(db.String(50),  nullable=True)
+
     service = db.relationship("Service", backref="client_bookings", lazy="joined")
 
     def to_dict(self):
@@ -38,5 +43,8 @@ class ClientBooking(db.Model):
             "appointment_date": self.appointment_date.isoformat(),
             "status":           self.status,
             "notes":            self.notes,
+            "provider_name":    self.provider_name,
+            "provider_phone":   self.provider_phone,
+            "reviewed_by":      self.reviewed_by,
             "created_at":       self.created_at.isoformat(),
         }

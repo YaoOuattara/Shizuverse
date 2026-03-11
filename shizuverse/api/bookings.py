@@ -27,6 +27,18 @@ def list_bookings():
     return jsonify({"count": len(bookings), "items": [b.to_dict() for b in bookings]}), 200
 
 
+def check_booking_anomaly(phone: str) -> dict:
+    from datetime import timedelta
+    cutoff = datetime.utcnow() - timedelta(hours=24)
+    recent_count = ClientBooking.query.filter(
+        ClientBooking.client_phone == phone,
+        ClientBooking.created_at >= cutoff
+    ).count()
+    if recent_count >= 3:
+        return {"flagged": True, "reason": f"{recent_count} bookings in 24h"}
+    return {"flagged": False}
+
+
 # ── POST /api/bookings/ ───────────────────────────────────────────────────────
 # Body: { client_name, client_phone, client_location, service_id|service_slug|service_name,
 #         appointment_date (ISO 8601), notes? }
@@ -66,9 +78,14 @@ def create_booking():
     if apt_date < datetime.utcnow():
         return jsonify({"error": "appointment_date must be in the future"}), 400
 
+    client_phone = data["client_phone"].strip()
+    anomaly = check_booking_anomaly(client_phone)
+    if anomaly["flagged"]:
+        print(f"[ANOMALY] {anomaly['reason']} - {client_phone}")
+
     booking = ClientBooking(
         client_name=data["client_name"].strip(),
-        client_phone=data["client_phone"].strip(),
+        client_phone=client_phone,
         client_location=data["client_location"].strip(),
         service_id=service.id if service else None,
         service_name=service_name.strip(),

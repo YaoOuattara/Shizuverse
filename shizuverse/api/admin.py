@@ -65,18 +65,46 @@ def get_bookings():
             'status': b.status,
             'location': b.client_location,
             'notes': b.notes or '',
+            'providerName': b.provider_name or '',
+            'providerPhone': b.provider_phone or '',
             'createdAt': b.created_at.isoformat() if b.created_at else '',
         })
     return jsonify({'bookings': result, 'count': len(result)})
 
-@admin_bp.route('/bookings/<int:booking_id>/status', methods=['PATCH'])
+@admin_bp.route('/bookings/<int:booking_id>/assign', methods=['PUT'])
+@require_admin_token
+def assign_booking(booking_id):
+    booking = ClientBooking.query.get_or_404(booking_id)
+    data = request.get_json() or {}
+    provider_name = data.get('provider_name', '').strip()
+    provider_phone = data.get('provider_phone', '').strip()
+    if not provider_name:
+        return jsonify({'error': 'provider_name required'}), 400
+    booking.provider_name = provider_name
+    booking.provider_phone = provider_phone
+    booking.status = 'assigned'
+    db.session.commit()
+    return jsonify({
+        'id': booking.id,
+        'status': booking.status,
+        'provider_name': booking.provider_name,
+        'provider_phone': booking.provider_phone,
+    })
+
+@admin_bp.route('/bookings/<int:booking_id>/status', methods=['PATCH', 'PUT'])
 @require_admin_token
 def update_booking_status(booking_id):
-    data = request.get_json()
-    appointment = Appointment.query.get_or_404(booking_id)
-    appointment.status = data.get('status', appointment.status)
+    VALID = ['pending', 'under_review', 'assigned', 'confirmed', 'completed', 'cancelled']
+    booking = ClientBooking.query.get_or_404(booking_id)
+    data = request.get_json() or {}
+    new_status = data.get('status', '').strip()
+    if not new_status or new_status not in VALID:
+        return jsonify({'error': f'Invalid status. Use: {VALID}'}), 400
+    booking.status = new_status
+    if new_status == 'under_review':
+        booking.reviewed_by = 'admin'
     db.session.commit()
-    return jsonify({'success': True, 'status': appointment.status})
+    return jsonify({'id': booking.id, 'status': booking.status})
 
 @admin_bp.route('/providers', methods=['GET'])
 @require_admin_token

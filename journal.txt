@@ -168,3 +168,32 @@ Fixed 3 BookingModal UI issues and deployed:
 2. Blank service Select (Fix 2): Changed value={field.value} to value={field.value || undefined} so Radix shows placeholder when value is ""
 3. Zone button (Fix 3): Added type="button" to zone combobox trigger to prevent accidental form submit
 Commit: 97aae34 | Deployed: https://client-sigma-gilt.vercel.app
+
+---
+Session 8 — 2026-03-11 — AI Tracking + Review Model
+
+COMPLETED:
+1. PostHog analytics (posthog-js installed)
+   - src/lib/analytics.ts: initAnalytics() + trackEvent()
+   - src/components/AnalyticsProvider.tsx: pageview tracking on route change
+   - layout.tsx: wraps children in <AnalyticsProvider>
+   Events tracked: $pageview, booking_started (modal open), booking_completed, service_viewed
+
+2. AI booking confirmation (claude-opus-4-6)
+   - src/app/api/booking-summary/route.ts: POST route, bilingual prompt
+   - ANTHROPIC_API_KEY added to .env.local
+   - BookingModal.tsx: calls /api/booking-summary after booking, shows AI text in toast
+
+3. Review model (Flask backend)
+   - shizuverse/models/review.py: Review table with moderation_status field
+   - Imported in models/__init__.py
+
+COMMITS:
+- Frontend: 8621aaf — feat: PostHog analytics, AI booking confirmation, Review model
+- Backend:  f6dd1e4 — feat: add Review model with moderation_status
+
+NEXT STEPS:
+- Push frontend to Vercel (set ANTHROPIC_API_KEY on Vercel dashboard)
+- Push backend + run db.create_all() on Render to create reviews table
+- Wire /bookings page to real client API (currently uses mock data)
+- Wire /provider page to real provider API
