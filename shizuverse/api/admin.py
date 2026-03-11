@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request, current_app
 from functools import wraps
 from shizuverse.models import db, User
 from shizuverse.models.appointment import Appointment
+from shizuverse.models.client_booking import ClientBooking
 from shizuverse.models.service_provider import ServiceProvider
 from shizuverse.models.service_models import Service
 from datetime import datetime, timedelta
@@ -48,23 +49,25 @@ def admin_login():
 @require_admin_token
 def get_bookings():
     status = request.args.get('status')
-    query = Appointment.query
+    query = ClientBooking.query
     if status:
         query = query.filter_by(status=status)
-    appointments = query.order_by(Appointment.appointment_date.desc()).all()
+    bookings = query.order_by(ClientBooking.appointment_date.desc()).all()
     result = []
-    for a in appointments:
+    for b in bookings:
         result.append({
-            'id': a.id,
-            'client': a.client.username if a.client else 'Unknown',
-            'provider': a.provider.username if a.provider else 'Unknown',
-            'service': a.service.name if a.service else 'Unknown',
-            'date': a.appointment_date.isoformat(),
-            'status': a.status,
-            'price': a.service.price if a.service and hasattr(a.service, 'price') else 0,
-            'notes': a.notes,
+            'id': str(b.id),
+            'clientName': b.client_name,
+            'clientPhone': b.client_phone,
+            'serviceName': b.service_name,
+            'serviceSlug': b.service_slug,
+            'date': b.appointment_date.isoformat(),
+            'status': b.status,
+            'location': b.client_location,
+            'notes': b.notes or '',
+            'createdAt': b.created_at.isoformat() if b.created_at else '',
         })
-    return jsonify(result)
+    return jsonify({'bookings': result, 'count': len(result)})
 
 @admin_bp.route('/bookings/<int:booking_id>/status', methods=['PATCH'])
 @require_admin_token
