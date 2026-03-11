@@ -56,6 +56,7 @@ import {
   MessageSquare,
   AlertCircle,
 } from "lucide-react";
+import { useParams } from "next/navigation";
 import { useAdminStore, type AdminBooking, type StatusHistoryEntry } from "@/data/adminStore";
 import { useAdminBookings, type ApiBooking } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
@@ -106,54 +107,59 @@ const payoutColors: Record<string, string> = {
   failed: "bg-red-100/50 text-red-800 dark:bg-red-900/20 dark:text-red-400",
 };
 
-const paymentStatusLabels: Record<string, string> = {
-  unpaid: 'Unpaid',
-  pending: 'Payment Pending',
-  paid: 'Paid',
-  refunded: 'Refunded',
-};
+const getPaymentStatusLabels = (isFr: boolean): Record<string, string> => ({
+  unpaid:   isFr ? 'Non payé'           : 'Unpaid',
+  pending:  isFr ? 'Paiement en attente': 'Payment Pending',
+  paid:     isFr ? 'Payé'               : 'Paid',
+  refunded: isFr ? 'Remboursé'          : 'Refunded',
+});
 
-const payoutStatusLabels: Record<string, string> = {
-  not_due: 'Not Due',
-  due: 'Due',
-  sent: 'Sent',
-  failed: 'Failed',
-};
+const getPayoutStatusLabels = (isFr: boolean): Record<string, string> => ({
+  not_due: isFr ? 'Pas encore dû' : 'Not Due',
+  due:     isFr ? 'Dû'            : 'Due',
+  sent:    isFr ? 'Envoyé'        : 'Sent',
+  failed:  isFr ? 'Échoué'        : 'Failed',
+});
 
 const statusOptions = ["all", "pending", "under_review", "assigned", "confirmed", "completed", "cancelled"];
 
-const defaultTimeline = [
-  { status: 'pending', label: 'Pending' },
-  { status: 'confirmed', label: 'Confirmed' },
-  { status: 'completed', label: 'Completed' },
+const getDefaultTimeline = (isFr: boolean) => [
+  { status: 'pending',   label: isFr ? 'En attente' : 'Pending'   },
+  { status: 'confirmed', label: isFr ? 'Confirmé'   : 'Confirmed' },
+  { status: 'completed', label: isFr ? 'Terminé'    : 'Completed' },
 ];
 
-const statusLabels: Record<string, string> = {
-  pending: 'Pending',
-  under_review: 'Under Review',
-  assigned: 'Provider Assigned',
-  confirmed: 'Confirmed',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-  rescheduled: 'Rescheduled',
-};
+const getStatusLabels = (isFr: boolean): Record<string, string> => ({
+  pending:      isFr ? 'En attente'        : 'Pending',
+  under_review: isFr ? "En cours d'examen" : 'Under Review',
+  assigned:     isFr ? 'Prestataire assigné': 'Provider Assigned',
+  confirmed:    isFr ? 'Confirmé'           : 'Confirmed',
+  completed:    isFr ? 'Terminé'            : 'Completed',
+  cancelled:    isFr ? 'Annulé'             : 'Cancelled',
+  rescheduled:  isFr ? 'Reprogrammé'        : 'Rescheduled',
+});
 
-function StatusTimeline({ currentStatus, statusHistory, createdAt }: { 
-  currentStatus: AdminBooking['status']; 
+function StatusTimeline({ currentStatus, statusHistory, createdAt, isFr }: {
+  currentStatus: AdminBooking['status'];
   statusHistory?: StatusHistoryEntry[];
   createdAt: string;
+  isFr: boolean;
 }) {
+  const statusLabels = getStatusLabels(isFr);
+  const defaultTimeline = getDefaultTimeline(isFr);
   const isCancelled = currentStatus === 'cancelled';
-  
+
   if (statusHistory && statusHistory.length > 0) {
     return (
       <div className="space-y-2">
-        <h4 className="font-medium text-sm text-muted-foreground">Status Timeline</h4>
+        <h4 className="font-medium text-sm text-muted-foreground">
+          {isFr ? "Suivi du statut" : "Status Timeline"}
+        </h4>
         <div className="space-y-3 pl-2 border-l-2 border-muted">
           <div className="relative pl-4">
             <div className="absolute -left-[9px] w-4 h-4 rounded-full bg-muted border-2 border-background" />
             <div className="text-sm">
-              <span className="font-medium">Created</span>
+              <span className="font-medium">{isFr ? "Créé" : "Created"}</span>
               <span className="text-xs text-muted-foreground ml-2">{createdAt}</span>
             </div>
           </div>
@@ -200,7 +206,9 @@ function StatusTimeline({ currentStatus, statusHistory, createdAt }: {
 
   return (
     <div className="space-y-2">
-      <h4 className="font-medium text-sm text-muted-foreground">Status Timeline</h4>
+      <h4 className="font-medium text-sm text-muted-foreground">
+        {isFr ? "Suivi du statut" : "Status Timeline"}
+      </h4>
       <div className="flex items-center gap-2">
         {defaultTimeline.map((step, index) => {
           const state = getStepState(step.status);
@@ -235,7 +243,7 @@ function StatusTimeline({ currentStatus, statusHistory, createdAt }: {
               <div className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500 text-white">
                 <XCircle className="h-4 w-4" />
               </div>
-              <span className="text-xs mt-1 font-medium text-red-600 dark:text-red-400">Cancelled</span>
+              <span className="text-xs mt-1 font-medium text-red-600 dark:text-red-400">{isFr ? "Annulé" : "Cancelled"}</span>
             </div>
           </>
         )}
@@ -245,6 +253,11 @@ function StatusTimeline({ currentStatus, statusHistory, createdAt }: {
 }
 
 export default function AdminBookings() {
+  const params = useParams();
+  const isFr = (params?.locale as string) === "fr";
+  const statusLabels = getStatusLabels(isFr);
+  const paymentStatusLabels = getPaymentStatusLabels(isFr);
+  const payoutStatusLabels = getPayoutStatusLabels(isFr);
   const { toast } = useToast();
   const { bookings: apiBookings, loading: bookingsLoading } = useAdminBookings();
   const { providers, reviews, services } = useAdminStore();
@@ -345,8 +358,10 @@ export default function AdminBookings() {
     }
 
     toast({
-      title: "Status Updated",
-      description: `Booking status changed to ${newStatus}.`,
+      title: isFr ? "Statut mis à jour" : "Status Updated",
+      description: isFr
+        ? `Réservation → ${statusLabels[newStatus] || newStatus}`
+        : `Booking status changed to ${newStatus}.`,
       duration: 3000,
     });
     setIsUpdating(false);
@@ -391,8 +406,10 @@ export default function AdminBookings() {
     } : null);
 
     toast({
-      title: "Booking Cancelled",
-      description: "The booking has been cancelled and refund initiated.",
+      title: isFr ? "Réservation annulée" : "Booking Cancelled",
+      description: isFr
+        ? "La réservation a été annulée et le remboursement initié."
+        : "The booking has been cancelled and refund initiated.",
       variant: "destructive",
     });
     
@@ -414,8 +431,10 @@ export default function AdminBookings() {
     } : null);
 
     toast({
-      title: "Booking Rescheduled",
-      description: `Booking moved to ${rescheduleDate} at ${rescheduleTime}.`,
+      title: isFr ? "Réservation reprogrammée" : "Booking Rescheduled",
+      description: isFr
+        ? `Réservation déplacée au ${rescheduleDate} à ${rescheduleTime}.`
+        : `Booking moved to ${rescheduleDate} at ${rescheduleTime}.`,
     });
     
     setRescheduleModalOpen(false);
@@ -440,8 +459,10 @@ export default function AdminBookings() {
     } : null);
 
     toast({
-      title: "Provider Assigned",
-      description: `${provider.name} has been assigned to this booking.`,
+      title: isFr ? "Prestataire assigné" : "Provider Assigned",
+      description: isFr
+        ? `${provider.name} a été assigné à cette réservation.`
+        : `${provider.name} has been assigned to this booking.`,
     });
     
     setAssignModalOpen(false);
@@ -465,8 +486,8 @@ export default function AdminBookings() {
     setAdminNote("");
 
     toast({
-      title: "Note Added",
-      description: "Admin note has been saved.",
+      title: isFr ? "Note ajoutée" : "Note Added",
+      description: isFr ? "La note admin a été enregistrée." : "Admin note has been saved.",
     });
     setIsUpdating(false);
   };
@@ -485,8 +506,10 @@ export default function AdminBookings() {
     } : null);
 
     toast({
-      title: "Booking Completed",
-      description: "The booking has been marked as completed. Provider payout is now due.",
+      title: isFr ? "Réservation terminée" : "Booking Completed",
+      description: isFr
+        ? "La réservation est marquée comme terminée. Le paiement du prestataire est dû."
+        : "The booking has been marked as completed. Provider payout is now due.",
       duration: 3000,
     });
     setIsUpdating(false);
@@ -657,12 +680,12 @@ export default function AdminBookings() {
             {bookingsLoading ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin opacity-50" />
-                <p>Loading bookings...</p>
+                <p>{isFr ? "Chargement des réservations…" : "Loading bookings..."}</p>
               </div>
             ) : filteredBookings.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Filter className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No bookings found</p>
+                <p>{isFr ? "Aucune réservation trouvée" : "No bookings found"}</p>
               </div>
             ) : (
               <div className="divide-y" data-testid="bookings-list">
@@ -784,7 +807,7 @@ export default function AdminBookings() {
       <Sheet open={!!selectedBooking} onOpenChange={(open) => !open && setSelectedBooking(null)}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto pb-24">
           <SheetHeader>
-            <SheetTitle>Booking Details</SheetTitle>
+            <SheetTitle>{isFr ? "Détails de la réservation" : "Booking Details"}</SheetTitle>
             <SheetDescription>
               ID: {selectedBooking?.id}
             </SheetDescription>
@@ -793,10 +816,11 @@ export default function AdminBookings() {
           {selectedBooking && (
             <div className="space-y-6 mt-6">
               {/* Status Timeline */}
-              <StatusTimeline 
-                currentStatus={selectedBooking.status} 
+              <StatusTimeline
+                currentStatus={selectedBooking.status}
                 statusHistory={selectedBooking.statusHistory}
                 createdAt={selectedBooking.createdAt}
+                isFr={isFr}
               />
 
               {/* Status & Price */}
@@ -804,20 +828,20 @@ export default function AdminBookings() {
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className="flex items-center gap-1">
-                      <span className="text-xs text-muted-foreground">Booking:</span>
+                      <span className="text-xs text-muted-foreground">{isFr ? "Statut\u00a0:" : "Booking:"}</span>
                       <Badge className={`${statusColors[selectedBooking.status]}`}>
                         {selectedBooking.status.charAt(0).toUpperCase() + selectedBooking.status.slice(1)}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="text-xs text-muted-foreground">Payment:</span>
+                      <span className="text-xs text-muted-foreground">{isFr ? "Paiement\u00a0:" : "Payment:"}</span>
                       <Badge className={`${paymentColors[selectedBooking.paymentStatus]}`}>
                         {paymentStatusLabels[selectedBooking.paymentStatus]}
                       </Badge>
                     </div>
                     {selectedBooking.status === 'completed' && (
                       <div className="flex items-center gap-1">
-                        <span className="text-xs text-muted-foreground">Payout:</span>
+                        <span className="text-xs text-muted-foreground">{isFr ? "Versement\u00a0:" : "Payout:"}</span>
                         <Badge className={`${payoutColors[selectedBooking.payoutStatus]}`}>
                           {payoutStatusLabels[selectedBooking.payoutStatus]}
                         </Badge>
@@ -830,15 +854,15 @@ export default function AdminBookings() {
                 {/* Fee Breakdown */}
                 <div className="text-xs text-muted-foreground space-y-1 bg-muted/50 rounded-md p-2">
                   <div className="flex justify-between">
-                    <span>Base Amount</span>
+                    <span>{isFr ? "Montant de base" : "Base Amount"}</span>
                     <span>{formatMoney(selectedBooking.baseAmount, selectedBooking.currency)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Platform Fee (15%)</span>
+                    <span>{isFr ? "Commission (15%)" : "Platform Fee (15%)"}</span>
                     <span>{formatMoney(selectedBooking.platformFeeAmount, selectedBooking.currency)}</span>
                   </div>
                   <div className="flex justify-between font-medium text-foreground">
-                    <span>Provider Payout</span>
+                    <span>{isFr ? "Versement prestataire" : "Provider Payout"}</span>
                     <span>{formatMoney(selectedBooking.providerPayoutAmount, selectedBooking.currency)}</span>
                   </div>
                 </div>
@@ -897,7 +921,7 @@ export default function AdminBookings() {
 
               {/* Schedule & Location */}
               <div className="space-y-3">
-                <h4 className="font-medium text-sm text-muted-foreground">Schedule & Location</h4>
+                <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Horaire & Lieu" : "Schedule & Location"}</h4>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -981,16 +1005,16 @@ export default function AdminBookings() {
 
               {/* Timestamps */}
               <div className="space-y-2 text-xs text-muted-foreground">
-                <p>Created: {selectedBooking.createdAt}</p>
+                <p>{isFr ? "Créé\u00a0:" : "Created:"} {selectedBooking.createdAt}</p>
                 {selectedBooking.updatedAt && selectedBooking.updatedAt !== selectedBooking.createdAt && (
-                  <p>Updated: {selectedBooking.updatedAt}</p>
+                  <p>{isFr ? "Mis à jour\u00a0:" : "Updated:"} {selectedBooking.updatedAt}</p>
                 )}
               </div>
 
               {/* Admin Notes */}
               {selectedBooking.adminNotes && (
                 <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-muted-foreground">Admin Notes</h4>
+                  <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Notes admin" : "Admin Notes"}</h4>
                   <p className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded-md">
                     {selectedBooking.adminNotes}
                   </p>
@@ -1040,7 +1064,9 @@ export default function AdminBookings() {
                       data-testid="button-send-quote"
                     >
                       <Banknote className="h-4 w-4 mr-2" />
-                      {selectedBooking.quoteStatus === 'sent' ? 'Update Quote' : 'Send Quote'}
+                      {selectedBooking.quoteStatus === 'sent'
+                        ? (isFr ? 'Modifier le devis' : 'Update Quote')
+                        : (isFr ? 'Envoyer un devis' : 'Send Quote')}
                     </Button>
                     <Button
                       variant="outline"
@@ -1050,7 +1076,9 @@ export default function AdminBookings() {
                       data-testid="button-assign-provider"
                     >
                       <User className="h-4 w-4 mr-2" />
-                      {selectedBooking.providerId ? 'Reassign Provider' : 'Assign Provider'}
+                      {selectedBooking.providerId
+                        ? (isFr ? 'Réassigner' : 'Reassign Provider')
+                        : (isFr ? 'Assigner un prestataire' : 'Assign Provider')}
                     </Button>
                     <Button
                       className="w-full"
@@ -1059,12 +1087,12 @@ export default function AdminBookings() {
                       data-testid="button-confirm-booking"
                     >
                       {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                      Confirm Booking
+                      {isFr ? "Confirmer" : "Confirm Booking"}
                     </Button>
                     {!selectedBooking.providerId && (
                       <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" />
-                        Assign a provider before confirming
+                        {isFr ? "Assignez un prestataire avant de confirmer" : "Assign a provider before confirming"}
                       </p>
                     )}
                     <Button
@@ -1075,7 +1103,7 @@ export default function AdminBookings() {
                       data-testid="button-cancel-booking"
                     >
                       <XCircle className="h-4 w-4 mr-2" />
-                      Cancel Booking
+                      {isFr ? "Annuler" : "Cancel Booking"}
                     </Button>
                   </div>
                 )}
@@ -1091,7 +1119,7 @@ export default function AdminBookings() {
                       data-testid="button-reassign-provider"
                     >
                       <User className="h-4 w-4 mr-2" />
-                      Reassign Provider
+                      {isFr ? "Réassigner" : "Reassign Provider"}
                     </Button>
                     <Button
                       variant="outline"
@@ -1101,7 +1129,7 @@ export default function AdminBookings() {
                       data-testid="button-reschedule"
                     >
                       <CalendarClock className="h-4 w-4 mr-2" />
-                      Reschedule
+                      {isFr ? "Reprogrammer" : "Reschedule"}
                     </Button>
                     <Button
                       className="w-full"
@@ -1110,7 +1138,7 @@ export default function AdminBookings() {
                       data-testid="button-complete-booking"
                     >
                       {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                      Mark Completed
+                      {isFr ? "Marquer terminé" : "Mark Completed"}
                     </Button>
                     <Button
                       variant="destructive"
@@ -1120,7 +1148,7 @@ export default function AdminBookings() {
                       data-testid="button-cancel-confirmed"
                     >
                       <XCircle className="h-4 w-4 mr-2" />
-                      Cancel Booking
+                      {isFr ? "Annuler" : "Cancel Booking"}
                     </Button>
                   </div>
                 )}
@@ -1128,7 +1156,7 @@ export default function AdminBookings() {
                 {/* Completed - Read only */}
                 {selectedBooking.status === "completed" && (
                   <p className="text-sm text-muted-foreground text-center py-2">
-                    This booking is completed and cannot be modified.
+                    {isFr ? "Cette réservation est terminée et ne peut plus être modifiée." : "This booking is completed and cannot be modified."}
                   </p>
                 )}
                 
@@ -1177,18 +1205,18 @@ export default function AdminBookings() {
                 {/* Cancelled - Read only */}
                 {selectedBooking.status === "cancelled" && (
                   <p className="text-sm text-muted-foreground text-center py-2">
-                    This booking is cancelled and cannot be modified.
+                    {isFr ? "Cette réservation est annulée et ne peut plus être modifiée." : "This booking is cancelled and cannot be modified."}
                   </p>
                 )}
 
                 {/* Add Note */}
                 <div className="space-y-2">
-                  <Label htmlFor="admin-note" className="text-sm">Add Note</Label>
+                  <Label htmlFor="admin-note" className="text-sm">{isFr ? "Ajouter une note" : "Add Note"}</Label>
                   <Textarea
                     id="admin-note"
                     value={adminNote}
                     onChange={(e) => setAdminNote(e.target.value)}
-                    placeholder="Add internal note..."
+                    placeholder={isFr ? "Note interne…" : "Add internal note..."}
                     rows={2}
                     data-testid="textarea-admin-note"
                   />
@@ -1199,7 +1227,7 @@ export default function AdminBookings() {
                     data-testid="button-add-note"
                   >
                     {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <StickyNote className="h-4 w-4 mr-1" />}
-                    Add Note
+                    {isFr ? "Ajouter" : "Add Note"}
                   </Button>
                 </div>
               </div>
@@ -1212,19 +1240,21 @@ export default function AdminBookings() {
       <Dialog open={cancelModalOpen} onOpenChange={setCancelModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cancel Booking</DialogTitle>
+            <DialogTitle>{isFr ? "Annuler la réservation" : "Cancel Booking"}</DialogTitle>
             <DialogDescription>
-              Please provide a reason for cancellation. This will be recorded and the client will be notified.
+              {isFr
+                ? "Veuillez indiquer la raison de l'annulation. Elle sera enregistrée et le client sera notifié."
+                : "Please provide a reason for cancellation. This will be recorded and the client will be notified."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="cancel-reason">Cancellation Reason *</Label>
+              <Label htmlFor="cancel-reason">{isFr ? "Raison de l'annulation *" : "Cancellation Reason *"}</Label>
               <Textarea
                 id="cancel-reason"
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Enter reason for cancellation..."
+                placeholder={isFr ? "Entrez la raison de l'annulation…" : "Enter reason for cancellation..."}
                 rows={3}
                 data-testid="textarea-cancel-reason"
               />
@@ -1232,16 +1262,16 @@ export default function AdminBookings() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCancelModalOpen(false)}>
-              Back
+              {isFr ? "Retour" : "Back"}
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={handleCancelWithReason}
               disabled={!cancelReason.trim() || isUpdating}
               data-testid="button-confirm-cancel"
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Cancel Booking
+              {isFr ? "Annuler la réservation" : "Cancel Booking"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1251,14 +1281,14 @@ export default function AdminBookings() {
       <Dialog open={rescheduleModalOpen} onOpenChange={setRescheduleModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reschedule Booking</DialogTitle>
+            <DialogTitle>{isFr ? "Reprogrammer la réservation" : "Reschedule Booking"}</DialogTitle>
             <DialogDescription>
-              Select a new date and time for this booking.
+              {isFr ? "Choisissez une nouvelle date et heure." : "Select a new date and time for this booking."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="reschedule-date">New Date</Label>
+              <Label htmlFor="reschedule-date">{isFr ? "Nouvelle date" : "New Date"}</Label>
               <Input
                 id="reschedule-date"
                 type="date"
@@ -1268,7 +1298,7 @@ export default function AdminBookings() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="reschedule-time">New Time</Label>
+              <Label htmlFor="reschedule-time">{isFr ? "Nouvelle heure" : "New Time"}</Label>
               <Input
                 id="reschedule-time"
                 value={rescheduleTime}
@@ -1280,15 +1310,15 @@ export default function AdminBookings() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRescheduleModalOpen(false)}>
-              Cancel
+              {isFr ? "Annuler" : "Cancel"}
             </Button>
-            <Button 
+            <Button
               onClick={handleReschedule}
               disabled={!rescheduleDate || !rescheduleTime || isUpdating}
               data-testid="button-confirm-reschedule"
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Reschedule
+              {isFr ? "Reprogrammer" : "Reschedule"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1298,14 +1328,14 @@ export default function AdminBookings() {
       <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign Provider</DialogTitle>
+            <DialogTitle>{isFr ? "Assigner un prestataire" : "Assign Provider"}</DialogTitle>
             <DialogDescription>
-              Select a provider to assign to this booking.
+              {isFr ? "Sélectionnez un prestataire pour cette réservation." : "Select a provider to assign to this booking."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Select Provider</Label>
+              <Label>{isFr ? "Choisir un prestataire" : "Select Provider"}</Label>
               <Select value={selectedProviderId} onValueChange={setSelectedProviderId}>
                 <SelectTrigger data-testid="select-assign-provider">
                   <SelectValue placeholder="Choose a provider..." />
@@ -1322,15 +1352,15 @@ export default function AdminBookings() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignModalOpen(false)}>
-              Cancel
+              {isFr ? "Annuler" : "Cancel"}
             </Button>
-            <Button 
+            <Button
               onClick={handleAssignProvider}
               disabled={!selectedProviderId || isUpdating}
               data-testid="button-confirm-assign"
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Assign Provider
+              {isFr ? "Assigner" : "Assign Provider"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1342,10 +1372,12 @@ export default function AdminBookings() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Banknote className="h-5 w-5" />
-              Send Quote
+              {isFr ? "Envoyer un devis" : "Send Quote"}
             </DialogTitle>
             <DialogDescription>
-              Calculate and send a price quote to the client for {selectedBooking?.serviceName}.
+              {isFr
+                ? `Calculez et envoyez un devis au client pour ${selectedBooking?.serviceName}.`
+                : `Calculate and send a price quote to the client for ${selectedBooking?.serviceName}.`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1366,7 +1398,7 @@ export default function AdminBookings() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Urgency</Label>
+                <Label>{isFr ? "Urgence" : "Urgency"}</Label>
                 <Select value={quoteUrgency} onValueChange={(v) => handleQuoteInputChange('urgency', v)}>
                   <SelectTrigger data-testid="select-quote-urgency">
                     <SelectValue placeholder="Normal" />
@@ -1381,7 +1413,7 @@ export default function AdminBookings() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Time Pref.</Label>
+                <Label>{isFr ? "Préférence horaire" : "Time Pref."}</Label>
                 <Select value={quoteTimePreference} onValueChange={(v) => handleQuoteInputChange('timePreference', v)}>
                   <SelectTrigger data-testid="select-quote-time-pref">
                     <SelectValue placeholder="Anytime" />
@@ -1425,7 +1457,7 @@ export default function AdminBookings() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="quote-price">Quote Price (CFA) *</Label>
+              <Label htmlFor="quote-price">{isFr ? "Prix du devis (CFA) *" : "Quote Price (CFA) *"}</Label>
               <div className="flex gap-2 items-center">
                 <Input
                   id="quote-price"
@@ -1445,18 +1477,18 @@ export default function AdminBookings() {
                   onClick={() => setQuotePrice(pricingSuggestion.suggestedQuote.toString())}
                   data-testid="button-use-suggested"
                 >
-                  Use Suggested: {formatMoney(pricingSuggestion.suggestedQuote, 'XOF')}
+                  {isFr ? "Utiliser la suggestion\u00a0:" : "Use Suggested:"} {formatMoney(pricingSuggestion.suggestedQuote, 'XOF')}
                 </Button>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="quote-note">Note (optional)</Label>
+              <Label htmlFor="quote-note">{isFr ? "Note (optionnel)" : "Note (optional)"}</Label>
               <Textarea
                 id="quote-note"
                 value={quoteNote}
                 onChange={(e) => setQuoteNote(e.target.value)}
-                placeholder="Add a note for the client..."
+                placeholder={isFr ? "Ajouter une note pour le client…" : "Add a note for the client..."}
                 rows={2}
                 data-testid="textarea-quote-note"
               />
@@ -1464,15 +1496,15 @@ export default function AdminBookings() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setQuoteModalOpen(false)}>
-              Cancel
+              {isFr ? "Annuler" : "Cancel"}
             </Button>
-            <Button 
+            <Button
               onClick={handleSendQuote}
               disabled={!quotePrice || Number(quotePrice) <= 0 || isUpdating}
               data-testid="button-submit-quote"
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Banknote className="h-4 w-4 mr-2" />}
-              Send Quote
+              {isFr ? "Envoyer le devis" : "Send Quote"}
             </Button>
           </DialogFooter>
         </DialogContent>

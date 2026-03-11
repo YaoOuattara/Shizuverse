@@ -30,13 +30,13 @@ interface AdminLayoutProps {
   title: string;
 }
 
-const navItems = [
-  { path: "/admin", label: "Overview", icon: LayoutDashboard },
-  { path: "/admin/bookings", label: "Bookings", icon: Calendar },
-  { path: "/admin/payments", label: "Payments", icon: Banknote },
-  { path: "/admin/providers", label: "Providers", icon: Users },
-  { path: "/admin/services", label: "Services", icon: Wrench },
-  { path: "/admin/reviews", label: "Reviews", icon: MessageSquare },
+const getNavItems = (isFr: boolean) => [
+  { path: "/admin", label: isFr ? "Aperçu" : "Overview", icon: LayoutDashboard },
+  { path: "/admin/bookings", label: isFr ? "Réservations" : "Bookings", icon: Calendar },
+  { path: "/admin/payments", label: isFr ? "Paiements" : "Payments", icon: Banknote },
+  { path: "/admin/providers", label: isFr ? "Prestataires" : "Providers", icon: Users },
+  { path: "/admin/services", label: isFr ? "Services" : "Services", icon: Wrench },
+  { path: "/admin/reviews", label: isFr ? "Avis" : "Reviews", icon: MessageSquare },
 ];
 
 export default function AdminLayout({ children, title }: AdminLayoutProps) {
@@ -44,6 +44,8 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
   const router = useRouter();
   const params = useParams();
   const locale = params?.locale ?? "en";
+  const isFr = locale === "fr";
+  const navItems = getNavItems(isFr);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
 
@@ -66,7 +68,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 pb-4 border-b mb-4">
         <Shield className="h-5 w-5 text-primary" />
-        <span className="font-semibold">Admin Panel</span>
+        <span className="font-semibold">{isFr ? "Panneau Admin" : "Admin Panel"}</span>
         <Badge variant="secondary" className="ml-auto text-xs">Demo</Badge>
       </div>
 
@@ -109,7 +111,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
           data-testid="button-exit-admin"
         >
           <LogOut className="h-4 w-4" />
-          Exit Admin
+          {isFr ? "Déconnexion" : "Exit Admin"}
         </Button>
       </div>
     </div>
