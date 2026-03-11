@@ -69,39 +69,29 @@ export default function ProviderDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Stats visibility: default collapsed on mobile, expanded on desktop
-  const [showStats, setShowStats] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.STATS_VISIBLE);
-      if (saved !== null) {
-        return JSON.parse(saved);
-      }
-      return !isMobileViewport();
-    } catch {
-      return !isMobileViewport();
-    }
-  });
-
-  // Load filters from localStorage
-  const [filters, setFilters] = useState<DashboardFilters>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.FILTERS);
-      return saved ? JSON.parse(saved) : defaultFilters;
-    } catch {
-      return defaultFilters;
-    }
-  });
-
-  // Load bookings from localStorage or use mock data
+  // Stats visibility: default true (expanded); hydrated from localStorage on mount
+  const [showStats, setShowStats] = useState(true);
+  const [filters, setFilters] = useState<DashboardFilters>(defaultFilters);
   // todo: replace with useProviderBookings() hook when auth context provides providerId
-  const [bookings, setBookings] = useState<ProviderBooking[]>(() => {
+  const [bookings, setBookings] = useState<ProviderBooking[]>(mockProviderBookings);
+
+  // Hydrate state from localStorage after mount (SSR-safe)
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEYS.BOOKINGS);
-      return saved ? JSON.parse(saved) : mockProviderBookings;
+      const savedStats = localStorage.getItem(STORAGE_KEYS.STATS_VISIBLE);
+      if (savedStats !== null) {
+        setShowStats(JSON.parse(savedStats));
+      } else {
+        setShowStats(!isMobileViewport());
+      }
+      const savedFilters = localStorage.getItem(STORAGE_KEYS.FILTERS);
+      if (savedFilters) setFilters(JSON.parse(savedFilters));
+      const savedBookings = localStorage.getItem(STORAGE_KEYS.BOOKINGS);
+      if (savedBookings) setBookings(JSON.parse(savedBookings));
     } catch {
-      return mockProviderBookings;
+      // keep defaults
     }
-  });
+  }, []);
 
   // Persist stats visibility to localStorage
   useEffect(() => {

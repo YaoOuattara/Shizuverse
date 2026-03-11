@@ -140,7 +140,9 @@
     "quoteDeclined": "Devis refusé",
     "quoteDeclinedDesc": "La demande de réservation a été annulée.",
     "reviewSubmitted": "Avis soumis !",
-    "reviewSubmittedDesc": "Merci d'avoir partagé votre expérience avec {name}."
+    "reviewSubmittedDesc": "Merci d'avoir partagé votre expérience avec {name}.",
+    "under_review": "En cours d'examen",
+    "assigned": "Prestataire assigné"
   },
   "bookingModal": {
     "createTitle": "Demander un service",

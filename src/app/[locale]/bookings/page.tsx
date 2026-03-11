@@ -217,8 +217,8 @@ export default function BookingsPage() {
       pending: t("pending"),
       cancelled: t("cancelled"),
       completed: t("completed"),
-      under_review: t("confirmed"),
-      assigned: t("confirmed"),
+      under_review: t("under_review"),
+      assigned: t("assigned"),
     };
 
     await new Promise((resolve) => setTimeout(resolve, 600));

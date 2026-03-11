@@ -140,7 +140,9 @@
     "quoteDeclined": "Quote declined",
     "quoteDeclinedDesc": "The booking request has been cancelled.",
     "reviewSubmitted": "Review submitted!",
-    "reviewSubmittedDesc": "Thank you for reviewing your experience with {name}."
+    "reviewSubmittedDesc": "Thank you for reviewing your experience with {name}.",
+    "under_review": "Under Review",
+    "assigned": "Provider Assigned"
   },
   "bookingModal": {
     "createTitle": "Request Service",
