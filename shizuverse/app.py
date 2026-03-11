@@ -59,7 +59,17 @@ def create_app():
 
     with app.app_context():
         db.create_all()
-    CORS(app)
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": [
+                "https://client-sigma-gilt.vercel.app",
+                "http://localhost:3000",
+                "http://localhost:3001"
+            ],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"]
+        }
+    })
     Babel(app)
 
     limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
@@ -83,6 +93,13 @@ def create_app():
     for blueprint, prefix in all_blueprints:
         if blueprint.name not in SKIP_NAMES:
             app.register_blueprint(blueprint, url_prefix=prefix)
+
+    @app.after_request
+    def after_request(response):
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
+        response.headers.add("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS")
+        return response
 
     @app.route("/")
     def home():

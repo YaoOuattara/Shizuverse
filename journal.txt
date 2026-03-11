@@ -99,3 +99,72 @@ tsc --noEmit: 0 new errors (same 12 pre-existing errors in unrelated files)
 
 NEXT:
   Step 8: Real admin auth (replace localStorage shizu_admin_mode)
+
+
+## 2026-03-09 — Step 8: Real Admin Auth
+- Flask: POST /api/admin/login (ADMIN_PASSWORD env var → JWT, 8h expiry)
+- Flask: @require_admin_token decorator on all /api/admin/* routes except /login
+- Frontend: src/lib/adminAuth.ts (getAdminToken, setAdminToken, clearAdminToken, isAdminAuthenticated)
+- Frontend: src/lib/api.ts — adminFetch() adds Authorization: Bearer; adminApi.login() added
+- Frontend: src/app/[locale]/admin/login/page.tsx — password form, i18n via adminLogin namespace
+- Frontend: AdminLayout.tsx — checks isAdminAuthenticated(), redirects to /[locale]/admin/login
+- Removed: shizu_admin_mode localStorage flag + useAdminMode hook dependency from AdminLayout
+- i18n: adminLogin namespace added to en.json + fr.json
+- Old access page (admin/access/) still exists but is no longer linked — can be removed later
+- Committed: frontend branch (8f1b8f2), backend staging branch (ccb800e)
+- TODO: set ADMIN_PASSWORD env var on Render before deploying
+
+
+## 2026-03-09 — Frontend deployed to Vercel
+Production URL: https://client-sigma-gilt.vercel.app
+Inspect: https://vercel.com/yao-ouattaras-projects/client
+
+Fixes made during deploy:
+- Removed stray pages outside [locale]: src/app/bookings/, src/app/client/
+- Installed missing shadcn/ui deps: react-day-picker@8.10.1, react-resizable-panels@1.0.4, react-hook-form, react-is, embla-carousel-react, input-otp, @radix-ui/react-aspect-ratio
+- Added .npmrc with legacy-peer-deps=true (date-fns@4 peer conflict)
+- Fixed booking/success/page.tsx and service/[id]/page.tsx to use Promise<params> (Next.js 15)
+- Fixed empty recommendations/page.tsx and rewards/page.tsx
+- Migrated Footer.tsx, HomeHero.tsx, ServiceCard.tsx from react-i18next → next-intl
+- Fixed ServiceList.tsx locale type annotation
+- Fixed chart.tsx type errors for recharts compat
+- Upgraded Next.js 15.4.6 → 15.5.12 (CVE-2025-66478 blocked Vercel deploy)
+- Added missing booking.successTitle + booking.successMessage to en.json + fr.json
+
+TODO: Set NEXT_PUBLIC_FLASK_API_URL env var on Vercel dashboard pointing to https://shizu-verse.onrender.com
+
+
+## 2026-03-10 — Session wrap-up / Admin login debug + deploy fixes
+
+### What was done
+- Confirmed NEXT_PUBLIC_FLASK_API_URL=https://shizu-verse.onrender.com is set on Vercel ✅
+- Confirmed BASE_URL fallback in api.ts is already "https://shizu-verse.onrender.com" ✅
+- Confirmed credentials:"include" was already removed (CORS fix from prev session) ✅
+- Confirmed console.error("[AdminLogin] error:", msg) already in login page catch ✅
+- Root cause of MISSING_MESSAGE warnings found and fixed:
+    src/messages/fr/booking.json (subdirectory override) was silently winning over fr.json
+    and did not have successTitle/successMessage — added both keys
+- Fixed request.ts to not spread empty {} when subdirectory file doesn't exist
+    (was overwriting base namespace keys with an empty object)
+- Added .npmrc legacy-peer-deps=true, all shadcn/ui peer deps installed
+- All 35 pages build and deploy cleanly on Vercel
+
+### Current production state
+- Frontend: https://client-sigma-gilt.vercel.app
+- Backend: https://shizu-verse.onrender.com
+- Admin login: https://client-sigma-gilt.vercel.app/en/admin/login
+- Admin password to test: YaAllahShizu@1 (set ADMIN_PASSWORD on Render if not already)
+- NEXT_PUBLIC_FLASK_API_URL: set on Vercel ✅
+
+### Known issues to fix next session
+1. Pages look minimal/unstyled on production — likely Tailwind purge stripping classes
+   (check tailwind.config.ts content array, ensure it covers all src/ paths)
+2. Admin login needs live test with YaAllahShizu@1 — if 401, ADMIN_PASSWORD not set on Render
+3. /bookings and /provider pages still use mock data — wire to real API when auth ready
+
+--- 2026-03-11 (Session 9) ---
+Fixed 3 BookingModal UI issues and deployed:
+1. Layout (Fix 1): DialogContent is now flex-col with fixed header/footer and overflow-y-auto scrollable body (form id="booking-form", footer uses form= attr)
+2. Blank service Select (Fix 2): Changed value={field.value} to value={field.value || undefined} so Radix shows placeholder when value is ""
+3. Zone button (Fix 3): Added type="button" to zone combobox trigger to prevent accidental form submit
+Commit: 97aae34 | Deployed: https://client-sigma-gilt.vercel.app
