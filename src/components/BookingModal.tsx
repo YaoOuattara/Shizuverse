@@ -44,6 +44,9 @@ import { formatMoney } from "@/lib/currency";
 import { useTranslations, useLocale } from "next-intl";
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL || "https://shizu-verse.onrender.com";
+if (typeof window !== "undefined") {
+  console.log("[BookingModal] FLASK_API =", FLASK_API);
+}
 
 const SLUG_TO_CATEGORY: Record<string, string> = {
   menage:     "MENAGE ET NETTOYAGE",
@@ -262,6 +265,7 @@ export default function BookingModal({
 
       setIsSubmitting(true);
       try {
+        console.log("Posting to:", `${FLASK_API}/api/bookings/`);
         const response = await fetch(`${FLASK_API}/api/bookings/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -276,7 +280,10 @@ export default function BookingModal({
           }),
         });
 
-        if (!response.ok) throw new Error("Booking failed");
+        if (!response.ok) {
+          const errBody = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errBody}`);
+        }
 
         const apiBooking = await response.json();
 
@@ -306,12 +313,10 @@ export default function BookingModal({
         setAvailableProviders([]);
         onOpenChange(false);
 
-      } catch {
-        form.setError("root", {
-          message: locale === "fr"
-            ? "Erreur lors de la réservation. Veuillez réessayer."
-            : "Booking failed. Please try again.",
-        });
+      } catch (error) {
+        console.error("Booking API error:", error);
+        const message = error instanceof Error ? error.message : String(error);
+        form.setError("root", { message: `Erreur: ${message}` });
       } finally {
         setIsSubmitting(false);
       }
