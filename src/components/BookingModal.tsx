@@ -43,10 +43,6 @@ import { useAdminStore } from "@/data/adminStore";
 import { formatMoney } from "@/lib/currency";
 import { useTranslations, useLocale } from "next-intl";
 
-const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL || "https://shizu-verse.onrender.com";
-if (typeof window !== "undefined") {
-  console.log("[BookingModal] FLASK_API =", FLASK_API);
-}
 
 const SLUG_TO_CATEGORY: Record<string, string> = {
   menage:     "MENAGE ET NETTOYAGE",
@@ -265,8 +261,7 @@ export default function BookingModal({
 
       setIsSubmitting(true);
       try {
-        console.log("Posting to:", `${FLASK_API}/api/bookings/`);
-        const response = await fetch(`${FLASK_API}/api/bookings/`, {
+        const response = await fetch("/api/bookings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
