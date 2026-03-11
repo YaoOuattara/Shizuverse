@@ -273,7 +273,7 @@ export default function BookingModal({
             client_location:  data.zone,
             service_name:     data.serviceType,
             service_slug:     slug,
-            appointment_date: dateObj.toISOString(),
+            appointment_date: dateObj.toISOString().split(".")[0], // strip .000Z → naive ISO
             notes:            data.notes || "",
           }),
         });

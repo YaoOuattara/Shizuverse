@@ -6,6 +6,7 @@ const FLASK_API =
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    console.log("Booking request body:", JSON.stringify(body));
     const response = await fetch(`${FLASK_API}/api/bookings/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
