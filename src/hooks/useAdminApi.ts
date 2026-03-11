@@ -11,14 +11,16 @@ export interface ApiStats {
 }
 
 export interface ApiBooking {
-  id: number;
-  client: string;
-  provider: string;
-  service: string;
+  id: string;
+  clientName: string;
+  clientPhone: string;
+  serviceName: string;
+  serviceSlug: string;
   date: string;
   status: string;
-  price: number;
-  notes?: string;
+  location: string;
+  notes: string;
+  createdAt: string;
 }
 
 export interface ApiProvider {
@@ -60,7 +62,7 @@ export function useAdminBookings(status?: string) {
 
   useEffect(() => {
     adminApi.getBookings(status)
-      .then(setBookings)
+      .then((data) => setBookings(Array.isArray(data) ? data : (data.bookings ?? [])))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [status]);
