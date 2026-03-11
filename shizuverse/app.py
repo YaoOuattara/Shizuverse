@@ -59,6 +59,12 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        try:
+            from flask_migrate import upgrade as flask_db_upgrade
+            flask_db_upgrade()
+            logger.info("flask db upgrade completed")
+        except Exception as e:
+            logger.warning("flask db upgrade skipped: %s", e)
     CORS(app, origins="*")
     Babel(app)
 

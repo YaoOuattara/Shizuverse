@@ -197,3 +197,44 @@ NEXT STEPS:
 - Push backend + run db.create_all() on Render to create reviews table
 - Wire /bookings page to real client API (currently uses mock data)
 - Wire /provider page to real provider API
+
+---
+Session 8 Part 2 — 2026-03-11 — Status Machine + AI Routes
+
+COMPLETED:
+
+Part 1 — Flask status machine:
+- ClientBooking: added provider_name, provider_phone, reviewed_by columns
+- VALID_STATUSES = ['pending','under_review','assigned','confirmed','completed','cancelled']
+- PUT /api/admin/bookings/<id>/assign → assigns provider, sets status=assigned
+- PATCH|PUT /api/admin/bookings/<id>/status → full transitions
+- get_bookings includes providerName/providerPhone in response
+- check_booking_anomaly() in bookings.py (flags 3+ bookings in 24h)
+
+Part 2 — AdminBookings UI:
+- formatDate() helper for ISO → fr-FR display
+- New statuses in statusColors, statusOptions, statusLabels
+- Inline action buttons per row: Examiner (pending→under_review), Assigner (with name+phone inputs), Confirmer, Terminé
+- handleStatusChange() calls PUT endpoints via adminApi.assignBooking/updateBookingStatusPut
+- Detail drawer: under_review and assigned action sections added
+
+Part 3 — Client booking cards:
+- BookingStatus extended with under_review + assigned
+- bookings/page.tsx maps provider_name from API
+- New i18n keys: status.under_review, status.assigned (en + fr)
+
+Part 4 — Mock data removed:
+- bookings/page.tsx fallback now [] instead of mockBookings
+- mockBookings import removed
+
+Part 5 — AI routes:
+- /api/provider-response: draft response for providers (claude-haiku)
+- /api/moderate-review: review moderation (claude-haiku, JSON output)
+
+COMMITS:
+- Frontend: 755c955 → pushed to origin/frontend
+- Backend:  0e059ef → pushed to origin/staging
+
+TODO BEFORE PRODUCTION:
+- Run db migrate/create_all on Render to create provider_name, provider_phone, reviewed_by columns
+- Add ANTHROPIC_API_KEY to Vercel env vars (for booking-summary, provider-response, moderate-review)
