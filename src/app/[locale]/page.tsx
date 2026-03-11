@@ -166,7 +166,7 @@ function ProviderCTA({ locale }: { locale: string }) {
               : "Join the Shizuverse network and grow your client base in Abidjan. Manage bookings, track your earnings, and build your online reputation."}
           </p>
           <Link
-            href={`/${locale}/bookings`}
+            href={`/${locale}/provider`}
             className="inline-block mt-6 bg-[#0F3A7A] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#0d3068] transition-colors"
           >
             {locale === 'fr' ? "Rejoindre Shizu" : "Join Shizu"}

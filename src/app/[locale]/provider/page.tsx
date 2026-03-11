@@ -23,7 +23,8 @@ import {
   ChevronUp,
 } from "lucide-react";
 import ProviderBookingCard from "@/components/ProviderBookingCard";
-import RevenueBreakdown from "@/components/RevenueBreakdown";
+import dynamic from "next/dynamic";
+const RevenueBreakdown = dynamic(() => import("@/components/RevenueBreakdown"), { ssr: false });
 import AchievementBadges from "@/components/AchievementBadges";
 import DateRangeFilter, { type DateRange } from "@/components/DateRangeFilter";
 import StatusTabs from "@/components/StatusTabs";
