@@ -400,10 +400,10 @@ export default function BookingModal({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
-        className="sm:max-w-[500px] overflow-visible"
+        className="sm:max-w-[540px] max-h-[90vh] flex flex-col gap-0 p-0"
         data-testid={`modal-${testIdPrefix}-booking`}
       >
-        <DialogHeader>
+        <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle>{modalTitle}</DialogTitle>
           {modalDescription && (
             <DialogDescription>{modalDescription}</DialogDescription>
@@ -411,8 +411,9 @@ export default function BookingModal({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleFormSubmit)}>
-            <div className="max-h-[70vh] overflow-y-auto px-1 space-y-4">
+          <div className="flex-1 overflow-y-auto px-6 pb-2">
+            <form id="booking-form" onSubmit={form.handleSubmit(handleFormSubmit)}>
+            <div className="space-y-4 py-2">
             {/* ── Client info — create mode only ───────────────────────── */}
             {!isEditMode && (
               <>
@@ -468,7 +469,7 @@ export default function BookingModal({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>{t("serviceType")}</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
                     <FormControl>
                       <SelectTrigger data-testid={`${testIdPrefix}-select-service-type`}>
                         <SelectValue placeholder={t("serviceTypePlaceholder")} />
@@ -611,6 +612,7 @@ export default function BookingModal({
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
+                          type="button"
                           variant="outline"
                           role="combobox"
                           aria-expanded={zoneOpen}
@@ -814,34 +816,36 @@ export default function BookingModal({
               </p>
             )}
             </div>{/* end scrollable area */}
-
-            <DialogFooter className="gap-2 sm:gap-0 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleClose(false)}
-                disabled={isSubmitting}
-                data-testid={`${testIdPrefix}-button-cancel`}
-              >
-                {t("cancel")}
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                data-testid={`${testIdPrefix}-button-submit`}
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {locale === "fr" ? "Envoi..." : "Sending..."}
-                  </>
-                ) : (
-                  isEditMode ? t("updateBooking") : t("submitRequest")
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
+            </form>
+          </div>
         </Form>
+
+        <DialogFooter className="px-6 py-4 border-t gap-2 sm:gap-0">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => handleClose(false)}
+            disabled={isSubmitting}
+            data-testid={`${testIdPrefix}-button-cancel`}
+          >
+            {t("cancel")}
+          </Button>
+          <Button
+            type="submit"
+            form="booking-form"
+            disabled={isSubmitting}
+            data-testid={`${testIdPrefix}-button-submit`}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {locale === "fr" ? "Envoi..." : "Sending..."}
+              </>
+            ) : (
+              isEditMode ? t("updateBooking") : t("submitRequest")
+            )}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
