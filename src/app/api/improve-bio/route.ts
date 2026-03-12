@@ -6,7 +6,7 @@ const client = new Anthropic()
 export async function POST(req: NextRequest) {
   try {
     const { bio, locale } = await req.json()
-    if (!bio || bio.trim().length < 10) {
+    if (!bio || bio.trim().length < 5) {
       return NextResponse.json({ improved: null })
     }
     const lang = locale === 'en' ? 'English' : 'French'
@@ -23,7 +23,8 @@ Garde le même sens, 2-4 phrases max. Réponds UNIQUEMENT avec la bio amélioré
 
     const text = message.content[0].type === 'text' ? message.content[0].text.trim() : null
     return NextResponse.json({ improved: text })
-  } catch {
+  } catch (err) {
+    console.error('[improve-bio] error:', err)
     return NextResponse.json({ improved: null }, { status: 500 })
   }
 }

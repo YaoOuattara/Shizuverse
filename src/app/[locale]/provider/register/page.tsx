@@ -37,8 +37,9 @@ const SERVICES = [
 ];
 
 const ZONES = [
-  "Cocody", "Plateau", "Yopougon", "Abobo", "Adjamé",
-  "Marcory", "Koumassi", "Port-Bouët", "Treichville", "Attécoubé",
+  "Cocody", "Deux-Plateaux", "Angré", "Riviera", "Plateau", "Marcory",
+  "Yopougon", "Abobo", "Adjamé", "Koumassi", "Port-Bouët",
+  "Treichville", "Bingerville", "Anyama", "Songon", "Abatta",
 ];
 
 const fmt = (n: number) =>
