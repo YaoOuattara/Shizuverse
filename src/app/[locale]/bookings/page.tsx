@@ -69,8 +69,6 @@ export default function BookingsPage() {
   const [serviceTypeFilter, setServiceTypeFilter] = useState<string>(savedFilters.serviceTypeFilter);
   const [providerFilter, setProviderFilter] = useState<string>(savedFilters.providerFilter);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [bookingToEdit, setBookingToEdit] = useState<BookingWithNotes | null>(null);
 
   // Provider profile modal state
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -174,25 +172,6 @@ export default function BookingsPage() {
     toast({
       title: t("requestSent"),
       description: t("requestSentDesc"),
-      variant: "success",
-    });
-  };
-
-  const handleEditBooking = (booking: BookingCardProps) => {
-    setBookingToEdit(booking as BookingWithNotes);
-    setIsEditModalOpen(true);
-  };
-
-  const handleBookingUpdated = (updatedBooking: BookingWithNotes) => {
-    setBookings((prev) =>
-      prev.map((booking) =>
-        booking.id === updatedBooking.id ? updatedBooking : booking
-      )
-    );
-    setBookingToEdit(null);
-    toast({
-      title: t("bookingUpdated"),
-      description: t("bookingUpdatedDesc", { service: updatedBooking.serviceName, provider: updatedBooking.providerName }),
       variant: "success",
     });
   };
@@ -561,7 +540,6 @@ export default function BookingsPage() {
               <BookingCard
                 key={booking.id}
                 {...booking}
-                onEdit={handleEditBooking}
                 onCancel={handleCancelBooking}
                 onStatusChange={undefined}
                 onViewProfile={handleViewProfile}
@@ -624,14 +602,6 @@ export default function BookingsPage() {
         mode="create"
         onSubmit={handleBookingCreated}
         preSelectedProvider={preSelectedProvider}
-      />
-
-      <BookingModal
-        open={isEditModalOpen}
-        onOpenChange={setIsEditModalOpen}
-        mode="edit"
-        booking={bookingToEdit}
-        onSubmit={handleBookingUpdated}
       />
 
       <ProviderProfileModal

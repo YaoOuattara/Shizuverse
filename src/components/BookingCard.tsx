@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, Clock, Calendar, Pencil, Trash2, ChevronDown, Check, CircleDashed, XCircle, CheckCircle2, UserCircle, Star, Loader2, Banknote, FileText } from "lucide-react";
+import { User, Clock, Calendar, Trash2, ChevronDown, Check, CircleDashed, XCircle, CheckCircle2, UserCircle, Star, Loader2, Banknote, FileText } from "lucide-react";
 import { useState } from "react";
 import { formatMoney } from "@/lib/currency";
 import { useTranslations } from "next-intl";
@@ -46,7 +46,6 @@ export interface BookingCardProps {
 }
 
 interface BookingCardComponentProps extends BookingCardProps {
-  onEdit?: (booking: BookingCardProps) => void;
   onCancel?: (bookingId: string) => Promise<void> | void;
   onStatusChange?: (bookingId: string, newStatus: BookingStatus) => Promise<void> | void;
   onViewProfile?: (providerId: string) => void;
@@ -71,7 +70,6 @@ export default function BookingCard({
   quoteNote,
   quoteExpiry,
   currency = "XOF",
-  onEdit,
   onCancel,
   onStatusChange,
   onViewProfile,
@@ -105,11 +103,6 @@ export default function BookingCard({
     currency,
   };
 
-  const handleEditClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onEdit?.(booking);
-  };
-
   const handleCancelConfirm = async () => {
     if (!onCancel) return;
     setIsCancelling(true);
@@ -126,6 +119,8 @@ export default function BookingCard({
       setPendingStatus(newStatus);
       try {
         await onStatusChange(id, newStatus);
+      } catch (err) {
+        console.error("[BookingCard] status change failed:", err);
       } finally {
         setIsChangingStatus(false);
         setPendingStatus(null);
@@ -269,16 +264,6 @@ export default function BookingCard({
                 >
                   {statusLabels[status]}
                 </Badge>
-              )}
-              {onEdit && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={handleEditClick}
-                  data-testid={`button-edit-${id}`}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
               )}
               {onCancel && (
                 <AlertDialog>
