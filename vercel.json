@@ -1,0 +1,11 @@
+{
+  "buildCommand": "next build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "git": {
+    "deploymentEnabled": {
+      "staging": false,
+      "frontend": true
+    }
+  }
+}
