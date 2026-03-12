@@ -163,6 +163,7 @@ export default function ProviderRegisterPage() {
         body: JSON.stringify({ bio, locale }),
       });
       const data = await res.json();
+      if (data.error) console.error('[improve-bio] server error:', data.error);
       if (data.improved) {
         setBio(data.improved);
         toast({
@@ -171,9 +172,20 @@ export default function ProviderRegisterPage() {
             ? "L'IA a réécrit votre bio."
             : "AI rewrote your bio.",
         });
+      } else {
+        toast({
+          title: isFr ? "Erreur IA" : "AI Error",
+          description: isFr ? "Réessayez dans un moment." : "Try again shortly.",
+          variant: "destructive",
+        });
       }
-    } catch {
-      // silently ignore
+    } catch (err) {
+      console.error('[improve-bio] fetch error:', err);
+      toast({
+        title: isFr ? "Erreur IA" : "AI Error",
+        description: isFr ? "Réessayez dans un moment." : "Try again shortly.",
+        variant: "destructive",
+      });
     } finally {
       setIsImprovingBio(false);
     }

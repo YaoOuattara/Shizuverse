@@ -6,8 +6,9 @@ const client = new Anthropic()
 export async function POST(req: NextRequest) {
   try {
     const { bio, locale } = await req.json()
+    console.log('[improve-bio] called with bio length:', bio?.length, 'locale:', locale)
     if (!bio || bio.trim().length < 5) {
-      return NextResponse.json({ improved: null })
+      return NextResponse.json({ improved: null, error: 'bio_too_short' })
     }
     const lang = locale === 'en' ? 'English' : 'French'
     const prompt = `Tu es un assistant qui aide les prestataires de services à Abidjan à améliorer leur bio professionnelle.
