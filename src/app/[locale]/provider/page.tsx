@@ -31,16 +31,16 @@ import StatusTabs from "@/components/StatusTabs";
 import UpcomingSchedule from "@/components/UpcomingSchedule";
 import { checkScheduleConflicts, formatConflictWarning } from "@/lib/scheduleConflicts";
 import {
-  providerServiceNames,
   type ProviderBooking,
   type ProviderBookingStatus,
 } from "@/data/mockProviderBookings";
+
+const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
 import { useTranslations } from "next-intl";
 
 // localStorage keys for filter persistence
 const STORAGE_KEYS = {
   FILTERS: "provider_dashboard_filters",
-  BOOKINGS: "provider_dashboard_bookings",
   STATS_VISIBLE: "provider_dashboard_stats_visible",
 };
 
@@ -68,6 +68,7 @@ export default function ProviderDashboard() {
   const params = useParams();
   const locale = (params?.locale as string) ?? "fr";
   const [isLoading, setIsLoading] = useState(true);
+  const [hasToken, setHasToken] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Stats visibility: default true (expanded); hydrated from localStorage on mount
@@ -87,8 +88,6 @@ export default function ProviderDashboard() {
       }
       const savedFilters = localStorage.getItem(STORAGE_KEYS.FILTERS);
       if (savedFilters) setFilters(JSON.parse(savedFilters));
-      const savedBookings = localStorage.getItem(STORAGE_KEYS.BOOKINGS);
-      if (savedBookings) setBookings(JSON.parse(savedBookings));
     } catch {
       // keep defaults
     }
@@ -104,17 +103,39 @@ export default function ProviderDashboard() {
     localStorage.setItem(STORAGE_KEYS.FILTERS, JSON.stringify(filters));
   }, [filters]);
 
-  // Persist bookings to localStorage
+  // Fetch bookings from real API
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings));
-  }, [bookings]);
-
-  // Simulate initial load
-  useEffect(() => {
-    const timer = setTimeout(() => {
+    const token = localStorage.getItem("provider_token");
+    if (!token) {
+      setHasToken(false);
       setIsLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
+      return;
+    }
+    setHasToken(true);
+    let providerId: string | null = null;
+    try {
+      const info = JSON.parse(localStorage.getItem("provider_info") || "null");
+      providerId = info?.provider_id ?? info?.id ?? null;
+    } catch { /* ignore */ }
+
+    const url = `${FLASK_API}/api/provider/bookings${providerId ? `?provider_id=${providerId}` : ""}`;
+    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => {
+        if (res.status === 401) {
+          localStorage.removeItem("provider_token");
+          localStorage.removeItem("provider_info");
+          setHasToken(false);
+          return null;
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setBookings(data.map((b) => ({ ...b, id: String(b.id) })));
+        }
+      })
+      .catch(() => { /* network error — leave empty */ })
+      .finally(() => setIsLoading(false));
   }, []);
 
   // Filter handlers
@@ -138,6 +159,9 @@ export default function ProviderDashboard() {
     setFilters(defaultFilters);
     setSearchQuery("");
   };
+
+  // Derive unique service names from fetched bookings for the filter dropdown
+  const serviceNames = [...new Set(bookings.map((b) => b.serviceName).filter(Boolean))].sort();
 
   const hasActiveFilters =
     filters.status !== "all" ||
@@ -182,10 +206,14 @@ export default function ProviderDashboard() {
       }
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    const token = localStorage.getItem("provider_token");
+    const res = await fetch(`${FLASK_API}/api/provider/bookings/${bookingId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status: "confirmed" }),
+    });
 
-    const shouldFail = Math.random() < 0.05;
-    if (shouldFail) {
+    if (!res.ok) {
       toast({
         title: t("failedAcceptTitle"),
         description: t("failedAcceptDesc"),
@@ -200,31 +228,26 @@ export default function ProviderDashboard() {
       )
     );
 
-    const booking2 = bookings.find((b) => b.id === bookingId);
-    const hasConflict = booking2 && checkScheduleConflicts(
-      { date: booking2.date, time: booking2.time, duration: booking2.duration },
-      bookings.filter((b) => b.status === "confirmed"),
-      bookingId
-    ).hasConflict;
-
-    if (!hasConflict) {
-      toast({
-        title: t("acceptedTitle"),
-        description: booking
-          ? t("acceptedDesc", { customerName: booking.customerName, serviceName: booking.serviceName })
-          : t("acceptedFallback"),
-        variant: "success",
-      });
-    }
+    toast({
+      title: t("acceptedTitle"),
+      description: booking
+        ? t("acceptedDesc", { customerName: booking.customerName, serviceName: booking.serviceName })
+        : t("acceptedFallback"),
+      variant: "success",
+    });
   };
 
   const handleRejectBooking = async (bookingId: string): Promise<void> => {
     const booking = bookings.find((b) => b.id === bookingId);
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    const token = localStorage.getItem("provider_token");
+    const res = await fetch(`${FLASK_API}/api/provider/bookings/${bookingId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
 
-    const shouldFail = Math.random() < 0.05;
-    if (shouldFail) {
+    if (!res.ok) {
       toast({
         title: t("failedRejectTitle"),
         description: t("failedRejectDesc"),
@@ -444,7 +467,7 @@ export default function ProviderDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t("allServices")}</SelectItem>
-                  {providerServiceNames.map((service) => (
+                  {serviceNames.map((service) => (
                     <SelectItem key={service} value={service}>
                       {service}
                     </SelectItem>
@@ -491,7 +514,28 @@ export default function ProviderDashboard() {
           />
         </div>
 
-        {filteredBookings.length > 0 ? (
+        {!hasToken ? (
+          <div
+            className="flex flex-col items-center justify-center py-16 text-center"
+            data-testid="empty-state-login"
+          >
+            <CalendarDays className="mb-4 h-12 w-12 text-muted-foreground" />
+            <h2 className="text-lg font-medium text-foreground">
+              {locale === "fr" ? "Connectez-vous" : "Log in to continue"}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {locale === "fr"
+                ? "Connectez-vous pour voir vos réservations."
+                : "Log in to view your booking requests."}
+            </p>
+            <Button
+              className="mt-4"
+              onClick={() => router.push(`/${locale}/provider/login`)}
+            >
+              {locale === "fr" ? "Se connecter" : "Log In"}
+            </Button>
+          </div>
+        ) : filteredBookings.length > 0 ? (
           <div
             className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
             data-testid="bookings-grid"
