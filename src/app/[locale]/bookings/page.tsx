@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, CalendarDays, Loader2, X, Plus } from "lucide-react";
+import { Search, CalendarDays, Loader2, X, Plus, ArrowLeft } from "lucide-react";
 import {
   serviceTypes,
   providerNames,
@@ -29,6 +29,7 @@ import {
 } from "@/data/mockProviders";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslations, useLocale } from "next-intl";
+import { useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
 
 // localStorage keys for persistence
@@ -52,6 +53,7 @@ function getStoredData<T>(key: string, fallback: T): T {
 export default function BookingsPage() {
   const t = useTranslations("bookingsPage");
   const locale = useLocale();
+  const router = useRouter();
 
   // Load saved filters from localStorage
   const savedFilters = getStoredData(STORAGE_KEYS.FILTERS, {
@@ -406,6 +408,16 @@ export default function BookingsPage() {
         <div className="mx-auto max-w-7xl px-4 py-4 md:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push(`/${locale}`)}
+                className="gap-1 text-muted-foreground hover:text-foreground -ml-2"
+                data-testid="button-back-home"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                {t("backHome")}
+              </Button>
               <CalendarDays className="h-6 w-6 text-primary" aria-hidden="true" />
               <h1
                 className="text-2xl font-semibold text-foreground"
@@ -551,7 +563,7 @@ export default function BookingsPage() {
                 {...booking}
                 onEdit={handleEditBooking}
                 onCancel={handleCancelBooking}
-                onStatusChange={handleStatusChange}
+                onStatusChange={undefined}
                 onViewProfile={handleViewProfile}
                 onLeaveReview={handleOpenReviewModal}
                 onAcceptQuote={handleAcceptQuote}

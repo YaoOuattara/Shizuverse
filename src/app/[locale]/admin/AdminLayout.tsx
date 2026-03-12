@@ -30,22 +30,22 @@ interface AdminLayoutProps {
   title: string;
 }
 
-const getNavItems = (isFr: boolean) => [
-  { path: "/admin", label: isFr ? "Aperçu" : "Overview", icon: LayoutDashboard },
-  { path: "/admin/bookings", label: isFr ? "Réservations" : "Bookings", icon: Calendar },
-  { path: "/admin/payments", label: isFr ? "Paiements" : "Payments", icon: Banknote },
-  { path: "/admin/providers", label: isFr ? "Prestataires" : "Providers", icon: Users },
-  { path: "/admin/services", label: isFr ? "Services" : "Services", icon: Wrench },
-  { path: "/admin/reviews", label: isFr ? "Avis" : "Reviews", icon: MessageSquare },
+const getNavItems = (locale: string, isFr: boolean) => [
+  { path: `/${locale}/admin`, label: isFr ? "Aperçu" : "Overview", icon: LayoutDashboard },
+  { path: `/${locale}/admin/bookings`, label: isFr ? "Réservations" : "Bookings", icon: Calendar },
+  { path: `/${locale}/admin/payments`, label: isFr ? "Paiements" : "Payments", icon: Banknote },
+  { path: `/${locale}/admin/providers`, label: isFr ? "Prestataires" : "Providers", icon: Users },
+  { path: `/${locale}/admin/services`, label: isFr ? "Services" : "Services", icon: Wrench },
+  { path: `/${locale}/admin/reviews`, label: isFr ? "Avis" : "Reviews", icon: MessageSquare },
 ];
 
 export default function AdminLayout({ children, title }: AdminLayoutProps) {
   const location = usePathname();
   const router = useRouter();
   const params = useParams();
-  const locale = params?.locale ?? "en";
+  const locale = (params?.locale as string) ?? "en";
   const isFr = locale === "fr";
-  const navItems = getNavItems(isFr);
+  const navItems = getNavItems(locale, isFr);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
 
@@ -74,8 +74,8 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
 
       <nav className="flex-1 space-y-1" data-testid="admin-nav">
         {navItems.map((item) => {
-          const isActive = location === item.path || 
-            (item.path !== "/admin" && location.startsWith(item.path));
+          const isActive = location === item.path ||
+            (item.path !== `/${locale}/admin` && location.startsWith(item.path));
           const Icon = item.icon;
 
           return (

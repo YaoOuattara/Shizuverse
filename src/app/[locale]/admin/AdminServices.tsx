@@ -103,7 +103,7 @@ function adaptApiService(s: ApiService): AdminService {
 export default function AdminServices() {
   const { toast } = useToast();
   const { services: apiServices, loading: servicesLoading } = useAdminServices();
-  const { bookings } = useAdminStore();
+  const { bookings = [] } = useAdminStore();
   const [services, setServices] = useState<AdminService[]>([]);
 
   useEffect(() => {

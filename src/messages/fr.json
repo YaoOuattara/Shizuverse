@@ -104,6 +104,7 @@
   },
   "bookingsPage": {
     "title": "Mes réservations",
+    "backHome": "Retour à l'accueil",
     "newBooking": "Nouvelle réservation",
     "searchPlaceholder": "Rechercher des réservations...",
     "clearFilters": "Effacer les filtres",

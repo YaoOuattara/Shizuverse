@@ -104,6 +104,7 @@
   },
   "bookingsPage": {
     "title": "My Bookings",
+    "backHome": "Back to home",
     "newBooking": "New Booking",
     "searchPlaceholder": "Search bookings...",
     "clearFilters": "Clear filters",

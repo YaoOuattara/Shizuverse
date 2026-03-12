@@ -128,6 +128,16 @@ export default function HomeHero() {
               </span>
             ))}
           </div>
+
+          {/* Returning client link */}
+          <p className="mt-4 text-white/40 text-sm">
+            <Link
+              href={`/${locale}/bookings`}
+              className="underline underline-offset-2 hover:text-white/70 transition-colors"
+            >
+              {locale === 'fr' ? "Voir mes réservations →" : "View my bookings →"}
+            </Link>
+          </p>
         </div>
 
         {/* Right column — fix 2: hidden on mobile, centered */}
