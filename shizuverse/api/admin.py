@@ -154,6 +154,57 @@ def get_services():
 
 provider_bp = Blueprint('provider', __name__)
 
+
+def require_provider_token(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Missing token'}), 401
+        token = auth_header[7:]
+        try:
+            payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+            if payload.get('type') != 'provider':
+                return jsonify({'error': 'Invalid token type'}), 401
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Invalid token'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
+@provider_bp.route('/login', methods=['POST'])
+def provider_login():
+    data = request.get_json() or {}
+    email = (data.get('email') or '').strip().lower()
+    password = data.get('password', '')
+    if not email or not password:
+        return jsonify({'error': 'email and password required'}), 400
+    user = User.query.filter_by(email=email, user_type='provider').first()
+    if not user or not user.check_password(password):
+        return jsonify({'error': 'Invalid credentials'}), 401
+    sp = ServiceProvider.query.filter_by(user_id=user.id).first()
+    payload = {
+        'sub': str(user.id),
+        'type': 'provider',
+        'provider_id': sp.id if sp else None,
+        'iat': datetime.utcnow(),
+        'exp': datetime.utcnow() + timedelta(hours=24),
+    }
+    token = jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm='HS256')
+    return jsonify({
+        'token': token,
+        'provider': {
+            'id': sp.id if sp else None,
+            'user_id': user.id,
+            'name': sp.company_name if sp else email.split('@')[0],
+            'email': user.email,
+            'verified': sp.verified if sp else False,
+        }
+    })
+
+
 @provider_bp.route('/bookings', methods=['GET'])
 def get_provider_bookings():
     provider_id = request.args.get('provider_id', type=int)
