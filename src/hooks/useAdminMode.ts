@@ -13,13 +13,15 @@ const ADMIN_MODE_KEY = "shizu_admin_mode";
 
 export function useAdminMode() {
   const router = useRouter();
-  const [isAdminMode, setIsAdminMode] = useState<boolean>(() => {
+  const [isAdminMode, setIsAdminMode] = useState<boolean>(false);
+
+  useEffect(() => {
     try {
-      return localStorage.getItem(ADMIN_MODE_KEY) === "true";
+      setIsAdminMode(localStorage.getItem(ADMIN_MODE_KEY) === "true");
     } catch {
-      return false;
+      // keep false
     }
-  });
+  }, []);
 
   useEffect(() => {
     try {

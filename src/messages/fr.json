@@ -375,6 +375,11 @@
       "security": "Sécurité"
     }
   },
+  "services": {
+    "notFoundTitle": "Service introuvable",
+    "notFound": "Le service demandé est introuvable.",
+    "serviceDescription": "Réservez {name} avec des professionnels vérifiés à Abidjan."
+  },
   "providerLogin": {
     "title": "Connexion Prestataire",
     "subtitle": "Accédez à votre tableau de bord Shizu",

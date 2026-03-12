@@ -375,6 +375,11 @@
       "security": "Security"
     }
   },
+  "services": {
+    "notFoundTitle": "Service Not Found",
+    "notFound": "The requested service could not be found.",
+    "serviceDescription": "Book {name} with verified professionals in Abidjan."
+  },
   "providerLogin": {
     "title": "Provider Login",
     "subtitle": "Access your Shizu dashboard",
