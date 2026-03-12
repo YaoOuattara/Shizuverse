@@ -373,5 +373,19 @@
       "gardening": "Gardening",
       "security": "Security"
     }
+  },
+  "providerLogin": {
+    "title": "Provider Login",
+    "subtitle": "Access your Shizu dashboard",
+    "email": "Email",
+    "emailPlaceholder": "you@example.com",
+    "password": "Password",
+    "passwordPlaceholder": "Your password",
+    "submit": "Login",
+    "loading": "Logging in...",
+    "errorInvalid": "Invalid email or password.",
+    "errorGeneral": "Something went wrong. Please try again.",
+    "noAccount": "Not yet a provider?",
+    "registerLink": "Join Shizu"
   }
 }

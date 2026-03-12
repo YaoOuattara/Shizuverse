@@ -373,5 +373,19 @@
       "gardening": "Jardinage",
       "security": "Sécurité"
     }
+  },
+  "providerLogin": {
+    "title": "Connexion Prestataire",
+    "subtitle": "Accédez à votre tableau de bord Shizu",
+    "email": "Email",
+    "emailPlaceholder": "vous@exemple.com",
+    "password": "Mot de passe",
+    "passwordPlaceholder": "Votre mot de passe",
+    "submit": "Se connecter",
+    "loading": "Connexion en cours...",
+    "errorInvalid": "Email ou mot de passe invalide.",
+    "errorGeneral": "Une erreur est survenue. Veuillez réessayer.",
+    "noAccount": "Pas encore prestataire ?",
+    "registerLink": "Rejoindre Shizu"
   }
 }

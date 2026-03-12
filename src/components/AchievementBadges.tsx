@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
@@ -333,12 +334,14 @@ export function AchievementBadges({
       </CardHeader>
 
       <CardContent>
+        <TooltipProvider>
         <div
           className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3"
           data-testid="grid-achievements"
         >
           {computedBadges.map(renderBadge)}
         </div>
+        </TooltipProvider>
 
         {unlockedCount < totalBadges && (
           <p className="text-sm text-muted-foreground text-center mt-4">

@@ -25,6 +25,6 @@ Garde le même sens, 2-4 phrases max. Réponds UNIQUEMENT avec la bio amélioré
     return NextResponse.json({ improved: text })
   } catch (err) {
     console.error('[improve-bio] error:', err)
-    return NextResponse.json({ improved: null }, { status: 500 })
+    return NextResponse.json({ improved: null, debug: String(err) }, { status: 500 })
   }
 }

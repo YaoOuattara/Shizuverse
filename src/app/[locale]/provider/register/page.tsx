@@ -428,7 +428,7 @@ export default function ProviderRegisterPage() {
           <p className="text-center text-xs text-gray-400 mt-6">
             {t("alreadyProvider")}{" "}
             <button
-              onClick={() => router.push(`/${locale}/provider`)}
+              onClick={() => router.push(`/${locale}/provider/login`)}
               className="text-[#0F3A7A] underline"
             >
               {t("loginLink")}
