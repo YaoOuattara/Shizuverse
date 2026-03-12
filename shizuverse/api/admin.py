@@ -205,6 +205,67 @@ def provider_login():
     })
 
 
+@provider_bp.route('/register', methods=['POST'])
+def provider_register():
+    data = request.get_json() or {}
+    full_name = (data.get('full_name') or '').strip()
+    phone = (data.get('phone') or '').strip()
+    password = data.get('password', '')
+    bio = (data.get('bio') or '').strip()
+    service_names = data.get('services') or []
+
+    if not full_name or not phone or not password:
+        return jsonify({'error': 'full_name, phone, and password are required'}), 400
+    if len(password) < 6:
+        return jsonify({'error': 'password must be at least 6 characters'}), 400
+
+    # Use phone as synthetic email so User.email constraint is satisfied
+    synthetic_email = f"{phone.replace(' ', '').replace('+', '')}@shizu.ci"
+    if User.query.filter_by(email=synthetic_email).first():
+        return jsonify({'error': 'A provider with this phone number already exists'}), 409
+
+    user = User(email=synthetic_email, user_type='provider', preferred_language='fr')
+    user.set_password(password)
+    db.session.add(user)
+    db.session.flush()  # get user.id before commit
+
+    # Match submitted service names against the services table (case-insensitive)
+    matched_services = []
+    for sname in service_names:
+        svc = Service.query.filter(Service.name.ilike(f'%{sname}%')).first()
+        if svc:
+            matched_services.append(svc)
+
+    # Need at least one ServiceProvider row for login to return provider_id
+    if not matched_services:
+        fallback = Service.query.filter_by(is_active=True).first()
+        if fallback:
+            matched_services = [fallback]
+
+    sp = None
+    for i, svc in enumerate(matched_services):
+        sp_row = ServiceProvider(
+            user_id=user.id,
+            service_id=svc.id,
+            company_name=full_name,
+            phone_number=phone,
+            bio=bio,
+            verified=False,
+        )
+        db.session.add(sp_row)
+        if i == 0:
+            sp = sp_row
+
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'Registration received. Our team will review your profile.',
+        'provider_id': sp.id if sp else None,
+        'login_email': synthetic_email,
+    }), 201
+
+
 @provider_bp.route('/bookings', methods=['GET'])
 def get_provider_bookings():
     provider_id = request.args.get('provider_id', type=int)

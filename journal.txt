@@ -238,3 +238,42 @@ COMMITS:
 TODO BEFORE PRODUCTION:
 - Run db migrate/create_all on Render to create provider_name, provider_phone, reviewed_by columns
 - Add ANTHROPIC_API_KEY to Vercel env vars (for booking-summary, provider-response, moderate-review)
+
+---
+2026-03-11 — Session 9 continued (bug fixes)
+
+## Fixes deployed (frontend commit b5e8283, backend commit a9cad34)
+
+### Bug 1 — Admin locale not persisting
+- Root cause: AdminLayout nav items used bare /admin/* paths without locale prefix
+- Fix: getNavItems(locale, isFr) now generates /${locale}/admin/* paths
+- Also fixed active state check: comparing full pathname to locale-prefixed path
+
+### Bug 2 — Admin services page crash
+- Root cause: broken nav link (without locale) redirected to login, not real crash
+- Additional: added defensive `bookings = []` default from useAdminStore()
+
+### Bug 3 — Client could change booking status
+- Fix: removed onStatusChange prop from BookingCard in bookings/page.tsx
+- Clients see read-only status badge; status changes only possible in admin panel
+
+### Bug 4 — No back navigation on bookings page
+- Added ← Back to home button in bookings page header
+- Added "View my bookings →" subtle text link in HomeHero below trust row
+- Added backHome translation key to en.json + fr.json bookingsPage namespace
+
+### Bug 5 — Flask /api/provider/login endpoint
+- Previously committed (a9cad34) but now pushed to staging for Render redeploy
+- Also includes require_provider_token decorator for future protected routes
+
+### Provider login page
+- Created /[locale]/provider/login/page.tsx (email + password)
+- Stores JWT in localStorage.provider_token + provider_info
+
+### AchievementBadges TooltipProvider fix
+- Wrapped badges grid in <TooltipProvider> — fixes /fr/provider crash
+
+### Next steps
+1. Render will auto-deploy from staging push — verify /api/provider/login is live
+2. Set ANTHROPIC_API_KEY in Vercel dashboard for improve-bio to work in production
+3. Wire /provider page to real API once auth context provides providerId
