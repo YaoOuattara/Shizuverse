@@ -1,0 +1,396 @@
+from flask import Blueprint, request, jsonify, current_app, g
+from functools import wraps
+from datetime import datetime
+import jwt as pyjwt
+from shizuverse.models import db, User, ServiceProvider, ClientBooking, Notification
+from shizuverse.models.booking_event import BookingEvent
+
+admin_bp = Blueprint('admin_portal', __name__, url_prefix='/admin')
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Missing token'}), 401
+        token = auth_header[7:]
+        try:
+            payload = pyjwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+            g.admin_payload = payload
+        except pyjwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token expired'}), 401
+        except pyjwt.InvalidTokenError:
+            return jsonify({'error': 'Invalid token'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ── Provider Applications ─────────────────────────────────────
+
+@admin_bp.route('/providers/applications', methods=['GET'])
+@admin_required
+def get_applications():
+    """All providers with verification_status = submitted, oldest first."""
+    providers = ServiceProvider.query.filter_by(
+        verification_status='submitted'
+    ).order_by(ServiceProvider.submitted_at.asc()).all()
+
+    return jsonify([{
+        'id': p.id,
+        'user_id': p.user_id,
+        'company_name': p.company_name,
+        'phone_number': p.phone_number,
+        'bio': p.bio,
+        'verified': p.verified,
+        'verification_status': p.verification_status,
+        'listed_status': p.listed_status,
+        'provider_status': p.provider_status,
+        'submitted_at': p.submitted_at.isoformat() if p.submitted_at else None,
+        'created_at': p.created_at.isoformat() if p.created_at else None,
+    } for p in providers])
+
+
+@admin_bp.route('/providers/<int:provider_id>', methods=['GET'])
+@admin_required
+def get_provider_detail(provider_id):
+    """Full provider profile for review."""
+    p = ServiceProvider.query.get_or_404(provider_id)
+    user = User.query.get(p.user_id)
+    return jsonify({
+        'id': p.id,
+        'user_id': p.user_id,
+        'email': user.email if user else None,
+        'company_name': p.company_name,
+        'phone_number': p.phone_number,
+        'address': p.address,
+        'bio': p.bio,
+        'profile_picture': p.profile_picture,
+        'verified': p.verified,
+        'verification_status': p.verification_status,
+        'listed_status': p.listed_status,
+        'provider_status': p.provider_status,
+        'rejection_reason': p.rejection_reason,
+        'rejection_note': p.rejection_note,
+        'submitted_at': p.submitted_at.isoformat() if p.submitted_at else None,
+        'reviewed_at': p.reviewed_at.isoformat() if p.reviewed_at else None,
+        'reviewed_by': p.reviewed_by,
+        'created_at': p.created_at.isoformat() if p.created_at else None,
+    })
+
+
+@admin_bp.route('/providers/<int:provider_id>/approve', methods=['POST'])
+@admin_required
+def approve_provider(provider_id):
+    """Approve a provider. Sets all 3 status fields and notifies."""
+    p = ServiceProvider.query.get_or_404(provider_id)
+    if p.verification_status != 'submitted':
+        return jsonify({'error': 'Provider is not in submitted state'}), 400
+
+    p.verification_status = 'approved'
+    p.listed_status = 'listed'
+    p.provider_status = 'active'
+    p.verified = True
+    p.reviewed_at = datetime.utcnow()
+    p.reviewed_by = None
+
+    notification = Notification(
+        user_id=p.user_id,
+        type='provider_approved',
+        content='Your profile has been approved. You are now listed on Shizu.'
+    )
+    db.session.add(notification)
+    db.session.commit()
+
+    return jsonify({'message': 'Provider approved', 'provider_id': provider_id})
+
+
+@admin_bp.route('/providers/<int:provider_id>/reject', methods=['POST'])
+@admin_required
+def reject_provider(provider_id):
+    """Reject a provider with a required reason."""
+    p = ServiceProvider.query.get_or_404(provider_id)
+    data = request.get_json()
+    reason = data.get('reason', '').strip()
+    note = data.get('note', '').strip()
+
+    if not reason:
+        return jsonify({'error': 'Rejection reason is required'}), 400
+
+    p.verification_status = 'rejected'
+    p.rejection_reason = reason
+    p.rejection_note = note if note else None
+    p.reviewed_at = datetime.utcnow()
+    p.reviewed_by = None
+
+    notification = Notification(
+        user_id=p.user_id,
+        type='provider_rejected',
+        content=f'Your application was not approved. Reason: {reason}'
+    )
+    db.session.add(notification)
+    db.session.commit()
+
+    return jsonify({'message': 'Provider rejected', 'provider_id': provider_id})
+
+
+@admin_bp.route('/providers/<int:provider_id>/suspend', methods=['POST'])
+@admin_required
+def suspend_provider(provider_id):
+    p = ServiceProvider.query.get_or_404(provider_id)
+    data = request.get_json()
+    reason = data.get('reason', '').strip()
+
+    p.verification_status = 'suspended'
+    p.listed_status = 'unlisted'
+    p.provider_status = 'paused'
+
+    notification = Notification(
+        user_id=p.user_id,
+        type='provider_suspended',
+        content=f'Your account has been suspended. Reason: {reason}' if reason else 'Your account has been suspended by an administrator.'
+    )
+    db.session.add(notification)
+    db.session.commit()
+
+    return jsonify({'message': 'Provider suspended', 'provider_id': provider_id})
+
+
+@admin_bp.route('/providers/<int:provider_id>/reinstate', methods=['POST'])
+@admin_required
+def reinstate_provider(provider_id):
+    p = ServiceProvider.query.get_or_404(provider_id)
+    p.verification_status = 'approved'
+    p.listed_status = 'listed'
+    p.provider_status = 'active'
+
+    notification = Notification(
+        user_id=p.user_id,
+        type='provider_reinstated',
+        content='Your account has been reinstated. You are now listed on Shizu.'
+    )
+    db.session.add(notification)
+    db.session.commit()
+
+    return jsonify({'message': 'Provider reinstated', 'provider_id': provider_id})
+
+
+@admin_bp.route('/providers/<int:provider_id>/listing', methods=['POST'])
+@admin_required
+def toggle_listing(provider_id):
+    p = ServiceProvider.query.get_or_404(provider_id)
+    data = request.get_json()
+    action = data.get('action')
+
+    if action not in ('list', 'unlist'):
+        return jsonify({'error': 'action must be list or unlist'}), 400
+    if p.verification_status != 'approved':
+        return jsonify({'error': 'Provider must be approved to change listing'}), 400
+
+    p.listed_status = 'listed' if action == 'list' else 'unlisted'
+    db.session.commit()
+
+    return jsonify({'message': f'Provider {action}ed', 'listed_status': p.listed_status})
+
+
+@admin_bp.route('/providers/<int:provider_id>/activation', methods=['POST'])
+@admin_required
+def toggle_activation(provider_id):
+    p = ServiceProvider.query.get_or_404(provider_id)
+    data = request.get_json()
+    action = data.get('action')
+
+    if action not in ('activate', 'pause'):
+        return jsonify({'error': 'action must be activate or pause'}), 400
+
+    p.provider_status = 'active' if action == 'activate' else 'paused'
+    db.session.commit()
+
+    return jsonify({'message': f'Provider {action}d', 'provider_status': p.provider_status})
+
+
+# ── Provider Directory ────────────────────────────────────────
+
+@admin_bp.route('/providers', methods=['GET'])
+@admin_required
+def get_all_providers():
+    """Full provider list with optional status filters."""
+    q = ServiceProvider.query
+
+    v = request.args.get('verification_status')
+    l = request.args.get('listed_status')
+    s = request.args.get('provider_status')
+
+    if v: q = q.filter_by(verification_status=v)
+    if l: q = q.filter_by(listed_status=l)
+    if s: q = q.filter_by(provider_status=s)
+
+    providers = q.order_by(ServiceProvider.created_at.desc()).all()
+
+    return jsonify([{
+        'id': p.id,
+        'company_name': p.company_name,
+        'phone_number': p.phone_number,
+        'verification_status': p.verification_status,
+        'listed_status': p.listed_status,
+        'provider_status': p.provider_status,
+        'verified': p.verified,
+        'submitted_at': p.submitted_at.isoformat() if p.submitted_at else None,
+        'created_at': p.created_at.isoformat() if p.created_at else None,
+    } for p in providers])
+
+
+# ── Bookings ──────────────────────────────────────────────────
+
+@admin_bp.route('/bookings', methods=['GET'])
+@admin_required
+def get_all_bookings():
+    """Full booking list with optional status filters."""
+    q = ClientBooking.query
+
+    status = request.args.get('status')
+    payment = request.args.get('payment_status')
+    payout = request.args.get('payout_status')
+
+    if status: q = q.filter_by(status=status)
+    if payment: q = q.filter_by(payment_status=payment)
+    if payout: q = q.filter_by(payout_status=payout)
+
+    bookings = q.order_by(ClientBooking.created_at.desc()).all()
+    return jsonify([b.to_dict() for b in bookings])
+
+
+@admin_bp.route('/bookings/<int:booking_id>', methods=['GET'])
+@admin_required
+def get_booking_detail(booking_id):
+    b = ClientBooking.query.get_or_404(booking_id)
+    events = BookingEvent.query.filter_by(booking_id=booking_id).order_by(BookingEvent.created_at.asc()).all()
+    data = b.to_dict()
+    data['events'] = [{
+        'id': e.id,
+        'event_type': e.event_type,
+        'from_status': e.from_status,
+        'to_status': e.to_status,
+        'actor_phone': e.actor_phone,
+        'note': e.note,
+        'created_at': e.created_at.isoformat()
+    } for e in events]
+    return jsonify(data)
+
+
+@admin_bp.route('/bookings/<int:booking_id>/cancel', methods=['POST'])
+@admin_required
+def cancel_booking(booking_id):
+    b = ClientBooking.query.get_or_404(booking_id)
+    data = request.get_json()
+
+    if b.status in ('completed', 'cancelled', 'declined'):
+        return jsonify({'error': f'Cannot cancel a booking with status {b.status}'}), 400
+
+    reason = data.get('reason', '').strip()
+    prev_status = b.status
+    b.status = 'cancelled'
+    b.cancellation_reason = reason if reason else None
+
+    event = BookingEvent(
+        booking_id=b.id,
+        event_type='admin_cancel',
+        from_status=prev_status,
+        to_status='cancelled',
+        actor_id=None,
+        note=reason if reason else None
+    )
+    db.session.add(event)
+    db.session.commit()
+
+    return jsonify({'message': 'Booking cancelled', 'booking_id': booking_id})
+
+
+@admin_bp.route('/bookings/<int:booking_id>/finance', methods=['POST'])
+@admin_required
+def update_finance(booking_id):
+    """Manually update payment_status or payout_status."""
+    b = ClientBooking.query.get_or_404(booking_id)
+    data = request.get_json()
+
+    payment = data.get('payment_status')
+    payout = data.get('payout_status')
+
+    valid_payment = ('unpaid', 'pending', 'paid', 'refunded')
+    valid_payout = ('not_due', 'due', 'sent', 'failed')
+
+    if payment and payment not in valid_payment:
+        return jsonify({'error': f'Invalid payment_status: {payment}'}), 400
+    if payout and payout not in valid_payout:
+        return jsonify({'error': f'Invalid payout_status: {payout}'}), 400
+    if payout == 'due' and b.payment_status != 'paid':
+        return jsonify({'error': 'Cannot set payout to due until payment_status is paid'}), 400
+
+    if payment:
+        b.payment_status = payment
+    if payout:
+        b.payout_status = payout
+
+    db.session.commit()
+    return jsonify({'message': 'Finance status updated', 'payment_status': b.payment_status, 'payout_status': b.payout_status})
+
+
+@admin_bp.route('/bookings/<int:booking_id>/dispute', methods=['POST'])
+@admin_required
+def resolve_dispute(booking_id):
+    b = ClientBooking.query.get_or_404(booking_id)
+    if b.status != 'disputed':
+        return jsonify({'error': 'Booking is not in disputed state'}), 400
+
+    data = request.get_json()
+    resolution = data.get('resolution')
+
+    if resolution not in ('complete', 'cancel'):
+        return jsonify({'error': 'resolution must be complete or cancel'}), 400
+
+    prev_status = b.status
+    if resolution == 'complete':
+        b.status = 'completed'
+        if b.payment_status == 'paid':
+            b.payout_status = 'due'
+        note = 'Dispute resolved in provider favour'
+    else:
+        b.status = 'cancelled'
+        if b.payment_status == 'paid':
+            b.payment_status = 'refunded'
+        note = 'Dispute resolved in client favour'
+
+    event = BookingEvent(
+        booking_id=b.id,
+        event_type='dispute_resolved',
+        from_status=prev_status,
+        to_status=b.status,
+        actor_id=None,
+        note=note
+    )
+    db.session.add(event)
+    db.session.commit()
+
+    return jsonify({'message': f'Dispute resolved: {resolution}', 'booking_id': booking_id})
+
+
+# ── Finance Overview ──────────────────────────────────────────
+
+@admin_bp.route('/finance/summary', methods=['GET'])
+@admin_required
+def finance_summary():
+    from sqlalchemy import func
+    completed = db.session.query(func.count(ClientBooking.id)).filter_by(status='completed').scalar()
+    total_paid = db.session.query(func.coalesce(func.sum(ClientBooking.amount_xof), 0)).filter_by(payment_status='paid').scalar()
+    payouts_due_count = db.session.query(func.count(ClientBooking.id)).filter_by(payout_status='due').scalar()
+    payouts_due_value = db.session.query(func.coalesce(func.sum(ClientBooking.amount_xof), 0)).filter_by(payout_status='due').scalar()
+    failed_payouts = db.session.query(func.count(ClientBooking.id)).filter_by(payout_status='failed').scalar()
+    unpaid_completed = db.session.query(func.count(ClientBooking.id)).filter_by(status='completed', payment_status='unpaid').scalar()
+
+    return jsonify({
+        'completed_bookings': completed,
+        'total_paid_xof': int(total_paid),
+        'payouts_due_count': payouts_due_count,
+        'payouts_due_value_xof': int(payouts_due_value),
+        'failed_payouts': failed_payouts,
+        'unpaid_completed_bookings': unpaid_completed,
+    })

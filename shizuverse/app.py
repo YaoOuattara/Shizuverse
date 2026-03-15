@@ -82,6 +82,8 @@ def create_app():
     create_socket_instance(socketio)
 
     SKIP_NAMES = {"auth", "socket_chat", "chat"}
+    from shizuverse.routes.admin import admin_bp
+    app.register_blueprint(admin_bp)
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(socket_chat_bp, url_prefix="/chat")
     app.register_blueprint(api_blueprint, url_prefix="/api")
