@@ -19,6 +19,8 @@ class User(UserMixin, db.Model):
     services = db.relationship(
         'Service',
         secondary='service_providers',
+        primaryjoin='User.id == foreign(ServiceProvider.user_id)',
+        secondaryjoin='Service.id == foreign(ServiceProvider.service_id)',
         lazy='dynamic',
         backref=db.backref('providers', lazy='dynamic'),
         overlaps='provider_links,service,service_provider_links,user'

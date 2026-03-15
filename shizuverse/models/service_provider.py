@@ -47,6 +47,7 @@ class ServiceProvider(db.Model):
     # Light, directional relationships. Full M2M is declared on User.services
     user = db.relationship(
         "User",
+        foreign_keys=[user_id],
         backref=db.backref("service_provider_links", cascade="all, delete-orphan"), overlaps="services"
     )
     service = db.relationship(
