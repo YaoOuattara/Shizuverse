@@ -26,6 +26,11 @@ def upgrade():
     op.execute("DROP TABLE IF EXISTS chat_session")
     op.execute("DROP TABLE IF EXISTS appointment")
     op.execute("DROP TABLE IF EXISTS submitted_services")
+    op.execute("CREATE TYPE IF NOT EXISTS payment_status_enum AS ENUM ('unpaid', 'pending', 'paid', 'refunded')")
+    op.execute("CREATE TYPE IF NOT EXISTS payout_status_enum AS ENUM ('not_due', 'due', 'sent', 'failed')")
+    op.execute("CREATE TYPE IF NOT EXISTS verification_status_enum AS ENUM ('draft', 'submitted', 'approved', 'rejected', 'suspended')")
+    op.execute("CREATE TYPE IF NOT EXISTS listed_status_enum AS ENUM ('listed', 'unlisted')")
+    op.execute("CREATE TYPE IF NOT EXISTS provider_status_enum AS ENUM ('active', 'paused')")
     with op.batch_alter_table('client_bookings', schema=None) as batch_op:
         batch_op.add_column(sa.Column('payment_status', sa.Enum('unpaid', 'pending', 'paid', 'refunded', name='payment_status_enum'), nullable=False))
         batch_op.add_column(sa.Column('payout_status', sa.Enum('not_due', 'due', 'sent', 'failed', name='payout_status_enum'), nullable=False))
@@ -222,4 +227,9 @@ def downgrade():
     sa.Column('requirements', postgresql.JSON(astext_type=sa.Text()), autoincrement=False, nullable=True),
     sa.PrimaryKeyConstraint('id', name='achievement_pkey')
     )
+    op.execute("DROP TYPE IF EXISTS payment_status_enum")
+    op.execute("DROP TYPE IF EXISTS payout_status_enum")
+    op.execute("DROP TYPE IF EXISTS verification_status_enum")
+    op.execute("DROP TYPE IF EXISTS listed_status_enum")
+    op.execute("DROP TYPE IF EXISTS provider_status_enum")
     # ### end Alembic commands ###
