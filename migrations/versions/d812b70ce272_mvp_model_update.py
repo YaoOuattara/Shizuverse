@@ -62,11 +62,7 @@ def upgrade():
     op.execute("ALTER TABLE client_bookings ADD COLUMN IF NOT EXISTS decline_reason TEXT")
     op.execute("ALTER TABLE client_bookings ADD COLUMN IF NOT EXISTS cancellation_reason TEXT")
 
-    with op.batch_alter_table('notifications', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('booking_id', sa.Integer(), nullable=True))
-        batch_op.drop_constraint('notifications_appointment_id_fkey', type_='foreignkey')
-        batch_op.create_foreign_key(None, 'client_bookings', ['booking_id'], ['id'])
-        batch_op.drop_column('appointment_id')
+    op.execute("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS booking_id INTEGER REFERENCES client_bookings(id)")
 
     op.execute("ALTER TABLE service_providers ADD COLUMN IF NOT EXISTS service_id INTEGER")
     op.execute("ALTER TABLE service_providers ADD COLUMN IF NOT EXISTS company_name VARCHAR(200)")
@@ -85,21 +81,11 @@ def upgrade():
     op.execute("ALTER TABLE service_providers ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP")
     op.execute("ALTER TABLE service_providers ADD COLUMN IF NOT EXISTS reviewed_by INTEGER")
 
-    with op.batch_alter_table('services', schema=None) as batch_op:
-        batch_op.alter_column('is_active',
-               existing_type=sa.BOOLEAN(),
-               nullable=False)
-        batch_op.alter_column('is_priority',
-               existing_type=sa.BOOLEAN(),
-               nullable=False)
-        batch_op.create_index(batch_op.f('ix_services_is_active'), ['is_active'], unique=False)
-        batch_op.create_index(batch_op.f('ix_services_is_priority'), ['is_priority'], unique=False)
-        batch_op.drop_constraint('services_provider_id_fkey', type_='foreignkey')
-        batch_op.drop_column('provider_id')
+    op.execute("CREATE INDEX IF NOT EXISTS ix_services_is_active ON services (is_active)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_services_is_priority ON services (is_priority)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_services_featured ON services (featured)")
 
-    with op.batch_alter_table('users', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('role_id', sa.Integer(), nullable=True))
-        batch_op.create_foreign_key(None, 'roles', ['role_id'], ['id'])
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role_id INTEGER REFERENCES roles(id)")
 
     # ### end Alembic commands ###
 
