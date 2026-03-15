@@ -251,6 +251,8 @@ def provider_register():
             phone_number=phone,
             bio=bio,
             verified=False,
+            verification_status='submitted',
+            submitted_at=datetime.utcnow(),
         )
         db.session.add(sp_row)
         if i == 0:
