@@ -20,7 +20,8 @@ class User(UserMixin, db.Model):
         'Service',
         secondary='service_providers',
         lazy='dynamic',
-        backref=db.backref('providers', lazy='dynamic'), overlaps='provider_links,service'
+        backref=db.backref('providers', lazy='dynamic'),
+        overlaps='provider_links,service,service_provider_links,user'
     )
 
     # REMOVED: conflicting appointments relationship that duplicated the backref
