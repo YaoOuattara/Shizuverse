@@ -57,8 +57,8 @@ def upgrade():
         END $$;
     """)
     with op.batch_alter_table('client_bookings', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('payment_status', sa.Enum('unpaid', 'pending', 'paid', 'refunded', name='payment_status_enum'), nullable=False))
-        batch_op.add_column(sa.Column('payout_status', sa.Enum('not_due', 'due', 'sent', 'failed', name='payout_status_enum'), nullable=False))
+        batch_op.add_column(sa.Column('payment_status', sa.Enum('unpaid', 'pending', 'paid', 'refunded', name='payment_status_enum'), nullable=False, server_default='unpaid'))
+        batch_op.add_column(sa.Column('payout_status', sa.Enum('not_due', 'due', 'sent', 'failed', name='payout_status_enum'), nullable=False, server_default='not_due'))
         batch_op.add_column(sa.Column('amount_xof', sa.Integer(), nullable=True))
         batch_op.add_column(sa.Column('decline_reason', sa.Text(), nullable=True))
         batch_op.add_column(sa.Column('cancellation_reason', sa.Text(), nullable=True))
@@ -76,9 +76,9 @@ def upgrade():
         batch_op.add_column(sa.Column('address', sa.String(length=255), nullable=True))
         batch_op.add_column(sa.Column('profile_picture', sa.String(length=255), nullable=True))
         batch_op.add_column(sa.Column('verified', sa.Boolean(), nullable=True))
-        batch_op.add_column(sa.Column('verification_status', sa.Enum('draft', 'submitted', 'approved', 'rejected', 'suspended', name='verification_status_enum'), nullable=False))
-        batch_op.add_column(sa.Column('listed_status', sa.Enum('listed', 'unlisted', name='listed_status_enum'), nullable=False))
-        batch_op.add_column(sa.Column('provider_status', sa.Enum('active', 'paused', name='provider_status_enum'), nullable=False))
+        batch_op.add_column(sa.Column('verification_status', sa.Enum('draft', 'submitted', 'approved', 'rejected', 'suspended', name='verification_status_enum'), nullable=False, server_default='draft'))
+        batch_op.add_column(sa.Column('listed_status', sa.Enum('listed', 'unlisted', name='listed_status_enum'), nullable=False, server_default='unlisted'))
+        batch_op.add_column(sa.Column('provider_status', sa.Enum('active', 'paused', name='provider_status_enum'), nullable=False, server_default='paused'))
         batch_op.add_column(sa.Column('rejection_reason', sa.String(length=200), nullable=True))
         batch_op.add_column(sa.Column('rejection_note', sa.Text(), nullable=True))
         batch_op.add_column(sa.Column('submitted_at', sa.DateTime(), nullable=True))
