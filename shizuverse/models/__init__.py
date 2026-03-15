@@ -13,4 +13,5 @@ from shizuverse.models.achievement import Achievement
 from shizuverse.models.notification import Notification
 from shizuverse.models.service_provider import ServiceProvider
 from shizuverse.models.client_booking import ClientBooking
+from shizuverse.models.booking_event import BookingEvent
 from shizuverse.models.review import Review

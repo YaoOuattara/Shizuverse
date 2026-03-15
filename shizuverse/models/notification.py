@@ -10,9 +10,9 @@ class Notification(db.Model):
     type = db.Column(db.String(50), nullable=False)
     content = db.Column(db.String(255), nullable=False)
 
-    appointment_id = db.Column(db.Integer, db.ForeignKey('appointments.id'), nullable=True)
+    booking_id = db.Column(db.Integer, db.ForeignKey('client_bookings.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
     user = db.relationship('User', backref='notifications')
-    appointment = db.relationship('Appointment', backref='notifications')
+    booking = db.relationship('ClientBooking', backref=db.backref('notifications', lazy='dynamic'), foreign_keys=[booking_id])

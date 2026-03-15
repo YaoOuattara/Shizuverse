@@ -57,14 +57,13 @@ def create_app():
     db.init_app(app)
     Migrate(app, db)
 
-    with app.app_context():
-        db.create_all()
-        try:
-            from flask_migrate import upgrade as flask_db_upgrade
+    from flask_migrate import upgrade as flask_db_upgrade
+    try:
+        with app.app_context():
             flask_db_upgrade()
-            logger.info("flask db upgrade completed")
-        except Exception as e:
-            logger.warning("flask db upgrade skipped: %s", e)
+    except Exception as e:
+        app.logger.error(f"Migration failed on startup: {e}")
+        # App continues to start — existing schema still works
     CORS(app, origins="*")
     Babel(app)
 

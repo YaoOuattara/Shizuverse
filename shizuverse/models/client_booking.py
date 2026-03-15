@@ -1,7 +1,7 @@
 from . import db
 from datetime import datetime
 
-VALID_STATUSES = ['pending', 'under_review', 'assigned', 'confirmed', 'completed', 'cancelled']
+VALID_STATUSES = ['requested', 'accepted', 'declined', 'in_progress', 'completed', 'cancelled', 'disputed']
 
 
 class ClientBooking(db.Model):
@@ -20,8 +20,17 @@ class ClientBooking(db.Model):
     service_slug = db.Column(db.String(80),  nullable=True)   # e.g. "menage"
 
     appointment_date = db.Column(db.DateTime, nullable=False)
-    status           = db.Column(db.String(20), default="pending", nullable=False)
+    status           = db.Column(db.String(20), default="requested", nullable=False)
     notes            = db.Column(db.Text, nullable=True)
+    payment_status = db.Column(
+        db.Enum('unpaid', 'pending', 'paid', 'refunded', name='payment_status_enum'),
+        default='unpaid', nullable=False)
+    payout_status = db.Column(
+        db.Enum('not_due', 'due', 'sent', 'failed', name='payout_status_enum'),
+        default='not_due', nullable=False)
+    amount_xof = db.Column(db.Integer, nullable=True)
+    decline_reason = db.Column(db.Text, nullable=True)
+    cancellation_reason = db.Column(db.Text, nullable=True)
     created_at       = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Provider assignment fields (set when admin assigns a provider)

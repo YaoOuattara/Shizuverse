@@ -25,6 +25,22 @@ class ServiceProvider(db.Model):
     profile_picture = db.Column(db.String(255))
     verified = db.Column(db.Boolean, default=False)
 
+    verification_status = db.Column(
+        db.Enum('draft', 'submitted', 'approved', 'rejected', 'suspended',
+                name='verification_status_enum'),
+        default='draft', nullable=False)
+    listed_status = db.Column(
+        db.Enum('listed', 'unlisted', name='listed_status_enum'),
+        default='unlisted', nullable=False)
+    provider_status = db.Column(
+        db.Enum('active', 'paused', name='provider_status_enum'),
+        default='paused', nullable=False)
+    rejection_reason = db.Column(db.String(200), nullable=True)
+    rejection_note = db.Column(db.Text, nullable=True)
+    submitted_at = db.Column(db.DateTime, nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    reviewed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
