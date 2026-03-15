@@ -26,11 +26,36 @@ def upgrade():
     op.execute("DROP TABLE IF EXISTS chat_session")
     op.execute("DROP TABLE IF EXISTS appointment")
     op.execute("DROP TABLE IF EXISTS submitted_services")
-    op.execute("CREATE TYPE IF NOT EXISTS payment_status_enum AS ENUM ('unpaid', 'pending', 'paid', 'refunded')")
-    op.execute("CREATE TYPE IF NOT EXISTS payout_status_enum AS ENUM ('not_due', 'due', 'sent', 'failed')")
-    op.execute("CREATE TYPE IF NOT EXISTS verification_status_enum AS ENUM ('draft', 'submitted', 'approved', 'rejected', 'suspended')")
-    op.execute("CREATE TYPE IF NOT EXISTS listed_status_enum AS ENUM ('listed', 'unlisted')")
-    op.execute("CREATE TYPE IF NOT EXISTS provider_status_enum AS ENUM ('active', 'paused')")
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE payment_status_enum AS ENUM ('unpaid', 'pending', 'paid', 'refunded');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE payout_status_enum AS ENUM ('not_due', 'due', 'sent', 'failed');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE verification_status_enum AS ENUM ('draft', 'submitted', 'approved', 'rejected', 'suspended');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE listed_status_enum AS ENUM ('listed', 'unlisted');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE provider_status_enum AS ENUM ('active', 'paused');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
     with op.batch_alter_table('client_bookings', schema=None) as batch_op:
         batch_op.add_column(sa.Column('payment_status', sa.Enum('unpaid', 'pending', 'paid', 'refunded', name='payment_status_enum'), nullable=False))
         batch_op.add_column(sa.Column('payout_status', sa.Enum('not_due', 'due', 'sent', 'failed', name='payout_status_enum'), nullable=False))
