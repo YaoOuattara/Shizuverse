@@ -393,5 +393,27 @@
     "errorGeneral": "Une erreur est survenue. Veuillez réessayer.",
     "noAccount": "Pas encore prestataire ?",
     "registerLink": "Rejoindre Shizu"
+  },
+  "adminProviders": {
+    "rejectionReasons": {
+      "missing_id": "Document d'identité manquant ou illisible",
+      "name_mismatch": "Le document ne correspond pas au nom du compte",
+      "unsupported_zone": "Catégorie de service non disponible dans les zones de lancement",
+      "insufficient_experience": "Expérience ou preuves de compétences insuffisantes",
+      "no_pricing": "Tarification non fournie",
+      "incomplete_profile": "Profil incomplet — champs obligatoires manquants",
+      "duplicate_account": "Compte en double ou potentiellement frauduleux",
+      "other": "Autre"
+    },
+    "unlistReason": "Pourquoi désinscrire ce prestataire ?",
+    "unlistTitle": "Désinscrire le prestataire",
+    "unlistDescription": "Cela masquera le prestataire de la marketplace. Il restera approuvé mais invisible aux clients.",
+    "approveButton": "Approuver le prestataire",
+    "rejectButton": "Rejeter la candidature",
+    "unlistButton": "Désinscrire le prestataire",
+    "pauseButton": "Suspendre les opérations",
+    "resumeButton": "Reprendre les opérations",
+    "suspendButton": "Suspendre le prestataire",
+    "reinstateButton": "Réintégrer le prestataire"
   }
 }

@@ -393,5 +393,27 @@
     "errorGeneral": "Something went wrong. Please try again.",
     "noAccount": "Not yet a provider?",
     "registerLink": "Join Shizu"
+  },
+  "adminProviders": {
+    "rejectionReasons": {
+      "missing_id": "Identity document missing or unreadable",
+      "name_mismatch": "Document does not match account name",
+      "unsupported_zone": "Service category not supported in launch zones",
+      "insufficient_experience": "Insufficient experience or proof of skill",
+      "no_pricing": "Pricing not provided",
+      "incomplete_profile": "Profile incomplete — key fields missing",
+      "duplicate_account": "Duplicate or suspected fraudulent account",
+      "other": "Other"
+    },
+    "unlistReason": "Why are you unlisting this provider?",
+    "unlistTitle": "Unlist Provider",
+    "unlistDescription": "This will hide the provider from the marketplace. They will remain approved but not visible to clients.",
+    "approveButton": "Approve Provider",
+    "rejectButton": "Reject Application",
+    "unlistButton": "Unlist Provider",
+    "pauseButton": "Pause Operations",
+    "resumeButton": "Resume Operations",
+    "suspendButton": "Suspend Provider",
+    "reinstateButton": "Reinstate Provider"
   }
 }

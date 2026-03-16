@@ -7,6 +7,7 @@
  */
 
 import { useState, useMemo, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import AdminLayout from "./AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -78,16 +79,16 @@ const verificationTabs: { value: VerificationFilterTab; label: string; icon: typ
   { value: 'suspended', label: 'Suspended', icon: ShieldAlert },
 ];
 
-const rejectionReasons = [
-  { value: 'missing_id', label: 'Identity document missing or unreadable' },
-  { value: 'name_mismatch', label: 'Document does not match account name' },
-  { value: 'unsupported_zone', label: 'Service category not supported in launch zones' },
-  { value: 'insufficient_experience', label: 'Insufficient experience or proof of skill' },
-  { value: 'no_pricing', label: 'Pricing not provided' },
-  { value: 'incomplete_profile', label: 'Profile incomplete — key fields missing' },
-  { value: 'duplicate_account', label: 'Duplicate or suspected fraudulent account' },
-  { value: 'other', label: 'Other' },
-];
+const REJECTION_REASON_KEYS = [
+  'missing_id',
+  'name_mismatch',
+  'unsupported_zone',
+  'insufficient_experience',
+  'no_pricing',
+  'incomplete_profile',
+  'duplicate_account',
+  'other',
+] as const;
 
 const suspensionReasons = [
   { value: 'customer_complaints', label: 'Multiple Customer Complaints' },
@@ -122,6 +123,11 @@ const getVerificationBadge = (status: VerificationStatus) => {
 
 export default function AdminProviders() {
   const { toast } = useToast();
+  const t = useTranslations("adminProviders");
+  const rejectionReasons = REJECTION_REASON_KEYS.map((key) => ({
+    value: key,
+    label: t(`rejectionReasons.${key}`),
+  }));
   const { providers: apiProviders, loading: providersLoading } = useAdminProviders();
   const [localProviders, setLocalProviders] = useState<AdminProvider[]>([]);
 
@@ -628,7 +634,7 @@ export default function AdminProviders() {
                     ) : (
                       <ShieldCheck className="h-4 w-4 mr-2" />
                     )}
-                    Approve Provider
+                    {t("approveButton")}
                   </Button>
 
                   <div className="space-y-2">
@@ -673,7 +679,7 @@ export default function AdminProviders() {
                       ) : (
                         <ShieldX className="h-4 w-4 mr-2" />
                       )}
-                      Reject Application
+                      {t("rejectButton")}
                     </Button>
                   </div>
                 </div>
@@ -698,7 +704,7 @@ export default function AdminProviders() {
                     ) : (
                       <Eye className="h-4 w-4 mr-2" />
                     )}
-                    {selectedProvider.listed ? "Unlist Provider" : "List Provider"}
+                    {selectedProvider.listed ? t("unlistButton") : "List Provider"}
                   </Button>
 
                   <Button
@@ -715,7 +721,7 @@ export default function AdminProviders() {
                     ) : (
                       <Play className="h-4 w-4 mr-2" />
                     )}
-                    {selectedProvider.status === "active" ? "Pause Operations" : "Resume Operations"}
+                    {selectedProvider.status === "active" ? t("pauseButton") : t("resumeButton")}
                   </Button>
 
                   <Button
@@ -726,7 +732,7 @@ export default function AdminProviders() {
                     data-testid="button-suspend"
                   >
                     <ShieldAlert className="h-4 w-4 mr-2" />
-                    Suspend Provider
+                    {t("suspendButton")}
                   </Button>
                 </div>
               )}
@@ -746,7 +752,7 @@ export default function AdminProviders() {
                     ) : (
                       <ShieldCheck className="h-4 w-4 mr-2" />
                     )}
-                    Approve Provider
+                    {t("approveButton")}
                   </Button>
                 </div>
               )}
@@ -783,7 +789,7 @@ export default function AdminProviders() {
                     ) : (
                       <ShieldCheck className="h-4 w-4 mr-2" />
                     )}
-                    Reinstate Provider
+                    {t("reinstateButton")}
                   </Button>
                 </div>
               )}
@@ -840,7 +846,7 @@ export default function AdminProviders() {
               data-testid="button-confirm-suspend"
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Suspend Provider
+              {t("suspendButton")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -850,9 +856,9 @@ export default function AdminProviders() {
       <Dialog open={unlistModalOpen} onOpenChange={setUnlistModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Unlist Provider</DialogTitle>
+            <DialogTitle>{t("unlistTitle")}</DialogTitle>
             <DialogDescription>
-              This will hide the provider from the marketplace. They will remain approved but not visible to clients.
+              {t("unlistDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -862,7 +868,7 @@ export default function AdminProviders() {
                 id="unlist-reason"
                 value={unlistReason}
                 onChange={(e) => setUnlistReason(e.target.value)}
-                placeholder="Why are you unlisting this provider?"
+                placeholder={t("unlistReason")}
                 rows={3}
                 data-testid="textarea-unlist-reason"
               />
@@ -872,13 +878,13 @@ export default function AdminProviders() {
             <Button variant="outline" onClick={() => setUnlistModalOpen(false)}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleUnlist}
               disabled={isUpdating}
               data-testid="button-confirm-unlist"
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Unlist Provider
+              {t("unlistButton")}
             </Button>
           </DialogFooter>
         </DialogContent>
