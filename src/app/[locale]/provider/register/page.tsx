@@ -160,12 +160,12 @@ export default function ProviderRegisterPage() {
       const res = await fetch("/api/improve-bio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bio, locale }),
+        body: JSON.stringify({ bio, services: selectedServices }),
       });
       const data = await res.json();
       if (data.error) console.error('[improve-bio] server error:', data.error);
-      if (data.improved) {
-        setBio(data.improved);
+      if (data.improved_bio) {
+        setBio(data.improved_bio);
         toast({
           title: isFr ? "Bio améliorée !" : "Bio improved!",
           description: isFr
