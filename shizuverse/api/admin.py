@@ -39,7 +39,7 @@ def admin_login():
     payload = {
         'sub': 'admin',
         'iat': datetime.utcnow(),
-        'exp': datetime.utcnow() + timedelta(hours=8),
+        'exp': datetime.utcnow() + timedelta(days=30),
     }
     token = jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm='HS256')
     return jsonify({'token': token})
