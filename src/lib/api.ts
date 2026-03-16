@@ -67,6 +67,10 @@ export const adminApi = {
     adminFetch(`/admin/providers/${id}/listing`, { method: "POST", body: JSON.stringify({ action }) }),
   portalToggleActivation: (id: number, action: "activate" | "pause") =>
     adminFetch(`/admin/providers/${id}/activation`, { method: "POST", body: JSON.stringify({ action }) }),
+  portalGetBookings: (params?: { status?: string; payment_status?: string; payout_status?: string }) => {
+    const qs = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => !!v).map(([k, v]) => [k, v as string])).toString() : "";
+    return adminFetch(`/admin/bookings${qs ? `?${qs}` : ""}`);
+  },
   portalGetFinanceSummary: () => adminFetch("/admin/finance/summary"),
 };
 

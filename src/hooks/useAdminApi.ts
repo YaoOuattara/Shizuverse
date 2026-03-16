@@ -11,18 +11,23 @@ export interface ApiStats {
 }
 
 export interface ApiBooking {
-  id: string;
-  clientName: string;
-  clientPhone: string;
-  serviceName: string;
-  serviceSlug: string;
-  date: string;
+  id: number;
+  client_name: string;
+  client_phone: string;
+  client_location: string;
+  service_name: string;
+  service_slug: string;
+  appointment_date: string;
   status: string;
-  location: string;
-  notes: string;
-  providerName: string;
-  providerPhone: string;
-  createdAt: string;
+  notes: string | null;
+  provider_name: string | null;
+  provider_phone: string | null;
+  created_at: string | null;
+  payment_status: string;
+  payout_status: string;
+  amount_xof: number | null;
+  decline_reason: string | null;
+  cancellation_reason: string | null;
 }
 
 export interface ApiProvider {
@@ -75,8 +80,8 @@ export function useAdminBookings(status?: string) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    adminApi.getBookings(status)
-      .then((data) => setBookings(Array.isArray(data) ? data : (data.bookings ?? [])))
+    adminApi.portalGetBookings(status ? { status } : undefined)
+      .then((data: ApiBooking[]) => setBookings(Array.isArray(data) ? data : []))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [status]);
