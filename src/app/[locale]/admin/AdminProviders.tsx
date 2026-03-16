@@ -79,12 +79,14 @@ const verificationTabs: { value: VerificationFilterTab; label: string; icon: typ
 ];
 
 const rejectionReasons = [
-  { value: 'incomplete_documents', label: 'Incomplete Documents' },
-  { value: 'invalid_id', label: 'Invalid ID Proof' },
-  { value: 'poor_quality_photos', label: 'Poor Quality Photos' },
-  { value: 'reference_issue', label: 'Reference Verification Failed' },
-  { value: 'policy_violation', label: 'Policy Violation' },
-  { value: 'other', label: 'Other Reason' },
+  { value: 'missing_id', label: 'Identity document missing or unreadable' },
+  { value: 'name_mismatch', label: 'Document does not match account name' },
+  { value: 'unsupported_zone', label: 'Service category not supported in launch zones' },
+  { value: 'insufficient_experience', label: 'Insufficient experience or proof of skill' },
+  { value: 'no_pricing', label: 'Pricing not provided' },
+  { value: 'incomplete_profile', label: 'Profile incomplete — key fields missing' },
+  { value: 'duplicate_account', label: 'Duplicate or suspected fraudulent account' },
+  { value: 'other', label: 'Other' },
 ];
 
 const suspensionReasons = [
@@ -157,7 +159,7 @@ export default function AdminProviders() {
   const [verificationFilter, setVerificationFilter] = useState<VerificationFilterTab>("all");
   const [selectedProvider, setSelectedProvider] = useState<AdminProvider | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("incomplete_documents");
+  const [rejectionReason, setRejectionReason] = useState("missing_id");
   const [customRejectionNote, setCustomRejectionNote] = useState("");
   
   // Modal states
@@ -631,12 +633,20 @@ export default function AdminProviders() {
 
                   <div className="space-y-2">
                     <Select value={rejectionReason} onValueChange={setRejectionReason}>
-                      <SelectTrigger data-testid="select-rejection-reason">
-                        <SelectValue placeholder="Rejection reason" />
+                      <SelectTrigger data-testid="select-rejection-reason" className="w-full">
+                        <SelectValue placeholder="Select rejection reason" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent
+                        position="popper"
+                        sideOffset={4}
+                        className="z-[9999] w-[var(--radix-select-trigger-width)] min-w-[280px] overflow-hidden rounded-md border border-border bg-white dark:bg-zinc-900 shadow-xl"
+                      >
                         {rejectionReasons.map((reason) => (
-                          <SelectItem key={reason.value} value={reason.value}>
+                          <SelectItem
+                            key={reason.value}
+                            value={reason.value}
+                            className="cursor-pointer py-3 px-4 text-sm leading-snug focus:bg-accent focus:text-accent-foreground data-[highlighted]:bg-accent"
+                          >
                             {reason.label}
                           </SelectItem>
                         ))}
