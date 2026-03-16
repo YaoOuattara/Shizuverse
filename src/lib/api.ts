@@ -48,6 +48,26 @@ export const adminApi = {
   verifyProvider: (id: number) =>
     adminFetch(`/api/admin/providers/${id}/verify`, { method: "PATCH" }),
   getServices: () => adminFetch("/api/admin/services"),
+
+  // New admin portal endpoints (/admin/* blueprint)
+  portalGetProviders: (params?: { verification_status?: string; listed_status?: string; provider_status?: string }) => {
+    const qs = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => !!v) as [string, string][]).toString() : "";
+    return adminFetch(`/admin/providers${qs ? `?${qs}` : ""}`);
+  },
+  portalGetProviderDetail: (id: number) => adminFetch(`/admin/providers/${id}`),
+  portalApproveProvider: (id: number) =>
+    adminFetch(`/admin/providers/${id}/approve`, { method: "POST", body: JSON.stringify({}) }),
+  portalRejectProvider: (id: number, reason: string, note?: string) =>
+    adminFetch(`/admin/providers/${id}/reject`, { method: "POST", body: JSON.stringify({ reason, note: note || "" }) }),
+  portalSuspendProvider: (id: number, reason?: string) =>
+    adminFetch(`/admin/providers/${id}/suspend`, { method: "POST", body: JSON.stringify({ reason: reason || "" }) }),
+  portalReinstateProvider: (id: number) =>
+    adminFetch(`/admin/providers/${id}/reinstate`, { method: "POST", body: JSON.stringify({}) }),
+  portalToggleListing: (id: number, action: "list" | "unlist") =>
+    adminFetch(`/admin/providers/${id}/listing`, { method: "POST", body: JSON.stringify({ action }) }),
+  portalToggleActivation: (id: number, action: "activate" | "pause") =>
+    adminFetch(`/admin/providers/${id}/activation`, { method: "POST", body: JSON.stringify({ action }) }),
+  portalGetFinanceSummary: () => adminFetch("/admin/finance/summary"),
 };
 
 export default apiFetch;

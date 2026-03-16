@@ -28,10 +28,22 @@ export interface ApiBooking {
 export interface ApiProvider {
   id: number;
   user_id: number;
-  name: string;
-  email: string;
-  verified: boolean;
+  // New portal endpoint fields
+  company_name?: string;
+  phone_number?: string;
+  verification_status?: string;
+  listed_status?: string;
+  provider_status?: string;
+  rejection_reason?: string;
+  rejection_note?: string;
+  submitted_at?: string;
+  reviewed_at?: string;
+  bio?: string;
   address?: string;
+  // Old endpoint fields (kept for backwards compat)
+  name?: string;
+  email?: string;
+  verified?: boolean;
   created_at?: string;
 }
 
@@ -77,8 +89,8 @@ export function useAdminProviders() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    adminApi.getProviders()
-      .then(setProviders)
+    adminApi.portalGetProviders()
+      .then((data: ApiProvider[]) => setProviders(Array.isArray(data) ? data : []))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);

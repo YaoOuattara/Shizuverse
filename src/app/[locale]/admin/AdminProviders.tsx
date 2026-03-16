@@ -6,7 +6,7 @@
  * Uses centralized admin store.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import AdminLayout from "./AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -121,30 +121,37 @@ const getVerificationBadge = (status: VerificationStatus) => {
 export default function AdminProviders() {
   const { toast } = useToast();
   const { providers: apiProviders, loading: providersLoading } = useAdminProviders();
-  const providers = useMemo<AdminProvider[]>(
-    () =>
+  const [localProviders, setLocalProviders] = useState<AdminProvider[]>([]);
+
+  useEffect(() => {
+    setLocalProviders(
       apiProviders.map((p: ApiProvider): AdminProvider => ({
         id: String(p.id),
-        name: p.name,
-        email: p.email,
-        phone: "",
+        name: p.company_name || p.name || `Provider #${p.id}`,
+        email: p.email || "",
+        phone: p.phone_number || "",
         services: [],
         serviceArea: p.address || "",
         rating: 0,
         reviewCount: 0,
-        status: "active",
+        status: (p.provider_status === "active" ? "active" : "paused") as "active" | "paused",
         joinedAt: p.created_at || "",
         totalBookings: 0,
         completedBookings: 0,
         revenue: 0,
-        verificationStatus: p.verified ? "approved" : "submitted",
-        listed: p.verified,
+        verificationStatus: (p.verification_status || (p.verified ? "approved" : "submitted")) as import("@/data/adminStore").VerificationStatus,
+        listed: p.listed_status === "listed" || p.verified === true,
+        submittedAt: p.submitted_at || undefined,
+        reviewedAt: p.reviewed_at || undefined,
+        rejectionReason: p.rejection_reason || undefined,
         hasIdProof: false,
         hasWorkPhoto: false,
         hasReference: false,
-      })),
-    [apiProviders]
-  );
+      }))
+    );
+  }, [apiProviders]);
+
+  const providers = localProviders;
   
   const [searchQuery, setSearchQuery] = useState("");
   const [verificationFilter, setVerificationFilter] = useState<VerificationFilterTab>("all");
@@ -186,101 +193,91 @@ export default function AdminProviders() {
     });
   }, [providers, searchQuery, verificationFilter]);
 
+  const updateLocalProvider = (id: string, patch: Partial<AdminProvider>) => {
+    setLocalProviders(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+    setSelectedProvider(prev => prev?.id === id ? { ...prev, ...patch } : prev);
+  };
+
   const handleToggleStatus = async (providerId: string, currentStatus: AdminProvider["status"]) => {
     setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    const newStatus = currentStatus === "active" ? "paused" : "active";
-
-    if (selectedProvider?.id === providerId) {
-      setSelectedProvider(prev => prev ? { ...prev, status: newStatus } : null);
+    const action = currentStatus === "active" ? "pause" : "activate";
+    const newStatus = action === "activate" ? "active" : "paused";
+    try {
+      await adminApi.portalToggleActivation(Number(providerId), action);
+      updateLocalProvider(providerId, { status: newStatus });
+      toast({ title: "Status Updated", description: `Provider is now ${newStatus}.` });
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      toast({ title: "Error", description: "Failed to update provider status.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
     }
-
-    toast({
-      title: "Status Updated",
-      description: `Provider is now ${newStatus}.`,
-    });
-    setIsUpdating(false);
   };
 
   const handleApprove = async (providerId: string) => {
     setIsUpdating(true);
     try {
-      await adminApi.verifyProvider(Number(providerId));
-    } catch (err) {
-      console.error("Failed to verify provider:", err);
-    }
-
-    if (selectedProvider?.id === providerId) {
-      setSelectedProvider(prev => prev ? { 
-        ...prev, 
+      await adminApi.portalApproveProvider(Number(providerId));
+      updateLocalProvider(providerId, {
         verificationStatus: 'approved',
         listed: true,
+        status: 'active',
         reviewedAt: new Date().toISOString().split('T')[0],
-      } : null);
+      });
+      toast({ title: "Provider Approved", description: "Provider has been approved and listed." });
+    } catch (err) {
+      console.error("Failed to approve provider:", err);
+      toast({ title: "Error", description: "Failed to approve provider.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
     }
-
-    toast({
-      title: "Provider Approved",
-      description: "Provider has been approved and listed.",
-    });
-    setIsUpdating(false);
   };
 
   const handleReject = async (providerId: string) => {
     setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    const fullReason = customRejectionNote
-      ? `${rejectionReasons.find(r => r.value === rejectionReason)?.label}: ${customRejectionNote}`
-      : rejectionReasons.find(r => r.value === rejectionReason)?.label || rejectionReason;
-
-    if (selectedProvider?.id === providerId) {
-      setSelectedProvider(prev => prev ? { 
-        ...prev, 
+    const fullReason = rejectionReasons.find(r => r.value === rejectionReason)?.label || rejectionReason;
+    try {
+      await adminApi.portalRejectProvider(Number(providerId), fullReason, customRejectionNote || undefined);
+      updateLocalProvider(providerId, {
         verificationStatus: 'rejected',
         listed: false,
         reviewedAt: new Date().toISOString().split('T')[0],
-        rejectionReason: fullReason,
-      } : null);
+        rejectionReason: customRejectionNote ? `${fullReason}: ${customRejectionNote}` : fullReason,
+      });
+      toast({ title: "Application Rejected", description: "Provider application has been rejected.", variant: "destructive" });
+      setCustomRejectionNote("");
+    } catch (err) {
+      console.error("Failed to reject provider:", err);
+      toast({ title: "Error", description: "Failed to reject provider.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
     }
-
-    toast({
-      title: "Application Rejected",
-      description: "Provider application has been rejected.",
-      variant: "destructive",
-    });
-    setCustomRejectionNote("");
-    setIsUpdating(false);
   };
 
   const handleSuspend = async () => {
     if (!selectedProvider) return;
-    
     setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
     const fullReason = suspensionNote
       ? `${suspensionReasons.find(r => r.value === suspensionReason)?.label}: ${suspensionNote}`
       : suspensionReasons.find(r => r.value === suspensionReason)?.label || suspensionReason;
-
-    setSelectedProvider(prev => prev ? {
-      ...prev, 
-      verificationStatus: 'suspended',
-      listed: false,
-      reviewedAt: new Date().toISOString().split('T')[0],
-      rejectionReason: fullReason,
-    } : null);
-
-    toast({
-      title: "Provider Suspended",
-      description: `Provider has been suspended. Reason: ${fullReason}`,
-      variant: "destructive",
-    });
-    
-    setSuspendModalOpen(false);
-    setSuspensionNote("");
-    setIsUpdating(false);
+    try {
+      await adminApi.portalSuspendProvider(Number(selectedProvider.id), fullReason);
+      updateLocalProvider(selectedProvider.id, {
+        verificationStatus: 'suspended',
+        listed: false,
+        status: 'paused',
+        reviewedAt: new Date().toISOString().split('T')[0],
+        rejectionReason: fullReason,
+      });
+      toast({ title: "Provider Suspended", description: `Provider has been suspended.`, variant: "destructive" });
+      setSuspendModalOpen(false);
+      setSuspensionNote("");
+    } catch (err) {
+      console.error("Failed to suspend provider:", err);
+      toast({ title: "Error", description: "Failed to suspend provider.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleToggleListed = async (providerId: string, currentListed: boolean) => {
@@ -289,39 +286,37 @@ export default function AdminProviders() {
       setUnlistModalOpen(true);
       return;
     }
-    
     setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    if (selectedProvider?.id === providerId) {
-      setSelectedProvider(prev => prev ? { ...prev, listed: true } : null);
+    try {
+      await adminApi.portalToggleListing(Number(providerId), "list");
+      updateLocalProvider(providerId, { listed: true });
+      toast({ title: "Provider Listed", description: "Provider is now visible to clients." });
+    } catch (err) {
+      console.error("Failed to list provider:", err);
+      toast({ title: "Error", description: "Failed to list provider.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
     }
-
-    toast({
-      title: "Provider Listed",
-      description: "Provider is now visible to clients.",
-    });
-    setIsUpdating(false);
   };
 
   const handleUnlist = async () => {
     if (!selectedProvider) return;
-    
     setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    setSelectedProvider(prev => prev ? { ...prev, listed: false } : null);
-
-    toast({
-      title: "Provider Unlisted",
-      description: unlistReason 
-        ? `Provider is now hidden from clients. Reason: ${unlistReason}`
-        : "Provider is now hidden from clients.",
-    });
-    
-    setUnlistModalOpen(false);
-    setUnlistReason("");
-    setIsUpdating(false);
+    try {
+      await adminApi.portalToggleListing(Number(selectedProvider.id), "unlist");
+      updateLocalProvider(selectedProvider.id, { listed: false });
+      toast({
+        title: "Provider Unlisted",
+        description: unlistReason ? `Provider hidden. Reason: ${unlistReason}` : "Provider is now hidden from clients.",
+      });
+      setUnlistModalOpen(false);
+      setUnlistReason("");
+    } catch (err) {
+      console.error("Failed to unlist provider:", err);
+      toast({ title: "Error", description: "Failed to unlist provider.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const openSuspendModal = () => {
@@ -752,7 +747,24 @@ export default function AdminProviders() {
                   <h4 className="font-medium text-sm text-muted-foreground">Actions</h4>
                   <Button
                     className="w-full"
-                    onClick={() => handleApprove(selectedProvider.id)}
+                    onClick={async () => {
+                      setIsUpdating(true);
+                      try {
+                        await adminApi.portalReinstateProvider(Number(selectedProvider.id));
+                        updateLocalProvider(selectedProvider.id, {
+                          verificationStatus: 'approved',
+                          listed: true,
+                          status: 'active',
+                          reviewedAt: new Date().toISOString().split('T')[0],
+                        });
+                        toast({ title: "Provider Reinstated", description: "Provider is now active and listed." });
+                      } catch (err) {
+                        console.error("Failed to reinstate provider:", err);
+                        toast({ title: "Error", description: "Failed to reinstate provider.", variant: "destructive" });
+                      } finally {
+                        setIsUpdating(false);
+                      }
+                    }}
                     disabled={isUpdating}
                     data-testid="button-reinstate"
                   >
