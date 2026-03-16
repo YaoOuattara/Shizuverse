@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useParams } from "next/navigation";
 import { isAdminAuthenticated, clearAdminToken } from "@/lib/adminAuth";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+
 import {
   Sheet,
   SheetContent,
@@ -69,7 +69,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
       <div className="flex items-center gap-2 pb-4 border-b mb-4">
         <Shield className="h-5 w-5 text-primary" />
         <span className="font-semibold">{isFr ? "Panneau Admin" : "Admin Panel"}</span>
-        <Badge variant="secondary" className="ml-auto text-xs">Demo</Badge>
+
       </div>
 
       <nav className="flex-1 space-y-1" data-testid="admin-nav">
