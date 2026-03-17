@@ -177,30 +177,43 @@ def require_provider_token(f):
 @provider_bp.route('/login', methods=['POST'])
 def provider_login():
     data = request.get_json() or {}
-    email = (data.get('email') or '').strip().lower()
+    phone = (data.get('phone') or '').strip().replace(' ', '').replace('+', '')
     password = data.get('password', '')
-    if not email or not password:
-        return jsonify({'error': 'email and password required'}), 400
-    user = User.query.filter_by(email=email, user_type='provider').first()
+    if not phone or not password:
+        return jsonify({'error': 'phone and password required'}), 400
+    # Look up by phone number stored on ServiceProvider
+    sp = ServiceProvider.query.filter_by(phone_number=phone).first()
+    if not sp:
+        # Fallback: try synthetic email pattern
+        synthetic_email = f"{phone}@shizu.ci"
+        user = User.query.filter_by(email=synthetic_email, user_type='provider').first()
+        if user:
+            sp = ServiceProvider.query.filter_by(user_id=user.id).first()
+    if not sp:
+        return jsonify({'error': 'Invalid credentials'}), 401
+    user = User.query.get(sp.user_id)
     if not user or not user.check_password(password):
         return jsonify({'error': 'Invalid credentials'}), 401
-    sp = ServiceProvider.query.filter_by(user_id=user.id).first()
     payload = {
         'sub': str(user.id),
         'type': 'provider',
-        'provider_id': sp.id if sp else None,
+        'provider_id': sp.id,
         'iat': datetime.utcnow(),
-        'exp': datetime.utcnow() + timedelta(hours=24),
+        'exp': datetime.utcnow() + timedelta(days=30),
     }
     token = jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm='HS256')
     return jsonify({
         'token': token,
         'provider': {
-            'id': sp.id if sp else None,
+            'id': sp.id,
             'user_id': user.id,
-            'name': sp.company_name if sp else email.split('@')[0],
-            'email': user.email,
-            'verified': sp.verified if sp else False,
+            'name': sp.company_name or phone,
+            'phone': sp.phone_number or phone,
+            'verification_status': sp.verification_status,
+            'listed_status': sp.listed_status,
+            'provider_status': sp.provider_status,
+            'bio': sp.bio,
+            'address': sp.address,
         }
     })
 
