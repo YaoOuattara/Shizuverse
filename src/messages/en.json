@@ -381,6 +381,10 @@
     "empty": "No services available at the moment.",
     "viewPricing": "View pricing",
     "viewDetails": "View Details",
+    "subcategoriesCount": "services",
+    "back": "Back",
+    "noSubcategories": "No services in this category yet.",
+    "selectSubcategoryHint": "Select a service to book",
     "notFoundTitle": "Service Not Found",
     "notFound": "The requested service could not be found.",
     "serviceDescription": "Book {name} with verified professionals in Abidjan."

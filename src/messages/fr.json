@@ -381,6 +381,10 @@
     "empty": "Aucun service disponible pour le moment.",
     "viewPricing": "Voir les tarifs",
     "viewDetails": "Voir les détails",
+    "subcategoriesCount": "prestations",
+    "back": "Retour",
+    "noSubcategories": "Aucune prestation dans cette catégorie.",
+    "selectSubcategoryHint": "Sélectionnez une prestation pour réserver",
     "notFoundTitle": "Service introuvable",
     "notFound": "Le service demandé est introuvable.",
     "serviceDescription": "Réservez {name} avec des professionnels vérifiés à Abidjan."
