@@ -263,6 +263,7 @@ export default function AdminProviders() {
   };
 
   const handleSuspend = async () => {
+    console.log('[AdminProviders] handleSuspend called, selectedProvider:', selectedProvider?.id, 'reason:', suspensionReason);
     if (!selectedProvider) return;
     setIsUpdating(true);
     const fullReason = suspensionNote
@@ -308,6 +309,7 @@ export default function AdminProviders() {
   };
 
   const handleUnlist = async () => {
+    console.log('[AdminProviders] handleUnlist called, selectedProvider:', selectedProvider?.id);
     if (!selectedProvider) return;
     setIsUpdating(true);
     try {
@@ -814,9 +816,17 @@ export default function AdminProviders() {
                 <SelectTrigger data-testid="select-suspension-reason">
                   <SelectValue placeholder="Select reason" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent
+                  position="popper"
+                  sideOffset={4}
+                  className="z-[9999] w-[var(--radix-select-trigger-width)] min-w-[280px] overflow-hidden rounded-md border border-border bg-white dark:bg-zinc-900 shadow-xl"
+                >
                   {suspensionReasons.map((reason) => (
-                    <SelectItem key={reason.value} value={reason.value}>
+                    <SelectItem
+                      key={reason.value}
+                      value={reason.value}
+                      className="cursor-pointer py-3 px-4 text-sm leading-snug focus:bg-accent focus:text-accent-foreground"
+                    >
                       {reason.label}
                     </SelectItem>
                   ))}
