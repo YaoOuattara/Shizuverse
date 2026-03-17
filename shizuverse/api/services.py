@@ -20,6 +20,16 @@ def _svc(s: Service):
         "category": cat.name if cat else None,
     }
 
+@services_bp.route("/categories", methods=["GET"])
+def list_categories():
+    categories = ServiceCategory.query.order_by(ServiceCategory.id).all()
+    return jsonify([{
+        "id": c.id,
+        "name": c.name,
+        "description": c.description or "",
+    } for c in categories])
+
+
 @services_bp.route("/", methods=["GET"])
 def list_services():
     q = Service.query
