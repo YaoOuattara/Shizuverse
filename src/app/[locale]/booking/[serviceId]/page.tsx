@@ -5,7 +5,7 @@ interface Props {
 }
 
 export default async function BookingPage({ params }: Props) {
-  const { serviceId } = await params;
+  const { locale, serviceId } = await params;
 
   return (
     <main className="max-w-lg mx-auto px-4 py-8">
@@ -13,6 +13,7 @@ export default async function BookingPage({ params }: Props) {
 
       <form action={submitBooking} className="space-y-4">
         <input type="hidden" name="serviceId" value={serviceId} />
+        <input type="hidden" name="locale" value={locale} />
 
         <div>
           <label className="block text-sm font-medium">Name</label>
