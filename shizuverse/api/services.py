@@ -22,12 +22,47 @@ def _svc(s: Service):
 
 @services_bp.route("/categories", methods=["GET"])
 def list_categories():
-    categories = ServiceCategory.query.order_by(ServiceCategory.id).all()
-    return jsonify([{
-        "id": c.id,
-        "name": c.name,
-        "description": c.description or "",
-    } for c in categories])
+    from sqlalchemy import inspect as sa_inspect, text
+    inspector = sa_inspect(db.engine)
+    cat_cols = {c['name'] for c in inspector.get_columns('service_categories')}
+    sub_cols = {c['name'] for c in inspector.get_columns('service_subcategories')}
+
+    q = ServiceCategory.query
+    if 'is_active' in cat_cols:
+        q = q.filter(text('is_active = true'))
+    cats = q.order_by(ServiceCategory.id).all()
+
+    result = []
+    for c in cats:
+        subs = ServiceSubcategory.query.filter_by(category_id=c.id).all()
+        sub_list = []
+        for s in subs:
+            svc = Service.query.filter_by(subcategory_id=s.id, is_active=True).first() \
+                  or Service.query.filter_by(subcategory_id=s.id).first()
+            sub_list.append({
+                "id": s.id,
+                "name": s.name,
+                "name_fr": db.session.execute(
+                    text("SELECT name_fr FROM service_subcategories WHERE id=:id"), {"id": s.id}
+                ).scalar() if 'name_fr' in sub_cols else s.name,
+                "name_en": db.session.execute(
+                    text("SELECT name_en FROM service_subcategories WHERE id=:id"), {"id": s.id}
+                ).scalar() if 'name_en' in sub_cols else s.name,
+                "service_id": svc.id if svc else None,
+            })
+        result.append({
+            "id": c.id,
+            "name": c.name,
+            "name_fr": db.session.execute(
+                text("SELECT name_fr FROM service_categories WHERE id=:id"), {"id": c.id}
+            ).scalar() if 'name_fr' in cat_cols else c.name,
+            "name_en": db.session.execute(
+                text("SELECT name_en FROM service_categories WHERE id=:id"), {"id": c.id}
+            ).scalar() if 'name_en' in cat_cols else c.name,
+            "description": c.description or "",
+            "subcategories": sub_list,
+        })
+    return jsonify(result)
 
 
 @services_bp.route("/", methods=["GET"])
