@@ -376,6 +376,11 @@
     }
   },
   "services": {
+    "title": "Our Services",
+    "loading": "Loading services...",
+    "empty": "No services available at the moment.",
+    "viewPricing": "View pricing",
+    "viewDetails": "View Details",
     "notFoundTitle": "Service Not Found",
     "notFound": "The requested service could not be found.",
     "serviceDescription": "Book {name} with verified professionals in Abidjan."

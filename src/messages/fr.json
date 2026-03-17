@@ -376,6 +376,11 @@
     }
   },
   "services": {
+    "title": "Nos Services",
+    "loading": "Chargement des services...",
+    "empty": "Aucun service disponible pour le moment.",
+    "viewPricing": "Voir les tarifs",
+    "viewDetails": "Voir les détails",
     "notFoundTitle": "Service introuvable",
     "notFound": "Le service demandé est introuvable.",
     "serviceDescription": "Réservez {name} avec des professionnels vérifiés à Abidjan."
