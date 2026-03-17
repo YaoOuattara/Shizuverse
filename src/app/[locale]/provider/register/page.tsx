@@ -21,6 +21,7 @@ import {
   Shield,
   Trophy,
   X,
+  ArrowLeft,
 } from "lucide-react";
 
 // ── Data ──────────────────────────────────────────────────────────────────────
@@ -243,6 +244,15 @@ export default function ProviderRegisterPage() {
 
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-lg w-full">
+          {/* Back button */}
+          <button
+            onClick={() => router.push(`/${locale}`)}
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-6 -mt-1 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            {isFr ? "Retour à l'accueil" : "Back to home"}
+          </button>
+
           {/* Header */}
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900">{t("title")}</h1>

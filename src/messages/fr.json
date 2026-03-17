@@ -383,13 +383,13 @@
   "providerLogin": {
     "title": "Connexion Prestataire",
     "subtitle": "Accédez à votre tableau de bord Shizu",
-    "email": "Email",
-    "emailPlaceholder": "vous@exemple.com",
+    "phone": "WhatsApp / Téléphone",
+    "phonePlaceholder": "+225 07 00 00 00",
     "password": "Mot de passe",
     "passwordPlaceholder": "Votre mot de passe",
     "submit": "Se connecter",
     "loading": "Connexion en cours...",
-    "errorInvalid": "Email ou mot de passe invalide.",
+    "errorInvalid": "Numéro de téléphone ou mot de passe invalide.",
     "errorGeneral": "Une erreur est survenue. Veuillez réessayer.",
     "noAccount": "Pas encore prestataire ?",
     "registerLink": "Rejoindre Shizu"

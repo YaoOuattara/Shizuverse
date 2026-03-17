@@ -17,7 +17,7 @@ export default function ProviderLoginPage() {
   const params = useParams()
   const locale = (params?.locale as string) ?? 'fr'
 
-  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -30,7 +30,7 @@ export default function ProviderLoginPage() {
       const res = await fetch(`${FLASK_API}/api/provider/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ phone, password }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -59,15 +59,15 @@ export default function ProviderLoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">{t('email')}</Label>
+              <Label htmlFor="phone">{t('phone')}</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder={t('emailPlaceholder')}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="phone"
+                type="tel"
+                placeholder={t('phonePlaceholder')}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 required
-                autoComplete="email"
+                autoComplete="tel"
               />
             </div>
             <div className="space-y-2">
