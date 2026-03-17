@@ -8,6 +8,7 @@
  */
 
 import { useState, useMemo } from "react";
+import { useParams } from "next/navigation";
 import AdminLayout from "./AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,8 @@ import {
   FileText,
 } from "lucide-react";
 import { useAdminStore, type AdminBooking } from "@/data/adminStore";
+import { useAdminFinanceSummary } from "@/hooks/useAdminApi";
+import { adminApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
 import { formatMoney } from "@/lib/currency";
@@ -96,8 +99,11 @@ const payoutStatusLabels: Record<string, string> = {
 
 export default function AdminPayments() {
   const { toast } = useToast();
-  const { 
-    bookings, 
+  const params = useParams();
+  const isFr = (params?.locale as string) === "fr";
+  const { summary, isLoading: summaryLoading } = useAdminFinanceSummary();
+  const {
+    bookings,
     providers,
     transactions,
     recordPayment,
@@ -182,31 +188,33 @@ export default function AdminPayments() {
 
   const handleRecordPayment = async (bookingId: string) => {
     setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    recordPayment(bookingId, {
-      method: paymentMethod,
-      reference: paymentReference || undefined,
-      note: paymentNote || undefined,
-    });
-    
-    toast({
-      title: "Payment Recorded",
-      description: `Payment for booking ${bookingId} has been recorded via ${paymentMethod.replace('_', ' ')}.`,
-      duration: 3000,
-    });
-    
-    if (selectedBooking?.id === bookingId) {
-      setSelectedBooking(prev => prev ? { 
-        ...prev, 
-        paymentStatus: 'paid', 
-        paidAt: new Date().toISOString().split('T')[0],
-        paymentMethod: paymentMethod,
-      } : null);
+    try {
+      await adminApi.portalUpdateFinance(bookingId, { payment_status: 'paid' });
+      recordPayment(bookingId, {
+        method: paymentMethod,
+        reference: paymentReference || undefined,
+        note: paymentNote || undefined,
+      });
+      if (selectedBooking?.id === bookingId) {
+        setSelectedBooking(prev => prev ? {
+          ...prev,
+          paymentStatus: 'paid',
+          paidAt: new Date().toISOString().split('T')[0],
+          paymentMethod: paymentMethod,
+        } : null);
+      }
+      toast({
+        title: "Payment Recorded",
+        description: `Payment for booking ${bookingId} has been recorded via ${paymentMethod.replace('_', ' ')}.`,
+        duration: 3000,
+      });
+      setPaymentModalOpen(false);
+    } catch (err) {
+      console.error("Failed to record payment:", err);
+      toast({ title: "Error", description: "Failed to record payment.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
     }
-    
-    setPaymentModalOpen(false);
-    setIsUpdating(false);
   };
 
   const handleIssueRefund = async (bookingId: string) => {
@@ -238,37 +246,133 @@ export default function AdminPayments() {
 
   const handleRecordPayout = async (bookingId: string) => {
     setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    recordPayout(bookingId, {
-      method: payoutMethod,
-      reference: payoutReference || undefined,
-      note: payoutNote || undefined,
-    });
-    
-    toast({
-      title: "Payout Sent",
-      description: `Provider payout for booking ${bookingId} has been sent via ${payoutMethod.replace('_', ' ')}.`,
-      duration: 3000,
-    });
-    
-    if (selectedBooking?.id === bookingId) {
-      setSelectedBooking(prev => prev ? { 
-        ...prev, 
-        payoutStatus: 'sent', 
-        payoutSentAt: new Date().toISOString().split('T')[0],
-        payoutMethod: payoutMethod,
-      } : null);
+    try {
+      await adminApi.portalUpdateFinance(bookingId, { payout_status: 'sent' });
+      recordPayout(bookingId, {
+        method: payoutMethod,
+        reference: payoutReference || undefined,
+        note: payoutNote || undefined,
+      });
+      if (selectedBooking?.id === bookingId) {
+        setSelectedBooking(prev => prev ? {
+          ...prev,
+          payoutStatus: 'sent',
+          payoutSentAt: new Date().toISOString().split('T')[0],
+          payoutMethod: payoutMethod,
+        } : null);
+      }
+      toast({
+        title: "Payout Sent",
+        description: `Provider payout for booking ${bookingId} has been sent via ${payoutMethod.replace('_', ' ')}.`,
+        duration: 3000,
+      });
+      setPayoutModalOpen(false);
+    } catch (err) {
+      console.error("Failed to record payout:", err);
+      toast({ title: "Error", description: "Failed to record payout.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
     }
-    
-    setPayoutModalOpen(false);
-    setIsUpdating(false);
   };
 
   return (
     <AdminLayout title="Payments">
       <div className="space-y-4">
-        {/* Stats Cards */}
+        {/* Live Finance Summary */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <span className="text-xs">{isFr ? "Réservations complétées" : "Completed bookings"}</span>
+              </div>
+              {summaryLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              ) : (
+                <p className="text-lg font-bold" data-testid="live-stat-completed">
+                  {summary?.completed_bookings ?? "—"}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
+                <span className="text-xs">{isFr ? "Total encaissé (XOF)" : "Total paid (XOF)"}</span>
+              </div>
+              {summaryLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              ) : (
+                <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400" data-testid="live-stat-paid">
+                  {formatMoney(summary?.total_paid_xof ?? 0)}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <ArrowUpRight className="h-4 w-4 text-amber-500" />
+                <span className="text-xs">{isFr ? "Paiements dus (nb)" : "Payouts due (count)"}</span>
+              </div>
+              {summaryLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              ) : (
+                <p className="text-lg font-bold text-amber-600 dark:text-amber-400" data-testid="live-stat-payouts-due-count">
+                  {summary?.payouts_due_count ?? "—"}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <Banknote className="h-4 w-4 text-amber-500" />
+                <span className="text-xs">{isFr ? "Valeur paiements dus" : "Payouts due value"}</span>
+              </div>
+              {summaryLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              ) : (
+                <p className="text-lg font-bold text-amber-600 dark:text-amber-400" data-testid="live-stat-payouts-due-value">
+                  {formatMoney(summary?.payouts_due_value_xof ?? 0)}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <XCircle className="h-4 w-4 text-red-500" />
+                <span className="text-xs">{isFr ? "Paiements échoués" : "Failed payouts"}</span>
+              </div>
+              {summaryLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              ) : (
+                <p className="text-lg font-bold text-red-600 dark:text-red-400" data-testid="live-stat-failed-payouts">
+                  {summary?.failed_payouts ?? "—"}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <Clock className="h-4 w-4 text-amber-500" />
+                <span className="text-xs">{isFr ? "Complétées non payées" : "Unpaid completed"}</span>
+              </div>
+              {summaryLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              ) : (
+                <p className="text-lg font-bold text-amber-600 dark:text-amber-400" data-testid="live-stat-unpaid-completed">
+                  {summary?.unpaid_completed_bookings ?? "—"}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Mock Stats Cards (Zustand) */}
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
           <Card>
             <CardContent className="p-4">

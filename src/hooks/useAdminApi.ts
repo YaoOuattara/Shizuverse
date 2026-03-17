@@ -116,3 +116,26 @@ export function useAdminServices() {
 
   return { services, loading };
 }
+
+export interface FinanceSummary {
+  completed_bookings: number;
+  total_paid_xof: number;
+  payouts_due_count: number;
+  payouts_due_value_xof: number;
+  failed_payouts: number;
+  unpaid_completed_bookings: number;
+}
+
+export function useAdminFinanceSummary() {
+  const [summary, setSummary] = useState<FinanceSummary | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    adminApi.portalGetFinanceSummary()
+      .then((data: FinanceSummary) => setSummary(data))
+      .catch(() => setSummary(null))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  return { summary, isLoading };
+}

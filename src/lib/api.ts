@@ -72,6 +72,8 @@ export const adminApi = {
     return adminFetch(`/admin/bookings${qs ? `?${qs}` : ""}`);
   },
   portalGetFinanceSummary: () => adminFetch("/admin/finance/summary"),
+  portalUpdateFinance: (bookingId: string, body: { payment_status?: string; payout_status?: string }) =>
+    adminFetch(`/admin/bookings/${bookingId}/finance`, { method: "POST", body: JSON.stringify(body) }),
 };
 
 export default apiFetch;
