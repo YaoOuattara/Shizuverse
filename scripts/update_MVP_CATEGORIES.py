@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from shizuverse.app import create_app
 from shizuverse.models import db
-from shizuverse.models.service_models import ServiceCategory, ServiceSubcategory
+from shizuverse.models.service_models import ServiceCategory, ServiceSubcategory, Service
 
 ELDERLY_SUBCATEGORIES = [
     "Home assistance",
@@ -51,7 +51,14 @@ def replace_category(category_id, new_name, subcategory_names, summary):
         return
     old_name = cat.name
 
-    # Wipe existing subcategories (cascade deletes their services too)
+    # Delete services referencing these subcategories before deleting subcategories
+    Service.query.filter(
+        Service.subcategory_id.in_(
+            [s.id for s in ServiceSubcategory.query.filter_by(category_id=category_id).all()]
+        )
+    ).delete(synchronize_session='fetch')
+
+    # Wipe existing subcategories
     ServiceSubcategory.query.filter_by(category_id=category_id).delete()
     cat.name = new_name
     db.session.flush()
