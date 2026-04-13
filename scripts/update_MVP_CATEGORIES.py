@@ -104,7 +104,8 @@ def print_summary(summary):
 
 
 def run():
-    app = create_app()
+    result = create_app()
+    app = result[0] if isinstance(result, tuple) else result
     with app.app_context():
         summary = []
 
