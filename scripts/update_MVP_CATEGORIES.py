@@ -16,7 +16,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from shizuverse.app import create_app
-from shizuverse.models.db import db
+from shizuverse.models import db
 from shizuverse.models.service_models import ServiceCategory, ServiceSubcategory
 
 ELDERLY_SUBCATEGORIES = [
