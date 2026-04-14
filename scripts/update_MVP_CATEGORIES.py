@@ -45,12 +45,13 @@ def _set_bilingual(category_id, name_en, name_fr):
 
 
 def _insert_service(service_id, name, subcategory_id):
-    """Raw SQL insert for a service with an explicit id."""
+    """Raw SQL insert for a service with an explicit id — idempotent via ON CONFLICT."""
     db.session.execute(
         text(
             "INSERT INTO services "
             "(id, name, is_active, professional_required, subcategory_id, is_priority, featured) "
-            "VALUES (:id, :name, :is_active, :prof, :sub_id, :is_priority, :featured)"
+            "VALUES (:id, :name, :is_active, :prof, :sub_id, :is_priority, :featured) "
+            "ON CONFLICT (id) DO NOTHING"
         ),
         {
             "id": service_id,
@@ -62,6 +63,17 @@ def _insert_service(service_id, name, subcategory_id):
             "featured": False,
         },
     )
+
+
+def _get_or_create_subcategory(name, category_id):
+    """Return the id of a subcategory, inserting it if absent — idempotent."""
+    existing = ServiceSubcategory.query.filter_by(name=name, category_id=category_id).first()
+    if existing:
+        return existing.id
+    sub = ServiceSubcategory(name=name, category_id=category_id)
+    db.session.add(sub)
+    db.session.flush()
+    return sub.id
 
 
 def rename_category(category_id, name, name_en, name_fr, summary):
@@ -103,10 +115,8 @@ def replace_category(category_id, name, name_en, name_fr,
 
     # Create one subcategory + one service per entry
     for sub_name, svc_id in zip(subcategory_names, service_ids):
-        sub = ServiceSubcategory(name=sub_name, category_id=category_id)
-        db.session.add(sub)
-        db.session.flush()
-        _insert_service(svc_id, sub_name, sub.id)
+        sub_id = _get_or_create_subcategory(sub_name, category_id)
+        _insert_service(svc_id, sub_name, sub_id)
 
     summary.append(
         f"  OK    id={category_id} replaced: '{old_name}' → "
@@ -116,26 +126,26 @@ def replace_category(category_id, name, name_en, name_fr,
 
 
 def add_category(name, name_en, name_fr, subcategory_names, service_ids, summary):
-    existing = ServiceCategory.query.filter_by(name=name).first()
-    if existing:
-        summary.append(f"  SKIP  '{name}' already exists (id={existing.id})")
-        return
-
-    cat = ServiceCategory(name=name)
-    db.session.add(cat)
+    # Idempotent category insert — skip silently if name already exists
+    db.session.execute(
+        text(
+            "INSERT INTO service_categories (name) VALUES (:name) "
+            "ON CONFLICT (name) DO NOTHING"
+        ),
+        {"name": name},
+    )
     db.session.flush()
+    cat = ServiceCategory.query.filter_by(name=name).first()
 
     _set_bilingual(cat.id, name_en, name_fr)
 
     # Create one subcategory + one service per entry
     for sub_name, svc_id in zip(subcategory_names, service_ids):
-        sub = ServiceSubcategory(name=sub_name, category_id=cat.id)
-        db.session.add(sub)
-        db.session.flush()
-        _insert_service(svc_id, sub_name, sub.id)
+        sub_id = _get_or_create_subcategory(sub_name, cat.id)
+        _insert_service(svc_id, sub_name, sub_id)
 
     summary.append(
-        f"  OK    Added '{name}' (id={cat.id}), "
+        f"  OK    Added/verified '{name}' (id={cat.id}), "
         f"name_en='{name_en}', name_fr='{name_fr}' | "
         f"{len(subcategory_names)} subcategories, services {service_ids}"
     )
