@@ -62,6 +62,7 @@ import {
   Users,
   XCircle,
   AlertTriangle,
+  Sparkles,
 } from "lucide-react";
 import { type AdminProvider, type VerificationStatus } from "@/data/adminStore";
 import { useAdminProviders, type ApiProvider } from "@/hooks/useAdminApi";
@@ -174,6 +175,7 @@ export default function AdminProviders() {
   const [suspensionNote, setSuspensionNote] = useState("");
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
   const [unlistReason, setUnlistReason] = useState("");
+  const [isGeneratingMessage, setIsGeneratingMessage] = useState(false);
 
   const tabCounts = useMemo(() => {
     return {
@@ -326,6 +328,30 @@ export default function AdminProviders() {
       toast({ title: "Error", description: "Failed to unlist provider.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleGenerateRejectionMessage = async () => {
+    if (!selectedProvider || isGeneratingMessage) return;
+    setIsGeneratingMessage(true);
+    const fullReason = rejectionReasons.find(r => r.value === rejectionReason)?.label || rejectionReason;
+    try {
+      const res = await fetch("/api/smart-rejection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider_name: selectedProvider.name,
+          rejection_reason: fullReason,
+          language: "fr",
+        }),
+      });
+      const data = await res.json();
+      if (data.message) setCustomRejectionNote(data.message);
+    } catch (err) {
+      console.error("[smart-rejection]", err);
+      toast({ title: "Erreur IA", description: "Impossible de générer le message.", variant: "destructive" });
+    } finally {
+      setIsGeneratingMessage(false);
     }
   };
 
@@ -661,11 +687,28 @@ export default function AdminProviders() {
                       </SelectContent>
                     </Select>
                     
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-purple-200 text-purple-700 hover:bg-purple-50 gap-2"
+                      onClick={handleGenerateRejectionMessage}
+                      disabled={isGeneratingMessage || isUpdating}
+                      data-testid="button-generate-rejection-message"
+                    >
+                      {isGeneratingMessage ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-4 w-4" />
+                      )}
+                      {isGeneratingMessage ? "Génération..." : "Générer un message"}
+                    </Button>
+
                     <Textarea
                       value={customRejectionNote}
                       onChange={(e) => setCustomRejectionNote(e.target.value)}
-                      placeholder="Additional notes (optional)..."
-                      rows={2}
+                      placeholder="Message de rejet (modifiable)..."
+                      rows={4}
                       data-testid="textarea-rejection-note"
                     />
                     

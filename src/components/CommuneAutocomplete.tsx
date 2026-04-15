@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 
-const COMMUNES = [
+export const COMMUNES = [
   "Cocody", "Plateau", "Marcory", "Treichville", "Adjamé", "Yopougon",
   "Abobo", "Koumassi", "Port-Bouët", "Attécoubé", "Williamsville",
   "Bingerville", "Anyama",
@@ -9,16 +9,17 @@ const COMMUNES = [
 
 interface Props {
   label: string;
+  value: string;
+  onChange: (value: string) => void;
 }
 
-export default function CommuneAutocomplete({ label }: Props) {
-  const [value, setValue] = useState("");
+export default function CommuneAutocomplete({ label, value, onChange }: Props) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value;
-    setValue(v);
+    onChange(v);
     if (v.length > 0) {
       const filtered = COMMUNES.filter((c) =>
         c.toLowerCase().includes(v.toLowerCase())
@@ -32,7 +33,7 @@ export default function CommuneAutocomplete({ label }: Props) {
   };
 
   const handleSelect = (commune: string) => {
-    setValue(commune);
+    onChange(commune);
     setSuggestions([]);
     setOpen(false);
   };
