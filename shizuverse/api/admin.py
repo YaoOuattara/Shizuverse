@@ -319,6 +319,25 @@ def update_provider_booking_status(booking_id):
     db.session.commit()
     return jsonify({'success': True, 'status': appointment.status})
 
+
+@provider_bp.route('/profile', methods=['PATCH'])
+@require_provider_token
+def update_provider_profile():
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header[7:]
+    payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+    provider_id = payload.get('provider_id')
+
+    sp = ServiceProvider.query.get_or_404(provider_id)
+
+    data = request.get_json() or {}
+    if 'bio' in data:
+        sp.bio = (data['bio'] or '').strip()
+
+    db.session.commit()
+    return jsonify({'success': True, 'bio': sp.bio})
+
+
 @admin_bp.route('/stats', methods=['GET'])
 @require_admin_token
 def get_stats():
