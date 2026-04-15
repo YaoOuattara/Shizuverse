@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-const client = new Anthropic()
-
 export async function POST(req: NextRequest) {
+  console.log('[smart-rejection] env check:', {
+    hasKey: !!process.env.ANTHROPIC_API_KEY,
+    keyLength: process.env.ANTHROPIC_API_KEY?.length ?? 0,
+  })
+
+  // Instantiate inside handler so missing-key errors are caught below
+  const client = new Anthropic()
+
   try {
     const { provider_name, rejection_reason, language = 'fr' } =
       await req.json() as { provider_name: string; rejection_reason: string; language?: string }

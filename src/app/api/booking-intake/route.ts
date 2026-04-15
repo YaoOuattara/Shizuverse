@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-const client = new Anthropic()
-
 interface IntakeResult {
   suggested_notes: string | null
   suggested_date_hint: string | null
@@ -10,6 +8,14 @@ interface IntakeResult {
 }
 
 export async function POST(req: NextRequest) {
+  console.log('[booking-intake] env check:', {
+    hasKey: !!process.env.ANTHROPIC_API_KEY,
+    keyLength: process.env.ANTHROPIC_API_KEY?.length ?? 0,
+  })
+
+  // Instantiate inside handler so missing-key errors are caught below
+  const client = new Anthropic()
+
   try {
     const { user_input, service_name, locale = 'fr' } =
       await req.json() as { user_input: string; service_name?: string; locale?: string }
