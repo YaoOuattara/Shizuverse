@@ -36,17 +36,31 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           locale,
         }),
       });
+
+      if (!res.ok) {
+        console.error("[booking-intake] non-ok response:", res.status, res.statusText);
+      }
+
       const data = await res.json();
-      if (data.suggested_notes) setNotes(data.suggested_notes);
-      if (data.suggested_date_hint) setDateHint(data.suggested_date_hint);
+      console.log("[booking-intake] response data:", data);
+
+      if (data.suggested_notes) {
+        console.log("[booking-intake] setting notes:", data.suggested_notes);
+        setNotes(data.suggested_notes);
+      }
+      if (data.suggested_date_hint) {
+        console.log("[booking-intake] setting dateHint:", data.suggested_date_hint);
+        setDateHint(data.suggested_date_hint);
+      }
       if (data.suggested_location_hint) {
-        const match = COMMUNES.find(
-          (c) => c.toLowerCase() === (data.suggested_location_hint as string).toLowerCase()
-        );
+        const hint = (data.suggested_location_hint as string).toLowerCase();
+        // Use includes() — Claude may return "Cocody" or "quartier de Cocody"
+        const match = COMMUNES.find((c) => hint.includes(c.toLowerCase()));
+        console.log("[booking-intake] location hint:", data.suggested_location_hint, "→ match:", match);
         if (match) setLocation(match);
       }
     } catch (err) {
-      console.error("[booking-intake]", err);
+      console.error("[booking-intake] fetch/parse error:", err);
     } finally {
       setIsAnalyzing(false);
     }

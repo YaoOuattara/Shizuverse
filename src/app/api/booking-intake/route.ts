@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 200,
+      max_tokens: 300,
       system:
         "Tu es un assistant de réservation pour Shizu à Abidjan. " +
         "L'utilisateur décrit son besoin en langage naturel. " +
@@ -36,8 +36,19 @@ export async function POST(req: NextRequest) {
     })
 
     const raw = message.content[0].type === 'text' ? message.content[0].text : '{}'
-    const cleaned = raw.replace(/```json|```/g, '').trim()
-    const result: IntakeResult = JSON.parse(cleaned)
+    console.log('[booking-intake] raw Claude response:', raw)
+
+    // Extract the first {...} block — handles leading/trailing text from Claude
+    const jsonMatch = raw.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      console.error('[booking-intake] no JSON object found in response:', raw)
+      return NextResponse.json(
+        { suggested_notes: null, suggested_date_hint: null, suggested_location_hint: null }
+      )
+    }
+
+    const result: IntakeResult = JSON.parse(jsonMatch[0])
+    console.log('[booking-intake] parsed result:', result)
 
     return NextResponse.json(result)
   } catch (err) {
