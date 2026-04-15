@@ -141,6 +141,94 @@ def create_app_flask_app():
     return _app
 
 
+# ── CLI command: flask --app shizuverse.app:app reset-cats ────────────────────
+
+import click
+
+_RESET_DATA = {
+    19: {
+        "label": "Elderly Care / Aide aux seniors",
+        "entries": [
+            ("Assistance à domicile",      "Home assistance"),
+            ("Accompagnement seniors",     "Senior companionship"),
+            ("Aide aux repas et hygiène",  "Meal and hygiene support"),
+        ],
+    },
+    21: {
+        "label": "Climatisation & Electromenager",
+        "entries": [
+            ("Installation de climatiseur",     "AC installation"),
+            ("Entretien et nettoyage de clim",  "AC maintenance"),
+            ("Réparation d'électroménager",     "Appliance repair"),
+            ("Dépannage TV et électronique",    "TV and electronics repair"),
+        ],
+    },
+}
+
+
+@app.cli.command("reset-cats")
+def reset_cats_command():
+    """Delete and recreate subcategories/services for categories 19 and 21."""
+    for category_id, data in _RESET_DATA.items():
+        cat = ServiceCategory.query.get(category_id)
+        if cat is None:
+            click.echo(f"  SKIP  category id={category_id} — not found in DB")
+            continue
+
+        sub_ids = [
+            s.id for s in ServiceSubcategory.query.filter_by(category_id=category_id).all()
+        ]
+        svc_deleted = 0
+        if sub_ids:
+            svc_deleted = Service.query.filter(
+                Service.subcategory_id.in_(sub_ids)
+            ).delete(synchronize_session="fetch")
+
+        sub_deleted = ServiceSubcategory.query.filter_by(
+            category_id=category_id
+        ).delete(synchronize_session="fetch")
+        db.session.flush()
+
+        created = []
+        for sub_name, svc_name in data["entries"]:
+            sub = ServiceSubcategory(name=sub_name, category_id=category_id)
+            db.session.add(sub)
+            db.session.flush()
+
+            svc = Service(
+                name=svc_name,
+                subcategory_id=sub.id,
+                is_active=True,
+                is_priority=False,
+                featured=False,
+                professional_required="",
+            )
+            db.session.add(svc)
+            db.session.flush()
+            created.append((sub.id, sub_name, svc.id, svc_name))
+
+        db.session.commit()
+
+        click.echo(
+            f"  OK  id={category_id} ({data['label']}) — "
+            f"deleted {svc_deleted} service(s), {sub_deleted} subcategory/ies; "
+            f"recreated {len(created)}"
+        )
+        for sub_id, sub_name, svc_id, svc_name in created:
+            click.echo(f"        sub_id={sub_id} '{sub_name}' → svc_id={svc_id} '{svc_name}'")
+
+    click.echo("\n  --- Verification ---")
+    for category_id in sorted(_RESET_DATA):
+        cat = ServiceCategory.query.get(category_id)
+        click.echo(f"\n  [category_id={category_id}] {cat.name if cat else 'NOT FOUND'}")
+        for sub in ServiceSubcategory.query.filter_by(category_id=category_id).all():
+            for svc in Service.query.filter_by(subcategory_id=sub.id).all():
+                click.echo(
+                    f"    sub_id={sub.id:<5} '{sub.name}'"
+                    f"  →  svc_id={svc.id:<5} '{svc.name}'  is_active={svc.is_active}"
+                )
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
     _socketio.run(_app, host="0.0.0.0", port=port, debug=True)
