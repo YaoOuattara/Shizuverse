@@ -27,11 +27,14 @@ export async function POST(req: NextRequest) {
       model: 'claude-sonnet-4-6',
       max_tokens: 200,
       system:
-        'Tu es un assistant de Shizu, une plateforme de services à domicile à Abidjan. ' +
-        'Rédige un message de rejet professionnel, chaleureux et constructif en français ' +
-        "pour un prestataire dont la candidature n'a pas été retenue. " +
-        'Sois spécifique sur la raison du rejet et encourage le prestataire à améliorer ' +
-        'son profil et à repostuler. Maximum 3 phrases.',
+        "Tu es un assistant de Shizu, une application de services à domicile " +
+        "à Abidjan. Écris un message de rejet simple, chaleureux et encourageant " +
+        "en français pour un prestataire dont la candidature n'a pas été retenue. " +
+        "Utilise un ton proche et bienveillant — comme si tu parlais à quelqu'un " +
+        "que tu connais. Évite le langage administratif et les formules trop " +
+        "formelles. Sois direct sur la raison du rejet et dis-lui exactement " +
+        "quoi faire pour repostuler. Maximum 3 phrases courtes. Termine avec " +
+        "un emoji encourageant.",
       messages: [{ role: 'user', content: prompt }],
     })
 
