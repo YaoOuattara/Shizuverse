@@ -506,6 +506,31 @@ export default function ProviderDashboard() {
           </div>
         )}
 
+        {/* Profile completion tip — shown when provider has fewer than 3 completed bookings */}
+        {hasToken && statusCounts.completed < 3 && !isLoading && (
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <span className="text-lg leading-none mt-0.5">💡</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-800">
+                {locale === 'fr'
+                  ? 'Complétez votre profil pour attirer plus de clients'
+                  : 'Complete your profile to attract more clients'}
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                {locale === 'fr'
+                  ? 'Ajoutez une présentation et améliorez-la avec l\'IA pour vous démarquer.'
+                  : 'Add a bio and improve it with AI to stand out.'}
+              </p>
+            </div>
+            <button
+              onClick={() => router.push(`/${locale}/provider/profile`)}
+              className="shrink-0 text-xs font-medium text-amber-700 underline underline-offset-2 hover:text-amber-900"
+            >
+              {locale === 'fr' ? 'Mon profil →' : 'My profile →'}
+            </button>
+          </div>
+        )}
+
         <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 mb-4 border-b border-border/50 md:relative md:mx-0 md:px-0 md:py-0 md:mb-4 md:border-b-0 md:bg-transparent md:backdrop-blur-none">
           <StatusTabs
             value={filters.status}
