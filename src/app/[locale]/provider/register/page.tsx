@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,13 @@ import {
   CheckCircle,
   Sparkles,
   Droplets,
+  Wrench,
   Zap,
-  PaintBucket,
-  Truck,
   Hammer,
+  Baby,
+  Heart,
   Leaf,
-  Shield,
+  Wind,
   Trophy,
   X,
   ArrowLeft,
@@ -26,16 +27,32 @@ import {
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 
-const SERVICES = [
-  { id: "cleaning",   icon: Droplets,    priceMin: 5000,   priceMax: 25000  },
-  { id: "plumbing",   icon: Droplets,    priceMin: 10000,  priceMax: 50000  },
-  { id: "electrical", icon: Zap,         priceMin: 10000,  priceMax: 60000  },
-  { id: "painting",   icon: PaintBucket, priceMin: 15000,  priceMax: 80000  },
-  { id: "moving",     icon: Truck,       priceMin: 20000,  priceMax: 100000 },
-  { id: "carpentry",  icon: Hammer,      priceMin: 10000,  priceMax: 60000  },
-  { id: "gardening",  icon: Leaf,        priceMin: 5000,   priceMax: 20000  },
-  { id: "security",   icon: Shield,      priceMin: 30000,  priceMax: 100000 },
-];
+const FLASK_API =
+  process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
+
+interface ApiCategory {
+  id: number;
+  name: string;
+  name_fr: string;
+  name_en: string;
+}
+
+import type { LucideIcon } from "lucide-react";
+const CATEGORY_ICON_MAP: Record<number, LucideIcon> = {
+  13: Droplets,
+  14: Wrench,
+  15: Zap,
+  16: Hammer,
+  17: Baby,
+  18: Sparkles,
+  19: Heart,
+  20: Leaf,
+  21: Wind,
+};
+
+function displayCatName(cat: ApiCategory, locale: string): string {
+  return locale === "fr" ? (cat.name_fr || cat.name) : (cat.name_en || cat.name);
+}
 
 const ZONES = [
   "Cocody", "Deux-Plateaux", "Angré", "Riviera", "Plateau", "Marcory",
@@ -126,7 +143,17 @@ export default function ProviderRegisterPage() {
   const [account, setAccount] = useState({ full_name: "", phone: "", password: "" });
 
   // Step 2
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [selectedServices, setSelectedServices] = useState<number[]>([]);
+
+  useEffect(() => {
+    fetch(`${FLASK_API}/api/services/categories`)
+      .then((r) => r.json())
+      .then((data) => setCategories(Array.isArray(data) ? data : []))
+      .catch(console.error)
+      .finally(() => setCategoriesLoading(false));
+  }, []);
 
   // Step 3
   const [selectedZones, setSelectedZones] = useState<string[]>([]);
@@ -161,7 +188,12 @@ export default function ProviderRegisterPage() {
       const res = await fetch("/api/improve-bio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bio, services: selectedServices }),
+        body: JSON.stringify({
+          bio,
+          services: selectedServices.map(
+            (id) => displayCatName(categories.find((c) => c.id === id) ?? { id, name: String(id), name_fr: String(id), name_en: String(id) }, locale)
+          ),
+        }),
       });
       const data = await res.json();
       if (data.error) console.error('[improve-bio] server error:', data.error);
@@ -308,40 +340,45 @@ export default function ProviderRegisterPage() {
           {step === 2 && (
             <div className="space-y-5">
               <p className="text-sm text-gray-500">{t("selectServicesHint")}</p>
-              <div className="grid grid-cols-2 gap-3">
-                {SERVICES.map(({ id, icon: Icon, priceMin, priceMax }) => {
-                  const selected = selectedServices.includes(id);
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() =>
-                        setSelectedServices((prev) =>
-                          selected ? prev.filter((s) => s !== id) : [...prev, id]
-                        )
-                      }
-                      className={`relative p-4 rounded-xl border-2 text-left transition-all
-                        ${selected
-                          ? "border-[#0F3A7A] bg-[#0F3A7A]/5"
-                          : "border-gray-100 hover:border-gray-200 bg-white"
-                        }`}
-                    >
-                      {selected && (
-                        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[#0F3A7A] flex items-center justify-center">
-                          <CheckCircle className="h-3 w-3 text-white" />
-                        </div>
-                      )}
-                      <Icon className={`h-6 w-6 mb-2 ${selected ? "text-[#0F3A7A]" : "text-gray-400"}`} />
-                      <p className={`text-sm font-medium ${selected ? "text-[#0F3A7A]" : "text-gray-700"}`}>
-                        {t(`services.${id}`)}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {fmt(priceMin)} – {fmt(priceMax)}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
+              {categoriesLoading ? (
+                <div className="flex items-center justify-center py-8 text-gray-400 gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="text-sm">{isFr ? "Chargement..." : "Loading..."}</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {categories.map((cat) => {
+                    const selected = selectedServices.includes(cat.id);
+                    const Icon = CATEGORY_ICON_MAP[cat.id] ?? Sparkles;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedServices((prev) =>
+                            selected ? prev.filter((id) => id !== cat.id) : [...prev, cat.id]
+                          )
+                        }
+                        className={`relative p-4 rounded-xl border-2 text-left transition-all
+                          ${selected
+                            ? "border-[#0F3A7A] bg-[#0F3A7A]/5"
+                            : "border-gray-100 hover:border-gray-200 bg-white"
+                          }`}
+                      >
+                        {selected && (
+                          <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[#0F3A7A] flex items-center justify-center">
+                            <CheckCircle className="h-3 w-3 text-white" />
+                          </div>
+                        )}
+                        <Icon className={`h-6 w-6 mb-2 ${selected ? "text-[#0F3A7A]" : "text-gray-400"}`} />
+                        <p className={`text-sm font-medium ${selected ? "text-[#0F3A7A]" : "text-gray-700"}`}>
+                          {displayCatName(cat, locale)}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <div className="flex gap-3 pt-1">
                 <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
                   {t("back")}
