@@ -124,7 +124,13 @@ export const ServiceList = () => {
                       type="button"
                       onClick={() => {
                         const targetId = sub.service_id ?? sub.id;
-                        router.push(`/${locale}/booking/${targetId}`);
+                        const serviceName =
+                          locale === 'fr'
+                            ? (sub.name_fr || sub.name)
+                            : (sub.name_en || sub.name);
+                        router.push(
+                          `/${locale}/booking/${targetId}?service=${encodeURIComponent(serviceName)}`
+                        );
                       }}
                       className="px-4 py-2 rounded-full border-2 border-indigo-200 bg-white dark:bg-zinc-900 dark:border-indigo-800
                                  text-sm font-medium text-indigo-800 dark:text-indigo-300

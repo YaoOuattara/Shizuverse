@@ -1,30 +1,58 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
-  Sparkles, Wrench, Zap, Hammer, Baby, Scissors, ChefHat, Leaf,
+  Sparkles, Wrench, Zap, Hammer, Baby, Scissors, ChefHat, Leaf, Heart, Wind, Star,
   type LucideIcon,
 } from 'lucide-react'
 import { trackEvent } from '@/lib/analytics'
 
-interface Service {
-  icon: LucideIcon
+interface ApiCategory {
+  id: number
   name: string
-  desc: string
-  slug: string
+  name_fr: string
+  name_en: string
+  description: string
+}
+
+const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL || 'https://shizu-verse.onrender.com'
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  'cleaning': Sparkles,
+  'plumbing': Wrench,
+  'electrical': Zap,
+  'handyman': Hammer,
+  'childcare': Baby,
+  'nounou & baby-sitting': Baby,
+  'beauty at home': Scissors,
+  'catering & cooking': ChefHat,
+  'garden & pool': Leaf,
+  'elderly care / aide aux seniors': Heart,
+  'climatisation & electromenager': Wind,
+}
+
+const FALLBACK_ICONS: LucideIcon[] = [
+  Sparkles, Wrench, Zap, Hammer, Baby, Scissors, ChefHat, Leaf, Heart, Wind, Star,
+]
+
+function getIcon(name: string, index: number): LucideIcon {
+  return ICON_MAP[name.toLowerCase()] ?? FALLBACK_ICONS[index % FALLBACK_ICONS.length]
+}
+
+function displayName(cat: ApiCategory, locale: string): string {
+  return locale === 'fr' ? (cat.name_fr || cat.name) : (cat.name_en || cat.name)
 }
 
 export default function ServicesGrid({ locale }: { locale: string }) {
-  const SERVICES: Service[] = [
-    { icon: Sparkles, name: locale === 'fr' ? 'Ménage & Nettoyage'       : 'Cleaning',           desc: locale === 'fr' ? 'Nettoyage régulier ou ponctuel'        : 'Regular or one-time cleaning',     slug: 'menage' },
-    { icon: Wrench,   name: locale === 'fr' ? 'Plomberie'                : 'Plumbing',           desc: locale === 'fr' ? 'Réparations & installations'           : 'Repairs & installations',          slug: 'plomberie' },
-    { icon: Zap,      name: locale === 'fr' ? 'Électricité'              : 'Electrical',         desc: locale === 'fr' ? 'Dépannage & câblage'                   : 'Troubleshooting & wiring',         slug: 'electricite' },
-    { icon: Hammer,   name: locale === 'fr' ? 'Bricolage & Réparations'  : 'Handyman',           desc: locale === 'fr' ? 'Petits travaux, montage, réparations'  : 'Small jobs, assembly, repairs',    slug: 'bricolage' },
-    { icon: Baby,     name: locale === 'fr' ? 'Nounou & Baby-sitting'    : 'Childcare',          desc: locale === 'fr' ? 'Garde ponctuelle ou régulière'         : 'Occasional or regular care',       slug: 'nounou' },
-    { icon: Scissors, name: locale === 'fr' ? 'Beauté à domicile'        : 'Beauty at Home',     desc: locale === 'fr' ? 'Coiffure, manucure, soins'             : 'Hair, nails, beauty care',         slug: 'beaute' },
-    { icon: ChefHat,  name: locale === 'fr' ? 'Traiteur & Cuisine'       : 'Catering & Cooking', desc: locale === 'fr' ? 'Événements, repas à domicile'          : 'Events, home-cooked meals',        slug: 'traiteur' },
-    { icon: Leaf,     name: locale === 'fr' ? 'Jardinage & Piscine'      : 'Garden & Pool',      desc: locale === 'fr' ? 'Entretien de jardin et piscine'        : 'Garden and pool maintenance',      slug: 'jardinage' },
-  ]
+  const [categories, setCategories] = useState<ApiCategory[]>([])
+
+  useEffect(() => {
+    fetch(`${FLASK_API}/api/services/categories`)
+      .then((r) => r.json())
+      .then((data) => setCategories(Array.isArray(data) ? data : []))
+      .catch(console.error)
+  }, [])
 
   return (
     <section className="bg-gray-50 py-16 px-6">
@@ -39,20 +67,26 @@ export default function ServicesGrid({ locale }: { locale: string }) {
         </p>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
-        {SERVICES.map((s) => (
-          <Link
-            key={s.slug}
-            href={`/${locale}/bookings?service=${s.slug}`}
-            className="bg-white rounded-2xl border border-gray-100 p-6 text-center hover:shadow-md hover:border-[#0F3A7A]/20 transition-all cursor-pointer group"
-            onClick={() => trackEvent('service_viewed', { service_slug: s.slug, service_name: s.name, locale })}
-          >
-            <s.icon className="h-8 w-8 text-[#0F3A7A] mx-auto group-hover:scale-110 transition-transform" />
-            <p className="font-semibold text-gray-800 mt-3 group-hover:text-[#0F3A7A] transition-colors">
-              {s.name}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">{s.desc}</p>
-          </Link>
-        ))}
+        {categories.map((cat, i) => {
+          const Icon = getIcon(cat.name, i)
+          const name = displayName(cat, locale)
+          return (
+            <Link
+              key={cat.id}
+              href={`/${locale}/services`}
+              className="bg-white rounded-2xl border border-gray-100 p-6 text-center hover:shadow-md hover:border-[#0F3A7A]/20 transition-all cursor-pointer group"
+              onClick={() => trackEvent('service_viewed', { service_name: name, locale })}
+            >
+              <Icon className="h-8 w-8 text-[#0F3A7A] mx-auto group-hover:scale-110 transition-transform" />
+              <p className="font-semibold text-gray-800 mt-3 group-hover:text-[#0F3A7A] transition-colors">
+                {name}
+              </p>
+              {cat.description && (
+                <p className="text-xs text-gray-400 mt-1">{cat.description}</p>
+              )}
+            </Link>
+          )
+        })}
       </div>
     </section>
   )
