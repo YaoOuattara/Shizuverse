@@ -139,7 +139,7 @@ export default function AdminProviders() {
         name: p.company_name || p.name || `Provider #${p.id}`,
         email: p.email || "",
         phone: p.phone_number || "",
-        services: [],
+        services: p.services || [],
         serviceArea: p.address || "",
         rating: 0,
         reviewCount: 0,

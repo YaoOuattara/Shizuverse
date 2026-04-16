@@ -33,7 +33,7 @@ export interface ApiBooking {
 export interface ApiProvider {
   id: number;
   user_id: number;
-  // New portal endpoint fields
+  // Portal endpoint fields
   company_name?: string;
   phone_number?: string;
   verification_status?: string;
@@ -45,11 +45,26 @@ export interface ApiProvider {
   reviewed_at?: string;
   bio?: string;
   address?: string;
+  services?: string[];
   // Old endpoint fields (kept for backwards compat)
   name?: string;
   email?: string;
   verified?: boolean;
   created_at?: string;
+}
+
+export interface ApiReview {
+  id: number;
+  booking_id: number;
+  client_name: string;
+  rating: number;
+  text: string;
+  service_slug: string;
+  provider_name: string;
+  provider_id: number | null;
+  moderation_status: string;
+  display_status: string;
+  created_at: string;
 }
 
 export interface ApiService {
@@ -124,6 +139,20 @@ export interface FinanceSummary {
   payouts_due_value_xof: number;
   failed_payouts: number;
   unpaid_completed_bookings: number;
+}
+
+export function useAdminReviews(status?: string) {
+  const [reviews, setReviews] = useState<ApiReview[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    adminApi.portalGetReviews(status ? { status } : undefined)
+      .then((data: ApiReview[]) => setReviews(Array.isArray(data) ? data : []))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [status]);
+
+  return { reviews, setReviews, loading };
 }
 
 export function useAdminFinanceSummary() {

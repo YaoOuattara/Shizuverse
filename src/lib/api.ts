@@ -74,6 +74,12 @@ export const adminApi = {
   portalGetFinanceSummary: () => adminFetch("/admin/finance/summary"),
   portalUpdateFinance: (bookingId: string, body: { payment_status?: string; payout_status?: string }) =>
     adminFetch(`/admin/bookings/${bookingId}/finance`, { method: "POST", body: JSON.stringify(body) }),
+  portalGetReviews: (params?: { status?: string }) => {
+    const qs = params?.status ? `?status=${params.status}` : "";
+    return adminFetch(`/admin/reviews${qs}`);
+  },
+  portalModerateReview: (id: number, status: string, reason?: string) =>
+    adminFetch(`/admin/reviews/${id}/moderate`, { method: "POST", body: JSON.stringify({ status, reason: reason || "" }) }),
 };
 
 export default apiFetch;

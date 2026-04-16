@@ -37,6 +37,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
+import { useParams } from "next/navigation";
 import { useAdminStats } from "@/hooks/useAdminApi";
 import { useAdminStore, type AdminBooking, type AdminProvider, type DateRangeOption, type VerificationStatus } from "@/data/adminStore";
 import { useToast } from "@/hooks/use-toast";
@@ -57,23 +58,27 @@ const verificationStyles: Record<VerificationStatus, string> = {
   suspended: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
 };
 
-const verificationLabels: Record<VerificationStatus, string> = {
-  draft: "Draft",
-  submitted: "Pending",
-  approved: "Approved",
-  rejected: "Rejected",
-  suspended: "Suspended",
+const verificationLabels: Record<VerificationStatus, { fr: string; en: string }> = {
+  draft:     { fr: "Brouillon",  en: "Draft"     },
+  submitted: { fr: "En attente", en: "Pending"   },
+  approved:  { fr: "Approuvé",   en: "Approved"  },
+  rejected:  { fr: "Refusé",     en: "Rejected"  },
+  suspended: { fr: "Suspendu",   en: "Suspended" },
 };
 
-const dateRangeOptions: { value: DateRangeOption; label: string }[] = [
-  { value: "today", label: "Today" },
-  { value: "7d", label: "7 days" },
-  { value: "30d", label: "30 days" },
+const dateRangeOptionsDef: { value: DateRangeOption; fr: string; en: string }[] = [
+  { value: "today", fr: "Aujourd'hui", en: "Today"   },
+  { value: "7d",    fr: "7 jours",     en: "7 days"  },
+  { value: "30d",   fr: "30 jours",    en: "30 days" },
 ];
 
 export default function AdminOverview() {
   const { toast } = useToast();
-  const { 
+  const params = useParams();
+  const isFr = (params?.locale as string) === 'fr';
+  const dateRangeOptions = dateRangeOptionsDef.map(o => ({ value: o.value, label: isFr ? o.fr : o.en }));
+  const getVerifLabel = (s: VerificationStatus) => verificationLabels[s]?.[isFr ? 'fr' : 'en'] ?? s;
+  const {
     dateRange, 
     setDateRange, 
     getKPIs, 
@@ -192,17 +197,17 @@ export default function AdminOverview() {
   };
 
   return (
-    <AdminLayout title="Overview">
+    <AdminLayout title={isFr ? "Tableau de bord" : "Overview"}>
       {liveStats && (
         <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-sm text-green-800">
           <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-          <strong>Live API:</strong> {liveStats.total_bookings} bookings · {liveStats.pending} pending · {liveStats.confirmed} confirmed · {liveStats.completed} completed · {liveStats.total_providers} providers
+          <strong>Live:</strong> {liveStats.total_bookings} {isFr ? "réservations" : "bookings"} · {liveStats.pending} {isFr ? "en attente" : "pending"} · {liveStats.confirmed} {isFr ? "confirmées" : "confirmed"} · {liveStats.completed} {isFr ? "terminées" : "completed"} · {liveStats.total_providers} {isFr ? "prestataires" : "providers"}
         </div>
       )}
       <div className="space-y-6">
         {/* Date Range Filter */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Show:</span>
+          <span className="text-sm text-muted-foreground">{isFr ? "Période :" : "Show:"}</span>
           <div className="flex gap-1">
             {dateRangeOptions.map((option) => (
               <Button
@@ -224,7 +229,7 @@ export default function AdminOverview() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Total Bookings</p>
+                  <p className="text-xs text-muted-foreground">{isFr ? "Total réservations" : "Total Bookings"}</p>
                   <p className="text-2xl font-bold" data-testid="kpi-total-bookings">{kpis.totalBookings}</p>
                 </div>
                 <Calendar className="h-8 w-8 text-muted-foreground/50" />
@@ -236,7 +241,7 @@ export default function AdminOverview() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Pending</p>
+                  <p className="text-xs text-muted-foreground">{isFr ? "En attente" : "Pending"}</p>
                   <p className="text-2xl font-bold text-amber-600" data-testid="kpi-pending">{kpis.pendingBookings}</p>
                 </div>
                 <Clock className="h-8 w-8 text-amber-500/50" />
@@ -248,7 +253,7 @@ export default function AdminOverview() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Confirmed</p>
+                  <p className="text-xs text-muted-foreground">{isFr ? "Confirmées" : "Confirmed"}</p>
                   <p className="text-2xl font-bold text-blue-600" data-testid="kpi-confirmed">{kpis.confirmedBookings}</p>
                 </div>
                 <CheckCircle2 className="h-8 w-8 text-blue-500/50" />
@@ -260,7 +265,7 @@ export default function AdminOverview() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Completed</p>
+                  <p className="text-xs text-muted-foreground">{isFr ? "Terminées" : "Completed"}</p>
                   <p className="text-2xl font-bold text-emerald-600" data-testid="kpi-completed">{kpis.completedBookings}</p>
                 </div>
                 <CheckCircle2 className="h-8 w-8 text-emerald-500/50" />
@@ -272,7 +277,7 @@ export default function AdminOverview() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Cancelled</p>
+                  <p className="text-xs text-muted-foreground">{isFr ? "Annulées" : "Cancelled"}</p>
                   <p className="text-2xl font-bold text-red-600" data-testid="kpi-cancelled">{kpis.cancelledBookings}</p>
                 </div>
                 <XCircle className="h-8 w-8 text-red-500/50" />
@@ -284,7 +289,7 @@ export default function AdminOverview() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Total GMV</p>
+                  <p className="text-xs text-muted-foreground">{isFr ? "Volume total (GMV)" : "Total GMV"}</p>
                   <p className="text-2xl font-bold" data-testid="kpi-gmv">{formatMoney(kpis.totalGMV)}</p>
                 </div>
                 <Banknote className="h-8 w-8 text-muted-foreground/50" />
@@ -296,7 +301,7 @@ export default function AdminOverview() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Avg Rating</p>
+                  <p className="text-xs text-muted-foreground">{isFr ? "Note moyenne" : "Avg Rating"}</p>
                   <p className="text-2xl font-bold" data-testid="kpi-avg-rating">{kpis.avgRating.toFixed(1)}</p>
                 </div>
                 <Star className="h-8 w-8 text-amber-500/50" />
@@ -308,7 +313,7 @@ export default function AdminOverview() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Active Providers</p>
+                  <p className="text-xs text-muted-foreground">{isFr ? "Prestataires actifs" : "Active Providers"}</p>
                   <p className="text-2xl font-bold" data-testid="kpi-active-providers">
                     {kpis.activeProviders}/{kpis.totalProviders}
                   </p>
@@ -322,11 +327,11 @@ export default function AdminOverview() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Eligible Providers</p>
+                  <p className="text-xs text-muted-foreground">{isFr ? "Prestataires éligibles" : "Eligible Providers"}</p>
                   <p className="text-2xl font-bold text-emerald-600" data-testid="kpi-eligible-providers">
                     {kpis.eligibleProviders}
                   </p>
-                  <p className="text-xs text-muted-foreground">Approved + Listed</p>
+                  <p className="text-xs text-muted-foreground">{isFr ? "Approuvés + listés" : "Approved + Listed"}</p>
                 </div>
                 <ShieldCheck className="h-8 w-8 text-emerald-500/50" />
               </div>
@@ -339,13 +344,13 @@ export default function AdminOverview() {
           {/* Recent Bookings */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Recent Bookings</CardTitle>
-              <CardDescription>Latest booking activity</CardDescription>
+              <CardTitle className="text-base">{isFr ? "Réservations récentes" : "Recent Bookings"}</CardTitle>
+              <CardDescription>{isFr ? "Activité récente" : "Latest booking activity"}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               {recentBookings.length === 0 ? (
                 <div className="p-6 text-center text-muted-foreground">
-                  No bookings found in this period
+                  {isFr ? "Aucune réservation sur cette période" : "No bookings found in this period"}
                 </div>
               ) : (
                 <div className="divide-y" data-testid="list-recent-bookings">
@@ -378,13 +383,13 @@ export default function AdminOverview() {
           {/* Top Providers */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Top Providers</CardTitle>
-              <CardDescription>By revenue</CardDescription>
+              <CardTitle className="text-base">{isFr ? "Top prestataires" : "Top Providers"}</CardTitle>
+              <CardDescription>{isFr ? "Par chiffre d'affaires" : "By revenue"}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               {topProviders.length === 0 ? (
                 <div className="p-6 text-center text-muted-foreground">
-                  No providers found
+                  {isFr ? "Aucun prestataire trouvé" : "No providers found"}
                 </div>
               ) : (
                 <div className="divide-y" data-testid="list-top-providers">
@@ -436,7 +441,7 @@ export default function AdminOverview() {
       <Sheet open={!!selectedBooking} onOpenChange={(open) => !open && setSelectedBooking(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Booking Details</SheetTitle>
+            <SheetTitle>{isFr ? "Détail réservation" : "Booking Details"}</SheetTitle>
           </SheetHeader>
           {selectedBooking && (
             <div className="space-y-6 mt-6">
@@ -449,7 +454,7 @@ export default function AdminOverview() {
 
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-medium text-sm text-muted-foreground mb-2">Client</h4>
+                  <h4 className="font-medium text-sm text-muted-foreground mb-2">{isFr ? "Client" : "Client"}</h4>
                   <p className="font-medium">{selectedBooking.clientName}</p>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                     <Mail className="h-4 w-4" />
@@ -462,18 +467,18 @@ export default function AdminOverview() {
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-sm text-muted-foreground mb-2">Service</h4>
+                  <h4 className="font-medium text-sm text-muted-foreground mb-2">{isFr ? "Service" : "Service"}</h4>
                   <p className="font-medium">{selectedBooking.serviceName}</p>
                   <p className="text-sm text-muted-foreground">{selectedBooking.serviceCategory}</p>
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-sm text-muted-foreground mb-2">Provider</h4>
+                  <h4 className="font-medium text-sm text-muted-foreground mb-2">{isFr ? "Prestataire" : "Provider"}</h4>
                   <p className="font-medium">{selectedBooking.providerName}</p>
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-sm text-muted-foreground mb-2">Schedule</h4>
+                  <h4 className="font-medium text-sm text-muted-foreground mb-2">{isFr ? "Horaire" : "Schedule"}</h4>
                   <p className="font-medium">{selectedBooking.date}</p>
                   <p className="text-sm text-muted-foreground">{selectedBooking.time} ({selectedBooking.duration})</p>
                 </div>
@@ -491,7 +496,7 @@ export default function AdminOverview() {
                     data-testid="button-confirm-booking"
                   >
                     <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Confirm
+                    {isFr ? "Confirmer" : "Confirm"}
                   </Button>
                   <Button
                     variant="destructive"
@@ -503,7 +508,7 @@ export default function AdminOverview() {
                     data-testid="button-cancel-booking"
                   >
                     <XCircle className="h-4 w-4 mr-2" />
-                    Cancel
+                    {isFr ? "Annuler" : "Cancel"}
                   </Button>
                 </div>
               )}
@@ -519,7 +524,7 @@ export default function AdminOverview() {
                     data-testid="button-complete-booking"
                   >
                     <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Mark Completed
+                    {isFr ? "Marquer terminée" : "Mark Completed"}
                   </Button>
                   <Button
                     variant="destructive"
@@ -531,7 +536,7 @@ export default function AdminOverview() {
                     data-testid="button-cancel-confirmed"
                   >
                     <XCircle className="h-4 w-4 mr-2" />
-                    Cancel
+                    {isFr ? "Annuler" : "Cancel"}
                   </Button>
                 </div>
               )}
@@ -544,7 +549,7 @@ export default function AdminOverview() {
       <Sheet open={!!selectedProvider} onOpenChange={(open) => !open && setSelectedProvider(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Provider Details</SheetTitle>
+            <SheetTitle>{isFr ? "Détail prestataire" : "Provider Details"}</SheetTitle>
           </SheetHeader>
           {selectedProvider && (
             <div className="space-y-6 mt-6">
@@ -552,7 +557,7 @@ export default function AdminOverview() {
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <Badge className={verificationStyles[selectedProvider.verificationStatus]}>
-                    {verificationLabels[selectedProvider.verificationStatus]}
+                    {getVerifLabel(selectedProvider.verificationStatus)}
                   </Badge>
                   {selectedProvider.verificationStatus === 'approved' && (
                     <Badge 
@@ -588,7 +593,7 @@ export default function AdminOverview() {
 
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-medium text-sm text-muted-foreground mb-2">Provider</h4>
+                  <h4 className="font-medium text-sm text-muted-foreground mb-2">{isFr ? "Prestataire" : "Provider"}</h4>
                   <p className="font-medium text-lg">{selectedProvider.name}</p>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                     <Mail className="h-4 w-4" />
@@ -601,7 +606,7 @@ export default function AdminOverview() {
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-sm text-muted-foreground mb-2">Services</h4>
+                  <h4 className="font-medium text-sm text-muted-foreground mb-2">{isFr ? "Services" : "Services"}</h4>
                   <div className="flex flex-wrap gap-1">
                     {selectedProvider.services.map((service) => (
                       <Badge key={service} variant="secondary" className="text-xs">
@@ -612,15 +617,15 @@ export default function AdminOverview() {
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-sm text-muted-foreground mb-2">Stats</h4>
+                  <h4 className="font-medium text-sm text-muted-foreground mb-2">{isFr ? "Statistiques" : "Stats"}</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-3 rounded-md bg-muted/50">
                       <p className="text-2xl font-bold">{selectedProvider.completedBookings}</p>
-                      <p className="text-xs text-muted-foreground">Completed</p>
+                      <p className="text-xs text-muted-foreground">{isFr ? "Terminées" : "Completed"}</p>
                     </div>
                     <div className="text-center p-3 rounded-md bg-muted/50">
                       <p className="text-2xl font-bold text-emerald-600">{formatMoney(selectedProvider.revenue)}</p>
-                      <p className="text-xs text-muted-foreground">Total Revenue</p>
+                      <p className="text-xs text-muted-foreground">{isFr ? "Chiffre d'affaires" : "Total Revenue"}</p>
                     </div>
                   </div>
                 </div>
@@ -628,7 +633,7 @@ export default function AdminOverview() {
                 {/* Verification Actions for Submitted Providers */}
                 {selectedProvider.verificationStatus === 'submitted' && (
                   <div className="pt-4 border-t space-y-3">
-                    <h4 className="font-medium text-sm text-muted-foreground">Review Application</h4>
+                    <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Examiner la demande" : "Review Application"}</h4>
                     <Button
                       className="w-full"
                       onClick={() => handleApproveProvider(selectedProvider.id)}
@@ -640,7 +645,7 @@ export default function AdminOverview() {
                       ) : (
                         <ShieldCheck className="h-4 w-4 mr-2" />
                       )}
-                      Approve Provider
+                      {isFr ? "Approuver" : "Approve Provider"}
                     </Button>
                   </div>
                 )}
@@ -648,7 +653,7 @@ export default function AdminOverview() {
                 {/* Actions for Approved Providers */}
                 {selectedProvider.verificationStatus === 'approved' && (
                   <div className="pt-4 border-t space-y-3">
-                    <h4 className="font-medium text-sm text-muted-foreground">Manage Provider</h4>
+                    <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Gérer le prestataire" : "Manage Provider"}</h4>
                     
                     <Button
                       variant="outline"
@@ -664,7 +669,7 @@ export default function AdminOverview() {
                       ) : (
                         <Eye className="h-4 w-4 mr-2" />
                       )}
-                      {selectedProvider.listed ? "Unlist Provider" : "List Provider"}
+                      {selectedProvider.listed ? (isFr ? "Délister" : "Unlist Provider") : (isFr ? "Lister" : "List Provider")}
                     </Button>
 
                     <Button
@@ -681,7 +686,7 @@ export default function AdminOverview() {
                       ) : (
                         <Play className="h-4 w-4 mr-2" />
                       )}
-                      {selectedProvider.status === "active" ? "Pause Operations" : "Resume Operations"}
+                      {selectedProvider.status === "active" ? (isFr ? "Suspendre l'activité" : "Pause Operations") : (isFr ? "Reprendre l'activité" : "Resume Operations")}
                     </Button>
 
                     <Button
@@ -704,7 +709,7 @@ export default function AdminOverview() {
                 {/* Actions for Suspended Providers */}
                 {selectedProvider.verificationStatus === 'suspended' && (
                   <div className="pt-4 border-t space-y-3">
-                    <h4 className="font-medium text-sm text-muted-foreground">Reinstate Provider</h4>
+                    <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Réintégrer" : "Reinstate Provider"}</h4>
                     <Button
                       className="w-full"
                       onClick={() => handleApproveProvider(selectedProvider.id)}
@@ -716,7 +721,7 @@ export default function AdminOverview() {
                       ) : (
                         <ShieldCheck className="h-4 w-4 mr-2" />
                       )}
-                      Reinstate Provider
+                      {isFr ? "Réintégrer" : "Reinstate Provider"}
                     </Button>
                   </div>
                 )}

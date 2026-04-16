@@ -7,7 +7,7 @@
  * 2. Provider Payouts - Track outgoing payments to providers
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams } from "next/navigation";
 import AdminLayout from "./AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Sheet,
@@ -57,17 +56,63 @@ import {
   CreditCard,
   Banknote,
   RefreshCw,
-  TrendingUp,
-  TrendingDown,
   Building2,
   FileText,
 } from "lucide-react";
-import { useAdminStore, type AdminBooking } from "@/data/adminStore";
-import { useAdminFinanceSummary } from "@/hooks/useAdminApi";
+import { useAdminBookings, useAdminFinanceSummary, type ApiBooking } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
 import { formatMoney } from "@/lib/currency";
+
+// Local type for payment page — maps from ApiBooking
+interface PaymentBooking {
+  id: string;
+  clientName: string;
+  clientPhone: string;
+  providerName: string;
+  providerCompany: string;
+  serviceName: string;
+  status: string;
+  paymentStatus: string;
+  payoutStatus: string;
+  price: number;
+  baseAmount: number;
+  platformFeeAmount: number;
+  providerPayoutAmount: number;
+  currency: string;
+  date: string;
+  time: string;
+  paidAt?: string;
+  payoutDueAt?: string;
+  payoutSentAt?: string;
+  paymentMethod?: string;
+  payoutMethod?: string;
+}
+
+function toPaymentBooking(b: ApiBooking): PaymentBooking {
+  const amount = b.amount_xof ?? 0;
+  const platformFee = Math.round(amount * 0.15);
+  const d = b.appointment_date ? new Date(b.appointment_date) : null;
+  return {
+    id: String(b.id),
+    clientName: b.client_name,
+    clientPhone: b.client_phone,
+    providerName: b.provider_name ?? '',
+    providerCompany: b.provider_name ?? '',
+    serviceName: b.service_name,
+    status: b.status,
+    paymentStatus: b.payment_status,
+    payoutStatus: b.payout_status,
+    price: amount,
+    baseAmount: amount,
+    platformFeeAmount: platformFee,
+    providerPayoutAmount: amount - platformFee,
+    currency: 'XOF',
+    date: d ? d.toLocaleDateString('fr-FR') : '',
+    time: d ? d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '',
+  };
+}
 
 const paymentStatusColors: Record<string, string> = {
   unpaid: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
@@ -83,18 +128,18 @@ const payoutStatusColors: Record<string, string> = {
   failed: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
 };
 
-const paymentStatusLabels: Record<string, string> = {
-  unpaid: 'Unpaid',
-  pending: 'Pending',
-  paid: 'Paid',
-  refunded: 'Refunded',
+const PAYMENT_STATUS_LABELS: Record<string, { fr: string; en: string }> = {
+  unpaid:   { fr: 'Non payé',   en: 'Unpaid'    },
+  pending:  { fr: 'En attente', en: 'Pending'   },
+  paid:     { fr: 'Payé',       en: 'Paid'      },
+  refunded: { fr: 'Remboursé',  en: 'Refunded'  },
 };
 
-const payoutStatusLabels: Record<string, string> = {
-  not_due: 'Not Due',
-  due: 'Due',
-  sent: 'Sent',
-  failed: 'Failed',
+const PAYOUT_STATUS_LABELS: Record<string, { fr: string; en: string }> = {
+  not_due: { fr: 'Non dû',   en: 'Not Due' },
+  due:     { fr: 'Dû',       en: 'Due'     },
+  sent:    { fr: 'Envoyé',   en: 'Sent'    },
+  failed:  { fr: 'Échoué',   en: 'Failed'  },
 };
 
 export default function AdminPayments() {
@@ -102,39 +147,50 @@ export default function AdminPayments() {
   const params = useParams();
   const isFr = (params?.locale as string) === "fr";
   const { summary, isLoading: summaryLoading } = useAdminFinanceSummary();
-  const {
-    bookings,
-    providers,
-    transactions,
-    recordPayment,
-    recordRefund,
-    recordPayout,
-  } = useAdminStore();
-  
+  const { bookings: apiBookings } = useAdminBookings();
+
+  const [bookings, setBookings] = useState<PaymentBooking[]>([]);
+  useEffect(() => {
+    setBookings(apiBookings.map(toPaymentBooking));
+  }, [apiBookings]);
+
+  // Bilingual status labels (derived from locale)
+  const paymentStatusLabels = Object.fromEntries(
+    Object.entries(PAYMENT_STATUS_LABELS).map(([k, v]) => [k, v[isFr ? 'fr' : 'en']])
+  );
+  const payoutStatusLabels = Object.fromEntries(
+    Object.entries(PAYOUT_STATUS_LABELS).map(([k, v]) => [k, v[isFr ? 'fr' : 'en']])
+  );
+
   const [activeTab, setActiveTab] = useState("payments");
   const [searchQuery, setSearchQuery] = useState("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
   const [payoutStatusFilter, setPayoutStatusFilter] = useState("all");
-  const [selectedBooking, setSelectedBooking] = useState<AdminBooking | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<PaymentBooking | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [refundModalOpen, setRefundModalOpen] = useState(false);
   const [payoutModalOpen, setPayoutModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  
+
   // Payment form state
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'mobile_money' | 'bank_transfer'>('cash');
   const [paymentReference, setPaymentReference] = useState('');
   const [paymentNote, setPaymentNote] = useState('');
-  
+
   // Payout form state
   const [payoutMethod, setPayoutMethod] = useState<'mobile_money' | 'bank_transfer'>('mobile_money');
   const [payoutReference, setPayoutReference] = useState('');
   const [payoutNote, setPayoutNote] = useState('');
-  
+
+  const updateLocalBooking = (id: string, patch: Partial<PaymentBooking>) => {
+    setBookings(prev => prev.map(b => b.id === id ? { ...b, ...patch } : b));
+    setSelectedBooking(prev => prev?.id === id ? { ...prev, ...patch } : prev);
+  };
+
   const paymentsBookings = useMemo(() => {
     return bookings.filter(b => b.status !== 'cancelled').filter(b => {
       const searchLower = searchQuery.toLowerCase();
-      const matchesSearch = !searchQuery || 
+      const matchesSearch = !searchQuery ||
         b.clientName.toLowerCase().includes(searchLower) ||
         b.serviceName.toLowerCase().includes(searchLower) ||
         b.providerName.toLowerCase().includes(searchLower) ||
@@ -143,11 +199,11 @@ export default function AdminPayments() {
       return matchesSearch && matchesStatus;
     });
   }, [bookings, searchQuery, paymentStatusFilter]);
-  
+
   const payoutsBookings = useMemo(() => {
     return bookings.filter(b => b.status === 'completed' && b.paymentStatus === 'paid').filter(b => {
       const searchLower = searchQuery.toLowerCase();
-      const matchesSearch = !searchQuery || 
+      const matchesSearch = !searchQuery ||
         b.providerName.toLowerCase().includes(searchLower) ||
         b.serviceName.toLowerCase().includes(searchLower) ||
         b.id.includes(searchLower);
@@ -155,29 +211,6 @@ export default function AdminPayments() {
       return matchesSearch && matchesStatus;
     });
   }, [bookings, searchQuery, payoutStatusFilter]);
-
-  const stats = useMemo(() => {
-    const unpaidTotal = bookings
-      .filter(b => b.paymentStatus === 'unpaid' && b.status !== 'cancelled')
-      .reduce((sum, b) => sum + (b.baseAmount || b.price || 0), 0);
-    const paidTotal = bookings
-      .filter(b => b.paymentStatus === 'paid')
-      .reduce((sum, b) => sum + (b.baseAmount || b.price || 0), 0);
-    const refundedTotal = bookings
-      .filter(b => b.paymentStatus === 'refunded')
-      .reduce((sum, b) => sum + (b.baseAmount || b.price || 0), 0);
-    const payoutsDue = bookings
-      .filter(b => b.payoutStatus === 'due')
-      .reduce((sum, b) => sum + (b.providerPayoutAmount || 0), 0);
-    const payoutsSent = bookings
-      .filter(b => b.payoutStatus === 'sent')
-      .reduce((sum, b) => sum + (b.providerPayoutAmount || 0), 0);
-    const platformRevenue = bookings
-      .filter(b => b.paymentStatus === 'paid')
-      .reduce((sum, b) => sum + (b.platformFeeAmount || 0), 0);
-    
-    return { unpaidTotal, paidTotal, refundedTotal, payoutsDue, payoutsSent, platformRevenue };
-  }, [bookings]);
 
   const openPaymentModal = () => {
     setPaymentMethod('cash');
@@ -190,22 +223,16 @@ export default function AdminPayments() {
     setIsUpdating(true);
     try {
       await adminApi.portalUpdateFinance(bookingId, { payment_status: 'paid' });
-      recordPayment(bookingId, {
-        method: paymentMethod,
-        reference: paymentReference || undefined,
-        note: paymentNote || undefined,
+      updateLocalBooking(bookingId, {
+        paymentStatus: 'paid',
+        paidAt: new Date().toISOString().split('T')[0],
+        paymentMethod,
       });
-      if (selectedBooking?.id === bookingId) {
-        setSelectedBooking(prev => prev ? {
-          ...prev,
-          paymentStatus: 'paid',
-          paidAt: new Date().toISOString().split('T')[0],
-          paymentMethod: paymentMethod,
-        } : null);
-      }
       toast({
-        title: "Payment Recorded",
-        description: `Payment for booking ${bookingId} has been recorded via ${paymentMethod.replace('_', ' ')}.`,
+        title: isFr ? "Paiement enregistré" : "Payment Recorded",
+        description: isFr
+          ? `Paiement via ${paymentMethod.replace('_', ' ')} enregistré.`
+          : `Payment for booking ${bookingId} recorded via ${paymentMethod.replace('_', ' ')}.`,
         duration: 3000,
       });
       setPaymentModalOpen(false);
@@ -219,22 +246,23 @@ export default function AdminPayments() {
 
   const handleIssueRefund = async (bookingId: string) => {
     setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    recordRefund(bookingId);
-    
-    toast({
-      title: "Refund Issued",
-      description: `Refund for booking ${bookingId} has been processed.`,
-      duration: 3000,
-    });
-    
-    if (selectedBooking?.id === bookingId) {
-      setSelectedBooking(prev => prev ? { ...prev, paymentStatus: 'refunded' } : null);
+    try {
+      await adminApi.portalUpdateFinance(bookingId, { payment_status: 'refunded' });
+      updateLocalBooking(bookingId, { paymentStatus: 'refunded' });
+      toast({
+        title: isFr ? "Remboursement effectué" : "Refund Issued",
+        description: isFr
+          ? `Remboursement pour la réservation ${bookingId} effectué.`
+          : `Refund for booking ${bookingId} has been processed.`,
+        duration: 3000,
+      });
+      setRefundModalOpen(false);
+    } catch (err) {
+      console.error("Failed to issue refund:", err);
+      toast({ title: "Error", description: "Failed to issue refund.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
     }
-    
-    setRefundModalOpen(false);
-    setIsUpdating(false);
   };
 
   const openPayoutModal = () => {
@@ -248,22 +276,16 @@ export default function AdminPayments() {
     setIsUpdating(true);
     try {
       await adminApi.portalUpdateFinance(bookingId, { payout_status: 'sent' });
-      recordPayout(bookingId, {
-        method: payoutMethod,
-        reference: payoutReference || undefined,
-        note: payoutNote || undefined,
+      updateLocalBooking(bookingId, {
+        payoutStatus: 'sent',
+        payoutSentAt: new Date().toISOString().split('T')[0],
+        payoutMethod,
       });
-      if (selectedBooking?.id === bookingId) {
-        setSelectedBooking(prev => prev ? {
-          ...prev,
-          payoutStatus: 'sent',
-          payoutSentAt: new Date().toISOString().split('T')[0],
-          payoutMethod: payoutMethod,
-        } : null);
-      }
       toast({
-        title: "Payout Sent",
-        description: `Provider payout for booking ${bookingId} has been sent via ${payoutMethod.replace('_', ' ')}.`,
+        title: isFr ? "Paiement prestataire envoyé" : "Payout Sent",
+        description: isFr
+          ? `Paiement envoyé via ${payoutMethod.replace('_', ' ')}.`
+          : `Provider payout for booking ${bookingId} sent via ${payoutMethod.replace('_', ' ')}.`,
         duration: 3000,
       });
       setPayoutModalOpen(false);
@@ -276,7 +298,7 @@ export default function AdminPayments() {
   };
 
   return (
-    <AdminLayout title="Payments">
+    <AdminLayout title={isFr ? "Paiements" : "Payments"}>
       <div className="space-y-4">
         {/* Live Finance Summary */}
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
@@ -372,86 +394,16 @@ export default function AdminPayments() {
           </Card>
         </div>
 
-        {/* Mock Stats Cards (Zustand) */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
-                <span className="text-xs">Collected</span>
-              </div>
-              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400" data-testid="stat-collected">
-                {formatMoney(stats.paidTotal)}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <Clock className="h-4 w-4 text-amber-500" />
-                <span className="text-xs">Unpaid</span>
-              </div>
-              <p className="text-lg font-bold text-amber-600 dark:text-amber-400" data-testid="stat-unpaid">
-                {formatMoney(stats.unpaidTotal)}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <span className="text-xs">Platform Revenue</span>
-              </div>
-              <p className="text-lg font-bold" data-testid="stat-revenue">
-                {formatMoney(stats.platformRevenue)}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <ArrowUpRight className="h-4 w-4 text-amber-500" />
-                <span className="text-xs">Payouts Due</span>
-              </div>
-              <p className="text-lg font-bold text-amber-600 dark:text-amber-400" data-testid="stat-payouts-due">
-                {formatMoney(stats.payoutsDue)}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                <span className="text-xs">Payouts Sent</span>
-              </div>
-              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400" data-testid="stat-payouts-sent">
-                {formatMoney(stats.payoutsSent)}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <RefreshCw className="h-4 w-4 text-gray-500" />
-                <span className="text-xs">Refunded</span>
-              </div>
-              <p className="text-lg font-bold text-muted-foreground" data-testid="stat-refunded">
-                {formatMoney(stats.refundedTotal)}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2 max-w-md">
             <TabsTrigger value="payments" data-testid="tab-payments">
               <ArrowDownLeft className="h-4 w-4 mr-2" />
-              Customer Payments
+              {isFr ? "Paiements clients" : "Customer Payments"}
             </TabsTrigger>
             <TabsTrigger value="payouts" data-testid="tab-payouts">
               <ArrowUpRight className="h-4 w-4 mr-2" />
-              Provider Payouts
+              {isFr ? "Paiements prestataires" : "Provider Payouts"}
             </TabsTrigger>
           </TabsList>
 
@@ -463,7 +415,7 @@ export default function AdminPayments() {
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search by client, service, or ID..."
+                      placeholder={isFr ? "Rechercher par client, service, ID..." : "Search by client, service, or ID..."}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9"
@@ -480,7 +432,7 @@ export default function AdminPayments() {
                         onClick={() => setPaymentStatusFilter(status)}
                         data-testid={`filter-payment-${status}`}
                       >
-                        {status === "all" ? "All" : paymentStatusLabels[status] || status}
+                        {status === "all" ? (isFr ? "Tous" : "All") : paymentStatusLabels[status] || status}
                       </Button>
                     ))}
                   </div>
@@ -498,7 +450,7 @@ export default function AdminPayments() {
                 {paymentsBookings.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <CreditCard className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>No payments found</p>
+                    <p>{isFr ? "Aucun paiement trouvé" : "No payments found"}</p>
                   </div>
                 ) : (
                   <div className="divide-y" data-testid="payments-list">
@@ -544,7 +496,7 @@ export default function AdminPayments() {
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search by provider, service, or ID..."
+                      placeholder={isFr ? "Rechercher par prestataire, service, ID..." : "Search by provider, service, or ID..."}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9"
@@ -561,7 +513,7 @@ export default function AdminPayments() {
                         onClick={() => setPayoutStatusFilter(status)}
                         data-testid={`filter-payout-${status}`}
                       >
-                        {status === "all" ? "All" : payoutStatusLabels[status] || status}
+                        {status === "all" ? (isFr ? "Tous" : "All") : payoutStatusLabels[status] || status}
                       </Button>
                     ))}
                   </div>
@@ -579,8 +531,8 @@ export default function AdminPayments() {
                 {payoutsBookings.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Banknote className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>No payouts found</p>
-                    <p className="text-xs mt-1">Payouts appear for completed & paid bookings</p>
+                    <p>{isFr ? "Aucun paiement prestataire" : "No payouts found"}</p>
+                    <p className="text-xs mt-1">{isFr ? "Réservations complétées et payées uniquement" : "Payouts appear for completed & paid bookings"}</p>
                   </div>
                 ) : (
                   <div className="divide-y" data-testid="payouts-list">
@@ -627,10 +579,12 @@ export default function AdminPayments() {
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader>
             <SheetTitle>
-              {activeTab === 'payments' ? 'Payment Details' : 'Payout Details'}
+              {activeTab === 'payments'
+                ? (isFr ? 'Détail paiement' : 'Payment Details')
+                : (isFr ? 'Détail versement' : 'Payout Details')}
             </SheetTitle>
             <SheetDescription>
-              Booking ID: {selectedBooking?.id}
+              {isFr ? "Réservation" : "Booking"} ID: {selectedBooking?.id}
             </SheetDescription>
           </SheetHeader>
 
@@ -663,18 +617,18 @@ export default function AdminPayments() {
 
               {/* Fee Breakdown */}
               <div className="space-y-2 bg-muted/50 rounded-md p-3">
-                <h4 className="font-medium text-sm">Fee Breakdown</h4>
+                <h4 className="font-medium text-sm">{isFr ? "Répartition des frais" : "Fee Breakdown"}</h4>
                 <div className="text-sm space-y-1">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Base Amount</span>
+                    <span className="text-muted-foreground">{isFr ? "Montant total" : "Base Amount"}</span>
                     <span>{formatMoney(selectedBooking.baseAmount, selectedBooking.currency)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Platform Fee (15%)</span>
+                    <span className="text-muted-foreground">{isFr ? "Commission Shizu (15%)" : "Platform Fee (15%)"}</span>
                     <span>{formatMoney(selectedBooking.platformFeeAmount, selectedBooking.currency)}</span>
                   </div>
                   <div className="flex justify-between font-medium pt-1 border-t">
-                    <span>Provider Payout</span>
+                    <span>{isFr ? "Part prestataire" : "Provider Payout"}</span>
                     <span className="text-emerald-600 dark:text-emerald-400">
                       {formatMoney(selectedBooking.providerPayoutAmount, selectedBooking.currency)}
                     </span>
@@ -796,9 +750,9 @@ export default function AdminPayments() {
       <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
+            <DialogTitle>{isFr ? "Enregistrer le paiement" : "Record Payment"}</DialogTitle>
             <DialogDescription>
-              Enter payment details for this booking.
+              {isFr ? "Saisir les détails du paiement." : "Enter payment details for this booking."}
             </DialogDescription>
           </DialogHeader>
           {selectedBooking && (
@@ -867,9 +821,9 @@ export default function AdminPayments() {
       <Dialog open={refundModalOpen} onOpenChange={setRefundModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm Refund</DialogTitle>
+            <DialogTitle>{isFr ? "Confirmer le remboursement" : "Confirm Refund"}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to issue a refund for this booking?
+              {isFr ? "Confirmer le remboursement pour cette réservation ?" : "Are you sure you want to issue a refund for this booking?"}
             </DialogDescription>
           </DialogHeader>
           {selectedBooking && (
@@ -906,9 +860,9 @@ export default function AdminPayments() {
       <Dialog open={payoutModalOpen} onOpenChange={setPayoutModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Record Payout</DialogTitle>
+            <DialogTitle>{isFr ? "Enregistrer le versement" : "Record Payout"}</DialogTitle>
             <DialogDescription>
-              Enter payout details for the provider.
+              {isFr ? "Saisir les détails du versement au prestataire." : "Enter payout details for the provider."}
             </DialogDescription>
           </DialogHeader>
           {selectedBooking && (

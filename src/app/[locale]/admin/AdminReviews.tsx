@@ -1,12 +1,13 @@
 "use client";
 /**
  * Admin Reviews Page
- * 
+ *
  * Reviews moderation with quick action buttons on cards and detail drawer.
- * Uses centralized admin store.
+ * Uses live API — no mock data.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useParams } from "next/navigation";
 import AdminLayout from "./AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,8 +50,39 @@ import {
   MoreVertical,
   CheckCircle2,
 } from "lucide-react";
-import { useAdminStore, type AdminReview } from "@/data/adminStore";
+import { useAdminReviews, type ApiReview } from "@/hooks/useAdminApi";
+import { adminApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+
+// Local shape that the UI works with
+interface ReviewItem {
+  id: string;
+  clientName: string;
+  providerName: string;
+  rating: number;
+  comment: string;
+  status: 'published' | 'hidden' | 'flagged';
+  createdAt: string;
+  moderationReason?: string;
+  serviceSlug: string;
+  bookingId: number;
+}
+
+function toReviewItem(r: ApiReview): ReviewItem {
+  const ds = r.display_status;
+  return {
+    id: String(r.id),
+    clientName: r.client_name,
+    providerName: r.provider_name || '',
+    rating: r.rating,
+    comment: r.text || '',
+    status: (ds === 'hidden' || ds === 'flagged' ? ds : 'published') as ReviewItem['status'],
+    createdAt: r.created_at ? r.created_at.split('T')[0] : '',
+    moderationReason: undefined,
+    serviceSlug: r.service_slug,
+    bookingId: r.booking_id,
+  };
+}
 
 const statusColors: Record<string, string> = {
   published: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
@@ -66,16 +98,23 @@ const statusIcons: Record<string, typeof Eye> = {
 
 export default function AdminReviews() {
   const { toast } = useToast();
-  const { reviews, updateReviewStatus } = useAdminStore();
-  
+  const params = useParams();
+  const isFr = (params?.locale as string) === 'fr';
+  const { reviews: apiReviews, setReviews: setApiReviews, loading } = useAdminReviews();
+
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  useEffect(() => {
+    setReviews(apiReviews.map(toReviewItem));
+  }, [apiReviews]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusTab, setStatusTab] = useState("published");
-  const [selectedReview, setSelectedReview] = useState<AdminReview | null>(null);
+  const [selectedReview, setSelectedReview] = useState<ReviewItem | null>(null);
   const [drawerModerationReason, setDrawerModerationReason] = useState("");
   const [modalModerationReason, setModalModerationReason] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
   const [actionModalOpen, setActionModalOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<{ reviewId: string; newStatus: AdminReview["status"] } | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ reviewId: string; newStatus: ReviewItem["status"] } | null>(null);
 
   const filteredReviews = useMemo(() => {
     return reviews.filter((review) => {
@@ -84,10 +123,7 @@ export default function AdminReviews() {
         review.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         review.providerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         review.comment.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesStatus = review.status === statusTab;
-
-      return matchesSearch && matchesStatus;
+      return matchesSearch && review.status === statusTab;
     });
   }, [reviews, searchQuery, statusTab]);
 
@@ -97,46 +133,47 @@ export default function AdminReviews() {
     flagged: reviews.filter(r => r.status === "flagged").length,
   }), [reviews]);
 
-  const handleUpdateStatus = async (reviewId: string, newStatus: AdminReview["status"], reason?: string, closeDrawer: boolean = true) => {
-    setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    updateReviewStatus(reviewId, newStatus, reason);
-
-    if (selectedReview?.id === reviewId) {
-      setSelectedReview(prev => prev ? { ...prev, status: newStatus, moderationReason: reason } : null);
-    }
-
-    const messages = {
-      published: "Review is now visible to users.",
-      hidden: "Review has been hidden from users.",
-      flagged: "Review has been flagged for further review.",
-    };
-
-    toast({
-      title: "Status Updated",
-      description: messages[newStatus],
-    });
-    
-    setDrawerModerationReason("");
-    setModalModerationReason("");
-    if (closeDrawer) {
-      setSelectedReview(null);
-    }
-    setActionModalOpen(false);
-    setPendingAction(null);
-    setIsUpdating(false);
+  const STATUS_MESSAGES: Record<string, { fr: string; en: string }> = {
+    published: { fr: "Avis publié.", en: "Review is now visible to users." },
+    hidden:    { fr: "Avis masqué.", en: "Review has been hidden from users." },
+    flagged:   { fr: "Avis signalé.", en: "Review has been flagged for further review." },
   };
 
-  const openActionModal = (reviewId: string, newStatus: AdminReview["status"]) => {
+  const handleUpdateStatus = async (reviewId: string, newStatus: ReviewItem["status"], reason?: string, closeDrawer: boolean = true) => {
+    setIsUpdating(true);
+    try {
+      await adminApi.portalModerateReview(Number(reviewId), newStatus, reason);
+      setReviews(prev => prev.map(r =>
+        r.id === reviewId ? { ...r, status: newStatus, moderationReason: reason } : r
+      ));
+      if (selectedReview?.id === reviewId) {
+        setSelectedReview(prev => prev ? { ...prev, status: newStatus, moderationReason: reason } : null);
+      }
+      toast({
+        title: isFr ? "Statut mis à jour" : "Status Updated",
+        description: STATUS_MESSAGES[newStatus]?.[isFr ? 'fr' : 'en'] ?? newStatus,
+      });
+    } catch (err) {
+      console.error("Failed to moderate review:", err);
+      toast({ title: "Error", description: "Failed to update review.", variant: "destructive" });
+    } finally {
+      setDrawerModerationReason("");
+      setModalModerationReason("");
+      if (closeDrawer) setSelectedReview(null);
+      setActionModalOpen(false);
+      setPendingAction(null);
+      setIsUpdating(false);
+    }
+  };
+
+  const openActionModal = (reviewId: string, newStatus: ReviewItem["status"]) => {
     setPendingAction({ reviewId, newStatus });
     setModalModerationReason("");
     setActionModalOpen(true);
   };
 
-  const handleQuickAction = async (e: React.MouseEvent, reviewId: string, newStatus: AdminReview["status"]) => {
+  const handleQuickAction = async (e: React.MouseEvent, reviewId: string, newStatus: ReviewItem["status"]) => {
     e.stopPropagation();
-    
     if (newStatus === "hidden" || newStatus === "flagged") {
       openActionModal(reviewId, newStatus);
     } else {
@@ -159,7 +196,7 @@ export default function AdminReviews() {
     </div>
   );
 
-  const getQuickActions = (review: AdminReview) => {
+  const getQuickActions = (review: ReviewItem) => {
     switch (review.status) {
       case "published":
         return (
@@ -172,7 +209,7 @@ export default function AdminReviews() {
               data-testid={`quick-hide-${review.id}`}
             >
               <EyeOff className="h-3.5 w-3.5 mr-1" />
-              Hide
+              {isFr ? "Masquer" : "Hide"}
             </Button>
             <Button
               variant="ghost"
@@ -182,7 +219,7 @@ export default function AdminReviews() {
               data-testid={`quick-flag-${review.id}`}
             >
               <Flag className="h-3.5 w-3.5 mr-1" />
-              Flag
+              {isFr ? "Signaler" : "Flag"}
             </Button>
           </div>
         );
@@ -197,7 +234,7 @@ export default function AdminReviews() {
               data-testid={`quick-publish-${review.id}`}
             >
               <Eye className="h-3.5 w-3.5 mr-1" />
-              Publish
+              {isFr ? "Publier" : "Publish"}
             </Button>
             <Button
               variant="ghost"
@@ -207,7 +244,7 @@ export default function AdminReviews() {
               data-testid={`quick-flag-hidden-${review.id}`}
             >
               <Flag className="h-3.5 w-3.5 mr-1" />
-              Flag
+              {isFr ? "Signaler" : "Flag"}
             </Button>
           </div>
         );
@@ -222,7 +259,7 @@ export default function AdminReviews() {
               data-testid={`quick-publish-flagged-${review.id}`}
             >
               <Eye className="h-3.5 w-3.5 mr-1" />
-              Publish
+              {isFr ? "Publier" : "Publish"}
             </Button>
             <Button
               variant="ghost"
@@ -232,7 +269,7 @@ export default function AdminReviews() {
               data-testid={`quick-hide-flagged-${review.id}`}
             >
               <EyeOff className="h-3.5 w-3.5 mr-1" />
-              Hide
+              {isFr ? "Masquer" : "Hide"}
             </Button>
           </div>
         );
@@ -242,7 +279,7 @@ export default function AdminReviews() {
   };
 
   return (
-    <AdminLayout title="Reviews">
+    <AdminLayout title={isFr ? "Avis" : "Reviews"}>
       <div className="space-y-4">
         {/* Search */}
         <Card>
@@ -250,7 +287,7 @@ export default function AdminReviews() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search reviews..."
+                placeholder={isFr ? "Rechercher dans les avis..." : "Search reviews..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -267,15 +304,15 @@ export default function AdminReviews() {
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="published" data-testid="tab-published">
                   <Eye className="h-4 w-4 mr-1.5 hidden sm:inline" />
-                  Published ({reviewCounts.published})
+                  {isFr ? `Publiés (${reviewCounts.published})` : `Published (${reviewCounts.published})`}
                 </TabsTrigger>
                 <TabsTrigger value="hidden" data-testid="tab-hidden">
                   <EyeOff className="h-4 w-4 mr-1.5 hidden sm:inline" />
-                  Hidden ({reviewCounts.hidden})
+                  {isFr ? `Masqués (${reviewCounts.hidden})` : `Hidden (${reviewCounts.hidden})`}
                 </TabsTrigger>
                 <TabsTrigger value="flagged" data-testid="tab-flagged">
                   <Flag className="h-4 w-4 mr-1.5 hidden sm:inline" />
-                  Flagged ({reviewCounts.flagged})
+                  {isFr ? `Signalés (${reviewCounts.flagged})` : `Flagged (${reviewCounts.flagged})`}
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -284,7 +321,7 @@ export default function AdminReviews() {
             {filteredReviews.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No {statusTab} reviews found</p>
+                <p>{isFr ? `Aucun avis ${statusTab === 'published' ? 'publié' : statusTab === 'hidden' ? 'masqué' : 'signalé'}` : `No ${statusTab} reviews found`}</p>
               </div>
             ) : (
               <div className="divide-y" data-testid="reviews-list">
@@ -308,7 +345,9 @@ export default function AdminReviews() {
                         <div className="flex items-center gap-2">
                           {getQuickActions(review)}
                           <Badge className={`text-xs ${statusColors[review.status]}`}>
-                            {review.status}
+                            {isFr
+                              ? (review.status === 'published' ? 'Publié' : review.status === 'hidden' ? 'Masqué' : 'Signalé')
+                              : review.status}
                           </Badge>
                         </div>
                       </div>
@@ -354,7 +393,7 @@ export default function AdminReviews() {
       <Sheet open={!!selectedReview} onOpenChange={(open) => !open && setSelectedReview(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Review Details</SheetTitle>
+            <SheetTitle>{isFr ? "Détail de l'avis" : "Review Details"}</SheetTitle>
             <SheetDescription>
               ID: {selectedReview?.id}
             </SheetDescription>
@@ -365,7 +404,9 @@ export default function AdminReviews() {
               {/* Status & Rating */}
               <div className="flex items-center justify-between">
                 <Badge className={`${statusColors[selectedReview.status]}`}>
-                  {selectedReview.status}
+                  {isFr
+                    ? (selectedReview.status === 'published' ? 'Publié' : selectedReview.status === 'hidden' ? 'Masqué' : 'Signalé')
+                    : selectedReview.status}
                 </Badge>
                 {renderStars(selectedReview.rating)}
               </div>
@@ -373,7 +414,7 @@ export default function AdminReviews() {
               {/* Review Info */}
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-muted-foreground">Reviewer</h4>
+                  <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Auteur" : "Reviewer"}</h4>
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground" />
                     <p className="font-medium">{selectedReview.clientName}</p>
@@ -381,7 +422,7 @@ export default function AdminReviews() {
                 </div>
                 
                 <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-muted-foreground">Provider</h4>
+                  <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Prestataire" : "Provider"}</h4>
                   <div className="flex items-center gap-2">
                     <Building2 className="h-4 w-4 text-muted-foreground" />
                     <p className="font-medium">{selectedReview.providerName}</p>
@@ -389,7 +430,7 @@ export default function AdminReviews() {
                 </div>
 
                 <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-muted-foreground">Comment</h4>
+                  <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Commentaire" : "Comment"}</h4>
                   <p className="text-sm bg-muted/30 p-3 rounded-md">{selectedReview.comment}</p>
                 </div>
 
@@ -400,7 +441,7 @@ export default function AdminReviews() {
 
                 {selectedReview.moderationReason && (
                   <div className="space-y-2">
-                    <h4 className="font-medium text-sm text-muted-foreground">Moderation Reason</h4>
+                    <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Raison de modération" : "Moderation Reason"}</h4>
                     <p className="text-sm italic bg-amber-50 dark:bg-amber-950/30 p-3 rounded-md">
                       {selectedReview.moderationReason}
                     </p>
@@ -415,12 +456,12 @@ export default function AdminReviews() {
                 {/* Reason input for hide/flag from sheet */}
                 {selectedReview.status === "published" && (
                   <div className="space-y-2">
-                    <Label htmlFor="moderation-reason" className="text-sm">Reason (for moderation)</Label>
+                    <Label htmlFor="moderation-reason" className="text-sm">{isFr ? "Raison (modération)" : "Reason (for moderation)"}</Label>
                     <Textarea
                       id="moderation-reason"
                       value={drawerModerationReason}
                       onChange={(e) => setDrawerModerationReason(e.target.value)}
-                      placeholder="Enter reason for moderation..."
+                      placeholder={isFr ? "Raison de la modération..." : "Enter reason for moderation..."}
                       rows={2}
                       data-testid="textarea-moderation-reason"
                     />
@@ -438,7 +479,7 @@ export default function AdminReviews() {
                         data-testid="button-hide-review"
                       >
                         {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <EyeOff className="h-4 w-4 mr-2" />}
-                        Hide Review
+                        {isFr ? "Masquer" : "Hide Review"}
                       </Button>
                       <Button
                         variant="destructive"
@@ -447,7 +488,7 @@ export default function AdminReviews() {
                         data-testid="button-flag-review"
                       >
                         {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Flag className="h-4 w-4 mr-2" />}
-                        Flag Review
+                        {isFr ? "Signaler" : "Flag Review"}
                       </Button>
                     </>
                   )}
@@ -461,7 +502,7 @@ export default function AdminReviews() {
                         data-testid="button-publish-review"
                       >
                         {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-                        Publish Review
+                        {isFr ? "Publier" : "Publish Review"}
                       </Button>
                       <Button
                         variant="destructive"
@@ -470,7 +511,7 @@ export default function AdminReviews() {
                         data-testid="button-flag-hidden"
                       >
                         {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Flag className="h-4 w-4 mr-2" />}
-                        Flag Review
+                        {isFr ? "Signaler" : "Flag Review"}
                       </Button>
                     </>
                   )}
@@ -484,7 +525,7 @@ export default function AdminReviews() {
                         data-testid="button-publish-flagged"
                       >
                         {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-                        Publish Review
+                        {isFr ? "Publier" : "Publish Review"}
                       </Button>
                       <Button
                         variant="outline"
@@ -493,7 +534,7 @@ export default function AdminReviews() {
                         data-testid="button-hide-flagged"
                       >
                         {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <EyeOff className="h-4 w-4 mr-2" />}
-                        Hide Review
+                        {isFr ? "Masquer" : "Hide Review"}
                       </Button>
                     </>
                   )}
@@ -509,13 +550,14 @@ export default function AdminReviews() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {pendingAction?.newStatus === "flagged" ? "Flag Review" : "Hide Review"}
+              {pendingAction?.newStatus === "flagged"
+                ? (isFr ? "Signaler l'avis" : "Flag Review")
+                : (isFr ? "Masquer l'avis" : "Hide Review")}
             </DialogTitle>
             <DialogDescription>
-              {pendingAction?.newStatus === "flagged" 
-                ? "Flag this review for further investigation. You can optionally add a reason."
-                : "Hide this review from public view. You can optionally add a reason."
-              }
+              {pendingAction?.newStatus === "flagged"
+                ? (isFr ? "Signaler cet avis pour investigation. Raison optionnelle." : "Flag this review for further investigation. You can optionally add a reason.")
+                : (isFr ? "Masquer cet avis. Raison optionnelle." : "Hide this review from public view. You can optionally add a reason.")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -525,7 +567,7 @@ export default function AdminReviews() {
                 id="action-reason"
                 value={modalModerationReason}
                 onChange={(e) => setModalModerationReason(e.target.value)}
-                placeholder="Enter reason for this action..."
+                placeholder={isFr ? "Raison (optionnelle)..." : "Enter reason for this action..."}
                 rows={3}
                 data-testid="textarea-action-reason"
               />
@@ -533,16 +575,18 @@ export default function AdminReviews() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setActionModalOpen(false)}>
-              Cancel
+              {isFr ? "Annuler" : "Cancel"}
             </Button>
-            <Button 
+            <Button
               variant={pendingAction?.newStatus === "flagged" ? "destructive" : "default"}
               onClick={() => pendingAction && handleUpdateStatus(pendingAction.reviewId, pendingAction.newStatus, modalModerationReason, false)}
               disabled={isUpdating}
               data-testid="button-confirm-action"
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {pendingAction?.newStatus === "flagged" ? "Flag Review" : "Hide Review"}
+              {pendingAction?.newStatus === "flagged"
+                ? (isFr ? "Signaler" : "Flag Review")
+                : (isFr ? "Masquer" : "Hide Review")}
             </Button>
           </DialogFooter>
         </DialogContent>
