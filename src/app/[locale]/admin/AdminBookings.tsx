@@ -58,7 +58,7 @@ import {
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useAdminStore, type AdminBooking, type StatusHistoryEntry } from "@/data/adminStore";
-import { useAdminBookings, type ApiBooking } from "@/hooks/useAdminApi";
+import { useAdminBookings, useAdminProviders, type ApiBooking, type ApiProvider } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
@@ -87,15 +87,47 @@ const statusColors: Record<string, string> = {
   disputed:     "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
 };
 
-const formatDate = (iso: string) => {
+const formatDate = (iso: string, locale = 'fr') => {
   if (!iso) return '';
-  return new Date(iso).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  if (locale === 'fr') {
+    const datePart = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    const hh = d.getHours().toString().padStart(2, '0');
+    const mm = d.getMinutes().toString().padStart(2, '0');
+    return `${datePart} à ${hh}h${mm}`;
+  }
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+const SLUG_DISPLAY: Record<string, string> = {
+  menage:         'Ménage',
+  nettoyage:      'Nettoyage',
+  cuisine:        'Cuisine',
+  garde_enfants:  "Garde d'enfants",
+  plomberie:      'Plomberie',
+  electricite:    'Électricité',
+  peinture:       'Peinture',
+  jardinage:      'Jardinage',
+  securite:       'Sécurité',
+  bricolage:      'Bricolage',
+  demenagement:   'Déménagement',
+  baby_sitting:   'Baby-sitting',
+};
+const formatServiceSlug = (slug: string) =>
+  SLUG_DISPLAY[slug?.toLowerCase().replace(/-/g, '_')] ?? slug;
+
+const URGENCY_LABELS: Record<string, { fr: string; en: string }> = {
+  normal:    { fr: 'Normal (3j+)',                    en: 'Normal (3+ days)' },
+  under_24h: { fr: 'Moins de 24h (+15%)',             en: 'Under 24 hours (+15%)' },
+  same_day:  { fr: "Express (aujourd'hui) (+25%)",    en: 'Same day (+25%)' },
+};
+
+const TIME_PREF_LABELS: Record<string, { fr: string; en: string }> = {
+  anytime:   { fr: 'Flexible',               en: 'Anytime' },
+  morning:   { fr: 'Matin (8h–12h)',          en: 'Morning (8am–12pm)' },
+  afternoon: { fr: 'Après-midi (12h–17h)',    en: 'Afternoon (12pm–5pm)' },
+  evening:   { fr: 'Soir (17h–21h, +10%)',   en: 'Evening (5pm–9pm, +10%)' },
 };
 
 const paymentColors: Record<string, string> = {
@@ -129,9 +161,10 @@ const getPayoutStatusLabels = (isFr: boolean): Record<string, string> => ({
 const statusOptions = ["all", "pending", "under_review", "assigned", "confirmed", "completed", "cancelled"];
 
 const getDefaultTimeline = (isFr: boolean) => [
-  { status: 'pending',   label: isFr ? 'En attente' : 'Pending'   },
-  { status: 'confirmed', label: isFr ? 'Confirmé'   : 'Confirmed' },
-  { status: 'completed', label: isFr ? 'Terminé'    : 'Completed' },
+  { status: 'pending',     label: isFr ? 'En attente'  : 'Pending'     },
+  { status: 'confirmed',   label: isFr ? 'Confirmée'   : 'Confirmed'   },
+  { status: 'in_progress', label: isFr ? 'En cours'    : 'In progress' },
+  { status: 'completed',   label: isFr ? 'Terminée'    : 'Completed'   },
 ];
 
 const STATUS_LABELS: Record<string, { fr: string; en: string }> = {
@@ -211,7 +244,7 @@ function StatusTimeline({ currentStatus, statusHistory, createdAt, isFr }: {
     if (isCancelled) {
       return step === 'pending' ? 'completed' : 'cancelled';
     }
-    const statusOrder = ['pending', 'confirmed', 'completed'];
+    const statusOrder = ['pending', 'confirmed', 'in_progress', 'completed'];
     const currentIndex = statusOrder.indexOf(currentStatus);
     const stepIndex = statusOrder.indexOf(step);
     
@@ -276,7 +309,8 @@ export default function AdminBookings() {
   const payoutStatusLabels = getPayoutStatusLabels(isFr);
   const { toast } = useToast();
   const { bookings: apiBookings, loading: bookingsLoading } = useAdminBookings();
-  const { providers, reviews, services } = useAdminStore();
+  const { providers: liveProviders } = useAdminProviders();
+  const { reviews, services } = useAdminStore();
   const bookings = useMemo<AdminBooking[]>(
     () =>
       apiBookings.map((b: ApiBooking): AdminBooking => ({
@@ -336,10 +370,10 @@ export default function AdminBookings() {
   const [pricingSuggestion, setPricingSuggestion] = useState<PricingSuggestion | null>(null);
 
   const eligibleProviders = useMemo(() => {
-    return providers.filter(p => 
-      p.verificationStatus === 'approved' && p.listed && p.status === 'active'
+    return liveProviders.filter((p: ApiProvider) =>
+      p.verification_status === 'approved'
     );
-  }, [providers]);
+  }, [liveProviders]);
 
   const filteredBookings = useMemo(() => {
     return bookings.filter((booking) => {
@@ -461,24 +495,24 @@ export default function AdminBookings() {
 
   const handleAssignProvider = async () => {
     if (!selectedBooking || !selectedProviderId) return;
-    
-    const provider = providers.find(p => p.id === selectedProviderId);
-    if (!provider) return;
-    
+
+    const provider = liveProviders.find((p: ApiProvider) => String(p.id) === selectedProviderId);
+    const providerName = provider ? (provider.company_name || provider.name || selectedProviderId) : selectedProviderId;
+
     setIsUpdating(true);
     await new Promise(resolve => setTimeout(resolve, 300));
-    
+
     setSelectedBooking(prev => prev ? {
-      ...prev, 
-      providerId: selectedProviderId, 
-      providerName: provider.name,
+      ...prev,
+      providerId: selectedProviderId,
+      providerName,
     } : null);
 
     toast({
       title: isFr ? "Prestataire assigné" : "Provider Assigned",
       description: isFr
-        ? `${provider.name} a été assigné à cette réservation.`
-        : `${provider.name} has been assigned to this booking.`,
+        ? `${providerName} a été assigné à cette réservation.`
+        : `${providerName} has been assigned to this booking.`,
     });
     
     setAssignModalOpen(false);
@@ -650,7 +684,7 @@ export default function AdminBookings() {
   };
 
   return (
-    <AdminLayout title="Bookings">
+    <AdminLayout title={isFr ? "Réservations" : "Bookings"}>
       <div className="space-y-4">
         {/* Filters */}
         <Card>
@@ -659,7 +693,7 @@ export default function AdminBookings() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by client, provider, or service..."
+                  placeholder={isFr ? "Rechercher par client, prestataire ou service..." : "Search by client, provider, or service..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -689,7 +723,7 @@ export default function AdminBookings() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">
-              Bookings ({filteredBookings.length})
+              {isFr ? "Réservations" : "Bookings"} ({filteredBookings.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -723,7 +757,7 @@ export default function AdminBookings() {
                         <p className="font-medium text-sm truncate">{booking.clientName}</p>
                         <p className="text-xs text-muted-foreground">{booking.serviceName}</p>
                         <p className="text-xs text-muted-foreground sm:hidden">
-                          {formatDate(booking.date)} • {formatMoney(booking.price, booking.currency)}
+                          {formatDate(booking.date, isFr ? 'fr' : 'en')} • {formatMoney(booking.price, booking.currency)}
                         </p>
                       </div>
                       <div className="hidden sm:block">
@@ -731,8 +765,8 @@ export default function AdminBookings() {
                         <p className="text-xs text-muted-foreground">{formatMoney(booking.price, booking.currency)}</p>
                       </div>
                       <div className="hidden sm:block">
-                        <p className="text-sm">{formatDate(booking.date)}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(booking.createdAt)}</p>
+                        <p className="text-sm">{formatDate(booking.date, isFr ? 'fr' : 'en')}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(booking.createdAt, isFr ? 'fr' : 'en')}</p>
                       </div>
                       <div className="flex items-center gap-1 sm:justify-end flex-wrap">
                         <Badge className={`text-xs ${statusColors[booking.status] || statusColors.pending}`}>
@@ -905,7 +939,7 @@ export default function AdminBookings() {
 
               {/* Provider Info */}
               <div className="space-y-3">
-                <h4 className="font-medium text-sm text-muted-foreground">Provider</h4>
+                <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Prestataire" : "Provider"}</h4>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm">
                     <User className="h-4 w-4 text-muted-foreground" />
@@ -931,7 +965,7 @@ export default function AdminBookings() {
                 <h4 className="font-medium text-sm text-muted-foreground">Service</h4>
                 <div className="space-y-2">
                   <p className="font-medium">{selectedBooking.serviceName}</p>
-                  <Badge variant="outline" className="text-xs">{selectedBooking.serviceCategory}</Badge>
+                  <Badge variant="outline" className="text-xs">{formatServiceSlug(selectedBooking.serviceCategory)}</Badge>
                 </div>
               </div>
 
@@ -959,7 +993,7 @@ export default function AdminBookings() {
               {/* Notes */}
               {selectedBooking.notes && (
                 <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-muted-foreground">Client Notes</h4>
+                  <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Notes du client" : "Client Notes"}</h4>
                   <p className="text-sm bg-muted/30 p-3 rounded-md">{selectedBooking.notes}</p>
                 </div>
               )}
@@ -969,13 +1003,13 @@ export default function AdminBookings() {
                 <div className="space-y-2">
                   <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                     <AlertCircle className="h-4 w-4 text-red-500" />
-                    Cancellation Details
+                    {isFr ? "Détails de l'annulation" : "Cancellation Details"}
                   </h4>
                   <div className="bg-red-50 dark:bg-red-950/30 p-3 rounded-md space-y-1">
                     <p className="text-sm">{selectedBooking.cancellationReason}</p>
                     {selectedBooking.cancelledBy && (
                       <p className="text-xs text-muted-foreground">
-                        Cancelled by: {selectedBooking.cancelledBy}
+                        {isFr ? "Annulé par\u00a0:" : "Cancelled by:"} {selectedBooking.cancelledBy}
                       </p>
                     )}
                   </div>
@@ -987,7 +1021,7 @@ export default function AdminBookings() {
                 <div className="space-y-2">
                   <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                     <MessageSquare className="h-4 w-4" />
-                    Review
+                    {isFr ? "Avis client" : "Review"}
                   </h4>
                   {(() => {
                     const review = getReviewForBooking(selectedBooking.id);
@@ -1013,7 +1047,7 @@ export default function AdminBookings() {
                       );
                     }
                     return (
-                      <p className="text-sm text-muted-foreground italic">No review yet</p>
+                      <p className="text-sm text-muted-foreground italic">{isFr ? "Aucun avis pour l'instant" : "No review yet"}</p>
                     );
                   })()}
                 </div>
@@ -1046,9 +1080,9 @@ export default function AdminBookings() {
                   <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-md space-y-1">
                     <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
                       <AlertCircle className="h-3 w-3" />
-                      {selectedBooking.quoteStatus === 'sent' 
-                        ? 'Quote sent - waiting for client approval before payment can be recorded.'
-                        : 'Send a quote to the client. Payment cannot be recorded until quote is accepted.'}
+                      {selectedBooking.quoteStatus === 'sent'
+                        ? (isFr ? "Devis envoyé — en attente d'approbation client…" : 'Quote sent — waiting for client approval before payment can be recorded.')
+                        : (isFr ? "Envoyez un devis au client. Le paiement ne peut être enregistré qu'après acceptation." : 'Send a quote to the client. Payment cannot be recorded until quote is accepted.')}
                     </p>
                   </div>
                 )}
@@ -1354,14 +1388,20 @@ export default function AdminBookings() {
               <Label>{isFr ? "Choisir un prestataire" : "Select Provider"}</Label>
               <Select value={selectedProviderId} onValueChange={setSelectedProviderId}>
                 <SelectTrigger data-testid="select-assign-provider">
-                  <SelectValue placeholder="Choose a provider..." />
+                  <SelectValue placeholder={isFr ? "Choisir un prestataire..." : "Choose a provider..."} />
                 </SelectTrigger>
-                <SelectContent>
-                  {eligibleProviders.map((provider) => (
-                    <SelectItem key={provider.id} value={provider.id}>
-                      {provider.name} - {provider.services.join(", ")}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="z-50">
+                  {eligibleProviders.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      {isFr ? "Aucun prestataire approuvé" : "No approved providers"}
+                    </div>
+                  ) : (
+                    eligibleProviders.map((provider: ApiProvider) => (
+                      <SelectItem key={provider.id} value={String(provider.id)}>
+                        {provider.company_name || provider.name || `#${provider.id}`}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -1402,7 +1442,7 @@ export default function AdminBookings() {
                 <Label>Zone</Label>
                 <Select value={quoteZone} onValueChange={(v) => handleQuoteInputChange('zone', v)}>
                   <SelectTrigger data-testid="select-quote-zone">
-                    <SelectValue placeholder="Select zone..." />
+                    <SelectValue placeholder={isFr ? "Sélectionner une zone..." : "Select zone..."} />
                   </SelectTrigger>
                   <SelectContent>
                     {ZONES_LIST.map((zone) => (
@@ -1422,7 +1462,7 @@ export default function AdminBookings() {
                   <SelectContent>
                     {URGENCY_OPTIONS.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
+                        {URGENCY_LABELS[opt.value]?.[isFr ? 'fr' : 'en'] ?? opt.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1437,7 +1477,7 @@ export default function AdminBookings() {
                   <SelectContent>
                     {TIME_PREFERENCE_OPTIONS.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
+                        {TIME_PREF_LABELS[opt.value]?.[isFr ? 'fr' : 'en'] ?? opt.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1449,7 +1489,7 @@ export default function AdminBookings() {
               <div className="bg-muted/50 rounded-md p-3 space-y-2">
                 <h4 className="font-medium text-sm flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                  Pricing Breakdown
+                  {isFr ? "Détail du prix" : "Pricing Breakdown"}
                 </h4>
                 <div className="space-y-1 text-xs">
                   {pricingSuggestion.breakdown.map((item, idx) => (
@@ -1464,7 +1504,7 @@ export default function AdminBookings() {
                   ))}
                 </div>
                 <div className="pt-2 border-t flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Suggested Range</span>
+                  <span className="text-sm text-muted-foreground">{isFr ? "Fourchette suggérée" : "Suggested Range"}</span>
                   <span className="text-sm font-medium">
                     {formatMoney(pricingSuggestion.suggestedMin, 'XOF')} - {formatMoney(pricingSuggestion.suggestedMax, 'XOF')}
                   </span>
@@ -1480,7 +1520,7 @@ export default function AdminBookings() {
                   type="number"
                   value={quotePrice}
                   onChange={(e) => setQuotePrice(e.target.value)}
-                  placeholder="Enter price..."
+                  placeholder={isFr ? "Entrer le prix..." : "Enter price..."}
                   data-testid="input-quote-price"
                 />
                 <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">CFA</span>
