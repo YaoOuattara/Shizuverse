@@ -309,6 +309,20 @@ def get_booking_detail(booking_id):
     return jsonify(data)
 
 
+@admin_bp.route('/bookings/<int:booking_id>/quote', methods=['POST'])
+@admin_required
+def set_booking_quote(booking_id):
+    """Store a quoted price on the booking (sets amount_xof)."""
+    b = ClientBooking.query.get_or_404(booking_id)
+    data = request.get_json() or {}
+    amount = data.get('amount_xof')
+    if amount is None or not isinstance(amount, (int, float)) or int(amount) <= 0:
+        return jsonify({'error': 'amount_xof must be a positive number'}), 400
+    b.amount_xof = int(amount)
+    db.session.commit()
+    return jsonify({'success': True, 'id': b.id, 'amount_xof': b.amount_xof})
+
+
 @admin_bp.route('/bookings/<int:booking_id>/cancel', methods=['POST'])
 @admin_required
 def cancel_booking(booking_id):

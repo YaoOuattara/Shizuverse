@@ -277,3 +277,39 @@ TODO BEFORE PRODUCTION:
 1. Render will auto-deploy from staging push — verify /api/provider/login is live
 2. Set ANTHROPIC_API_KEY in Vercel dashboard for improve-bio to work in production
 3. Wire /provider page to real API once auth context provides providerId
+
+---
+2026-04-15 — Session 10: Admin portal — real data + bilingual
+
+### Backend (staging branch, commit 6e2fa49)
+- routes/admin.py: GET /admin/providers now deduplicates by user_id,
+  collects services[], adds email, bio, address, reviewed_at,
+  rejection_reason, rejection_note to response
+- Added GET /admin/reviews: list all reviews with display_status mapping
+  (pending/approved → published, rejected → hidden, flagged → flagged)
+- Added POST /admin/reviews/:id/moderate: accepts published/hidden/flagged
+
+### Frontend (frontend branch, commit 39c90b8)
+Part 1A — AdminPayments: switched from Zustand mock to useAdminBookings()
+  - Local PaymentBooking type + toPaymentBooking() mapper
+  - Removed mock stats grid section
+  - handleIssueRefund now calls real API (was Zustand-only)
+  - Bilingual payment/payout status labels, tab labels, modals
+
+Part 1B — AdminReviews: switched from Zustand mock to useAdminReviews()
+  - ReviewItem local type + toReviewItem() mapper
+  - handleUpdateStatus calls portalModerateReview() instead of Zustand
+  - Full bilingual labels on all tabs, buttons, status badges, modals
+
+Part 1D — AdminProviders: services: [] → p.services || [] from API
+
+Part 2 — AdminOverview: full bilingual pass
+  - KPI labels, date range options, live banner, sheet sections,
+    action buttons all bilingual
+
+useAdminApi.ts: added ApiReview interface, useAdminReviews hook,
+  services?: string[] on ApiProvider
+api.ts: added portalGetReviews, portalModerateReview
+
+NEXT: Part 3 (provider category/zone filters, quote stored on booking)
+      CLAUDE.md Step 6/7 pending, Tailwind production styling fix
