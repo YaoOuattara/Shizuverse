@@ -7,6 +7,7 @@
  */
 
 import { useState, useMemo, useEffect } from "react";
+import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import AdminLayout from "./AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,12 +73,20 @@ import { useToast } from "@/hooks/use-toast";
 
 type VerificationFilterTab = 'all' | 'submitted' | 'approved' | 'rejected' | 'suspended';
 
-const verificationTabs: { value: VerificationFilterTab; label: string; icon: typeof Shield }[] = [
-  { value: 'all', label: 'All', icon: User },
-  { value: 'submitted', label: 'Submitted', icon: Clock },
-  { value: 'approved', label: 'Approved', icon: ShieldCheck },
-  { value: 'rejected', label: 'Rejected', icon: ShieldX },
-  { value: 'suspended', label: 'Suspended', icon: ShieldAlert },
+const VERIFICATION_TAB_LABELS: Record<VerificationFilterTab, { fr: string; en: string }> = {
+  all:       { fr: 'Tous',       en: 'All'       },
+  submitted: { fr: 'Soumis',     en: 'Submitted' },
+  approved:  { fr: 'Approuvés',  en: 'Approved'  },
+  rejected:  { fr: 'Refusés',    en: 'Rejected'  },
+  suspended: { fr: 'Suspendus',  en: 'Suspended' },
+};
+
+const verificationTabsDef: { value: VerificationFilterTab; icon: typeof Shield }[] = [
+  { value: 'all',       icon: User       },
+  { value: 'submitted', icon: Clock      },
+  { value: 'approved',  icon: ShieldCheck },
+  { value: 'rejected',  icon: ShieldX    },
+  { value: 'suspended', icon: ShieldAlert },
 ];
 
 const REJECTION_REASON_KEYS = [
@@ -124,6 +133,8 @@ const getVerificationBadge = (status: VerificationStatus) => {
 
 export default function AdminProviders() {
   const { toast } = useToast();
+  const params = useParams();
+  const isFr = (params?.locale as string) === 'fr';
   const t = useTranslations("adminProviders");
   const rejectionReasons = REJECTION_REASON_KEYS.map((key) => ({
     value: key,
@@ -164,6 +175,7 @@ export default function AdminProviders() {
   
   const [searchQuery, setSearchQuery] = useState("");
   const [verificationFilter, setVerificationFilter] = useState<VerificationFilterTab>("all");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<AdminProvider | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("missing_id");
@@ -187,6 +199,12 @@ export default function AdminProviders() {
     };
   }, [providers]);
 
+  const allCategories = useMemo(() => {
+    const cats = new Set<string>();
+    providers.forEach(p => p.services.forEach(s => { if (s) cats.add(s); }));
+    return Array.from(cats).sort();
+  }, [providers]);
+
   const filteredProviders = useMemo(() => {
     return providers.filter((provider) => {
       const matchesSearch =
@@ -195,13 +213,17 @@ export default function AdminProviders() {
         provider.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         provider.services.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      const matchesVerification = 
-        verificationFilter === "all" || 
+      const matchesVerification =
+        verificationFilter === "all" ||
         provider.verificationStatus === verificationFilter;
 
-      return matchesSearch && matchesVerification;
+      const matchesCategory =
+        categoryFilter === "" ||
+        provider.services.some(s => s === categoryFilter);
+
+      return matchesSearch && matchesVerification && matchesCategory;
     });
-  }, [providers, searchQuery, verificationFilter]);
+  }, [providers, searchQuery, verificationFilter, categoryFilter]);
 
   const updateLocalProvider = (id: string, patch: Partial<AdminProvider>) => {
     setLocalProviders(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
@@ -362,12 +384,12 @@ export default function AdminProviders() {
   };
 
   return (
-    <AdminLayout title="Providers">
+    <AdminLayout title={isFr ? "Prestataires" : "Providers"}>
       <div className="space-y-4">
         {/* Verification Status Tabs */}
         <ScrollArea className="w-full">
           <div className="flex gap-1 pb-2" data-testid="verification-tabs">
-            {verificationTabs.map(({ value, label, icon: Icon }) => (
+            {verificationTabsDef.map(({ value, icon: Icon }) => (
               <Button
                 key={value}
                 variant={verificationFilter === value ? "default" : "outline"}
@@ -377,7 +399,7 @@ export default function AdminProviders() {
                 data-testid={`tab-${value}`}
               >
                 <Icon className="h-4 w-4 mr-1.5" />
-                {label}
+                {VERIFICATION_TAB_LABELS[value][isFr ? 'fr' : 'en']}
                 {tabCounts[value] > 0 && (
                   <span className="ml-1.5 text-xs bg-background/20 px-1.5 py-0.5 rounded-full">
                     {tabCounts[value]}
@@ -389,18 +411,33 @@ export default function AdminProviders() {
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
 
-        {/* Search */}
+        {/* Search + Category Filter */}
         <Card>
           <CardContent className="py-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search providers by name, email, or service..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-                data-testid="input-search-providers"
-              />
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder={isFr ? "Rechercher par nom, email ou service..." : "Search providers by name, email, or service..."}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-providers"
+                />
+              </div>
+              {allCategories.length > 0 && (
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-full sm:w-52" data-testid="select-category-filter">
+                    <SelectValue placeholder={isFr ? "Toutes les catégories" : "All categories"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">{isFr ? "Toutes les catégories" : "All categories"}</SelectItem>
+                    {allCategories.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -409,14 +446,14 @@ export default function AdminProviders() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">
-              Providers ({filteredProviders.length})
+              {isFr ? `Prestataires (${filteredProviders.length})` : `Providers (${filteredProviders.length})`}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {providersLoading ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin opacity-50" />
-                <p>Loading providers...</p>
+                <p>{isFr ? "Chargement des prestataires..." : "Loading providers..."}</p>
               </div>
             ) : filteredProviders.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">

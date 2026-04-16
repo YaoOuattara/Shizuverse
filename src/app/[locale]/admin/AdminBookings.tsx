@@ -653,34 +653,41 @@ export default function AdminBookings() {
   const handleSendQuote = async () => {
     if (!selectedBooking || !quotePrice || Number(quotePrice) <= 0) {
       toast({
-        title: "Invalid Quote",
-        description: "Please enter a valid price.",
+        title: isFr ? "Devis invalide" : "Invalid Quote",
+        description: isFr ? "Veuillez saisir un prix valide." : "Please enter a valid price.",
         variant: "destructive",
       });
       return;
     }
-    
-    setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    setSelectedBooking(prev => prev ? {
-      ...prev, 
-      zone: quoteZone,
-      urgency: quoteUrgency,
-      timePreference: quoteTimePreference,
-      quotedPrice: Number(quotePrice),
-      quoteNote,
-      quoteStatus: 'sent',
-      pricingSuggestion: pricingSuggestion || undefined,
-    } : null);
 
-    toast({
-      title: "Quote Sent",
-      description: `Quote of ${formatMoney(Number(quotePrice), 'XOF')} has been sent to the client.`,
-    });
-    
-    setQuoteModalOpen(false);
-    setIsUpdating(false);
+    setIsUpdating(true);
+    try {
+      await adminApi.portalSetBookingQuote(selectedBooking.id, Number(quotePrice));
+      setSelectedBooking(prev => prev ? {
+        ...prev,
+        zone: quoteZone,
+        urgency: quoteUrgency,
+        timePreference: quoteTimePreference,
+        quotedPrice: Number(quotePrice),
+        price: Number(quotePrice),
+        baseAmount: Number(quotePrice),
+        quoteNote,
+        quoteStatus: 'sent',
+        pricingSuggestion: pricingSuggestion || undefined,
+      } : null);
+      toast({
+        title: isFr ? "Devis enregistré" : "Quote Saved",
+        description: isFr
+          ? `Devis de ${formatMoney(Number(quotePrice), 'XOF')} enregistré.`
+          : `Quote of ${formatMoney(Number(quotePrice), 'XOF')} has been saved to the booking.`,
+      });
+      setQuoteModalOpen(false);
+    } catch (err) {
+      console.error("Failed to save quote:", err);
+      toast({ title: "Error", description: isFr ? "Impossible d'enregistrer le devis." : "Failed to save quote.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   return (
