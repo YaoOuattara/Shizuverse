@@ -4,6 +4,8 @@ from datetime import datetime
 import jwt as pyjwt
 from shizuverse.models import db, User, ServiceProvider, ClientBooking, Notification
 from shizuverse.models.booking_event import BookingEvent
+from shizuverse.models.service_models import Service
+from shizuverse.models.review import Review
 
 admin_bp = Blueprint('admin_portal', __name__, url_prefix='/admin')
 
@@ -213,7 +215,7 @@ def toggle_activation(provider_id):
 @admin_bp.route('/providers', methods=['GET'])
 @admin_required
 def get_all_providers():
-    """Full provider list with optional status filters."""
+    """Full provider list, deduplicated by user_id, with services and all profile fields."""
     q = ServiceProvider.query
 
     v = request.args.get('verification_status')
@@ -224,19 +226,49 @@ def get_all_providers():
     if l: q = q.filter_by(listed_status=l)
     if s: q = q.filter_by(provider_status=s)
 
-    providers = q.order_by(ServiceProvider.created_at.desc()).all()
+    all_rows = q.order_by(ServiceProvider.created_at.desc()).all()
 
-    return jsonify([{
-        'id': p.id,
-        'company_name': p.company_name,
-        'phone_number': p.phone_number,
-        'verification_status': p.verification_status,
-        'listed_status': p.listed_status,
-        'provider_status': p.provider_status,
-        'verified': p.verified,
-        'submitted_at': p.submitted_at.isoformat() if p.submitted_at else None,
-        'created_at': p.created_at.isoformat() if p.created_at else None,
-    } for p in providers])
+    # Deduplicate by user_id: keep first (most recent) row as canonical, collect all service names
+    seen = {}  # user_id -> {'row': ..., 'user': ..., 'services': [...]}
+    for row in all_rows:
+        if row.user_id not in seen:
+            user = User.query.get(row.user_id)
+            svc = Service.query.get(row.service_id) if row.service_id else None
+            seen[row.user_id] = {
+                'row': row,
+                'user': user,
+                'services': [svc.name] if svc else [],
+            }
+        else:
+            svc = Service.query.get(row.service_id) if row.service_id else None
+            if svc and svc.name not in seen[row.user_id]['services']:
+                seen[row.user_id]['services'].append(svc.name)
+
+    result = []
+    for data in seen.values():
+        p = data['row']
+        user = data['user']
+        result.append({
+            'id': p.id,
+            'user_id': p.user_id,
+            'company_name': p.company_name,
+            'phone_number': p.phone_number,
+            'email': user.email if user else None,
+            'bio': p.bio,
+            'address': p.address,
+            'verification_status': p.verification_status,
+            'listed_status': p.listed_status,
+            'provider_status': p.provider_status,
+            'verified': p.verified,
+            'rejection_reason': p.rejection_reason,
+            'rejection_note': p.rejection_note,
+            'reviewed_at': p.reviewed_at.isoformat() if p.reviewed_at else None,
+            'submitted_at': p.submitted_at.isoformat() if p.submitted_at else None,
+            'created_at': p.created_at.isoformat() if p.created_at else None,
+            'services': data['services'],
+        })
+
+    return jsonify(result)
 
 
 # ── Bookings ──────────────────────────────────────────────────
@@ -371,6 +403,68 @@ def resolve_dispute(booking_id):
     db.session.commit()
 
     return jsonify({'message': f'Dispute resolved: {resolution}', 'booking_id': booking_id})
+
+
+# ── Finance Overview ──────────────────────────────────────────
+
+# ── Reviews ───────────────────────────────────────────────────
+
+@admin_bp.route('/reviews', methods=['GET'])
+@admin_required
+def get_all_reviews():
+    """All reviews. Optional ?status=published|hidden|flagged filter."""
+    status = request.args.get('status')
+
+    q = Review.query
+    # DB moderation_status values: 'pending' (default), 'approved', 'rejected', 'flagged'
+    # Frontend display_status: 'published' = pending|approved, 'hidden' = rejected, 'flagged' = flagged
+    if status == 'published':
+        q = q.filter(Review.moderation_status.in_(['pending', 'approved']))
+    elif status == 'hidden':
+        q = q.filter_by(moderation_status='rejected')
+    elif status == 'flagged':
+        q = q.filter_by(moderation_status='flagged')
+
+    reviews = q.order_by(Review.created_at.desc()).all()
+
+    result = []
+    for r in reviews:
+        sp = ServiceProvider.query.get(r.provider_id) if r.provider_id else None
+        ms = r.moderation_status
+        display = 'flagged' if ms == 'flagged' else ('hidden' if ms == 'rejected' else 'published')
+        result.append({
+            'id': r.id,
+            'booking_id': r.booking_id,
+            'client_name': r.client_name,
+            'rating': r.rating,
+            'text': r.text or '',
+            'service_slug': r.service_slug,
+            'provider_name': sp.company_name if sp else '',
+            'provider_id': r.provider_id,
+            'moderation_status': ms,
+            'display_status': display,
+            'created_at': r.created_at.isoformat() if r.created_at else '',
+        })
+
+    return jsonify(result)
+
+
+@admin_bp.route('/reviews/<int:review_id>/moderate', methods=['POST'])
+@admin_required
+def moderate_review(review_id):
+    """Set review moderation status. Body: { status: published|hidden|flagged, reason?: str }"""
+    r = Review.query.get_or_404(review_id)
+    data = request.get_json() or {}
+    status = data.get('status', '').strip()
+
+    STATUS_MAP = {'published': 'approved', 'hidden': 'rejected', 'flagged': 'flagged'}
+    if status not in STATUS_MAP:
+        return jsonify({'error': f'Invalid status. Use: {list(STATUS_MAP.keys())}'}), 400
+
+    r.moderation_status = STATUS_MAP[status]
+    db.session.commit()
+
+    return jsonify({'success': True, 'id': r.id, 'display_status': status, 'moderation_status': r.moderation_status})
 
 
 # ── Finance Overview ──────────────────────────────────────────
