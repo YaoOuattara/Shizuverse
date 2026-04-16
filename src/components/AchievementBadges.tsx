@@ -236,18 +236,33 @@ export function AchievementBadges({
               </Badge>
             )}
 
-            {!isUnlocked && !isComingSoon && !badge.notEnoughHistory && badge.progress && (
-              <div className="w-full space-y-1">
-                <Progress
-                  value={(badge.progress.current / badge.progress.target) * 100}
-                  className="h-1.5"
-                />
-                <p className="text-xs text-center text-muted-foreground">
-                  {badge.progress.displayFormat === "goal"
-                    ? `${badge.progress.current}${badge.progress.suffix || ""} \u2022 ${t("goal")} ${badge.progress.target}${badge.progress.suffix || ""}`
-                    : `${badge.progress.current}/${badge.progress.target}${badge.progress.suffix || ""}`
-                  }
-                </p>
+            {!isUnlocked && !isComingSoon && (
+              <div className="w-full space-y-1.5">
+                {badge.notEnoughHistory ? (
+                  <p className="text-xs text-center text-muted-foreground italic">
+                    {badge.requirement}
+                  </p>
+                ) : badge.progress ? (
+                  <>
+                    <Progress
+                      value={(badge.progress.current / badge.progress.target) * 100}
+                      className="h-2"
+                    />
+                    <p className="text-xs text-center text-muted-foreground font-medium">
+                      {badge.progress.displayFormat === "goal"
+                        ? `${badge.progress.current}${badge.progress.suffix || ""} / ${badge.progress.target}${badge.progress.suffix || ""}`
+                        : `${badge.progress.current}/${badge.progress.target}${badge.progress.suffix || ""}`
+                      }
+                    </p>
+                    <p className="text-xs text-center text-muted-foreground/70 italic leading-snug">
+                      {badge.requirement}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-center text-muted-foreground italic">
+                    {badge.requirement}
+                  </p>
+                )}
               </div>
             )}
           </div>

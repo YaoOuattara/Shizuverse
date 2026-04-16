@@ -137,10 +137,15 @@ export default function BookingsPage() {
                 locale === "fr" ? "fr-FR" : "en-US",
                 { month: "short", day: "numeric", year: "numeric" }
               ),
-              time: new Date(b.appointment_date).toLocaleTimeString(
-                locale === "fr" ? "fr-FR" : "en-US",
-                { hour: "2-digit", minute: "2-digit" }
-              ),
+              time: (() => {
+                const d = new Date(b.appointment_date);
+                if (locale === "fr") {
+                  const h = d.getHours().toString().padStart(2, "0");
+                  const m = d.getMinutes().toString().padStart(2, "0");
+                  return `${h}h${m}`;
+                }
+                return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+              })(),
               status: b.status,
               notes: b.notes,
             }));
@@ -406,7 +411,7 @@ export default function BookingsPage() {
               </h1>
             </div>
             <Button
-              onClick={() => { setIsCreateModalOpen(true); trackEvent("booking_started"); }}
+              onClick={() => { router.push(`/${locale}/services`); trackEvent("booking_started"); }}
               data-testid="button-new-booking"
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -584,7 +589,7 @@ export default function BookingsPage() {
             </p>
             <Button
               className="mt-4"
-              onClick={() => { setIsCreateModalOpen(true); trackEvent("booking_started"); }}
+              onClick={() => { router.push(`/${locale}/services`); trackEvent("booking_started"); }}
               data-testid="button-create-first"
             >
               {t("createFirst")}

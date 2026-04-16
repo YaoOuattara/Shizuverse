@@ -4,16 +4,24 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
+import { useEffect, useState } from 'react';
 
 export default function Navbar() {
   const locale = useLocale();
   const pathname = usePathname();
   const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}(?=\/|$)/, '') || '';
+  const [isProvider, setIsProvider] = useState(false);
+
+  useEffect(() => {
+    setIsProvider(!!localStorage.getItem('provider_token'));
+  }, []);
+
+  const providerHref = isProvider ? `/${locale}/provider` : `/${locale}/provider/register`;
 
   const navLinks = [
     { label: locale === 'fr' ? 'Accueil' : 'Home', href: `/${locale}` },
     { label: locale === 'fr' ? 'Réservations' : 'Bookings', href: `/${locale}/bookings` },
-    { label: locale === 'fr' ? 'Devenir prestataire' : 'Become a Provider', href: `/${locale}/provider` },
+    { label: locale === 'fr' ? 'Devenir prestataire' : 'Become a Provider', href: providerHref },
   ];
 
   return (
@@ -65,7 +73,7 @@ export default function Navbar() {
           </div>
 
           <Link
-            href={`/${locale}/bookings`}
+            href={`/${locale}/services`}
             className="bg-[#0F3A7A] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0d3068] transition-colors"
           >
             {locale === 'fr' ? 'Réserver' : 'Book Now'}

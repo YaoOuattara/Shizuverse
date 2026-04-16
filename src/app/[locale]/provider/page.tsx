@@ -21,7 +21,9 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  Bell,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import ProviderBookingCard from "@/components/ProviderBookingCard";
 import dynamic from "next/dynamic";
 const RevenueBreakdown = dynamic(() => import("@/components/RevenueBreakdown"), { ssr: false });
@@ -379,6 +381,29 @@ export default function ProviderDashboard() {
     );
   }
 
+  // FIX 4A — show login prompt as a clean full-page state, not buried at the bottom
+  if (!hasToken) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <CalendarDays className="mb-4 h-14 w-14 text-muted-foreground" />
+        <h2 className="text-xl font-semibold text-foreground">
+          {locale === "fr" ? "Connectez-vous" : "Log in to continue"}
+        </h2>
+        <p className="mt-2 text-sm text-muted-foreground max-w-xs">
+          {locale === "fr"
+            ? "Connectez-vous pour voir vos réservations et gérer votre activité."
+            : "Log in to view your booking requests and manage your dashboard."}
+        </p>
+        <Button
+          className="mt-6"
+          onClick={() => router.push(`/${locale}/provider/login`)}
+        >
+          {locale === "fr" ? "Se connecter" : "Log In"}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       <header className="sticky top-0 z-40 bg-background border-b px-4 sm:px-6 py-4">
@@ -492,6 +517,37 @@ export default function ProviderDashboard() {
       </header>
 
       <main className="flex-1 overflow-auto p-4 sm:p-6">
+        {/* FIX 4B — Nouvelles demandes: pending bookings at the very top */}
+        {(() => {
+          const pending = bookings.filter((b) => b.status === "pending");
+          if (pending.length === 0) return null;
+          return (
+            <div className="mb-6" data-testid="section-new-requests">
+              <div className="flex items-center gap-2 mb-3">
+                <Bell className="h-5 w-5 text-amber-500" />
+                <h2 className="text-base font-semibold text-foreground">
+                  {locale === "fr" ? "Nouvelles demandes" : "New Requests"}
+                </h2>
+                <Badge variant="destructive" className="text-xs">
+                  {pending.length}
+                </Badge>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {pending.map((booking) => (
+                  <ProviderBookingCard
+                    key={booking.id}
+                    booking={booking}
+                    conflictWarning={getBookingConflict(booking.id)}
+                    onAccept={handleAcceptBooking}
+                    onReject={handleRejectBooking}
+                    onReschedule={handleRescheduleBooking}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {showStats && (
           <div className="space-y-4 mb-6" data-testid="stats-section">
             <div className="grid gap-4 lg:grid-cols-2">
@@ -539,28 +595,7 @@ export default function ProviderDashboard() {
           />
         </div>
 
-        {!hasToken ? (
-          <div
-            className="flex flex-col items-center justify-center py-16 text-center"
-            data-testid="empty-state-login"
-          >
-            <CalendarDays className="mb-4 h-12 w-12 text-muted-foreground" />
-            <h2 className="text-lg font-medium text-foreground">
-              {locale === "fr" ? "Connectez-vous" : "Log in to continue"}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {locale === "fr"
-                ? "Connectez-vous pour voir vos réservations."
-                : "Log in to view your booking requests."}
-            </p>
-            <Button
-              className="mt-4"
-              onClick={() => router.push(`/${locale}/provider/login`)}
-            >
-              {locale === "fr" ? "Se connecter" : "Log In"}
-            </Button>
-          </div>
-        ) : filteredBookings.length > 0 ? (
+        {filteredBookings.length > 0 ? (
           <div
             className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
             data-testid="bookings-grid"

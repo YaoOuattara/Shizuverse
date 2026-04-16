@@ -2,29 +2,35 @@
 
 import Link from "next/link";
 import { useLocale } from "next-intl";
-import { Calendar, CheckCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Calendar, CheckCircle, User } from "lucide-react";
 
-function BookingCardMockup() {
+function BookingCardMockup({ locale }: { locale: "en" | "fr" }) {
+  const isFr = locale === "fr";
   return (
     <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-auto">
       {/* Header */}
       <div className="flex items-center gap-2 mb-5">
         <Calendar className="h-4 w-4 text-[#0F3A7A]" />
-        <span className="font-semibold text-gray-800 text-sm">Nouvelle réservation</span>
+        <span className="font-semibold text-gray-800 text-sm">
+          {isFr ? "Nouvelle réservation" : "New Booking"}
+        </span>
       </div>
 
       {/* Service selector */}
       <div className="mb-4">
-        <p className="text-xs text-gray-400 mb-2">Service</p>
+        <p className="text-xs text-gray-400 mb-2">{isFr ? "Service" : "Service"}</p>
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-3 bg-[#0F3A7A]/5 border border-[#0F3A7A]/20 rounded-xl px-4 py-2.5">
             <span className="text-lg">🧹</span>
-            <span className="text-sm font-medium text-[#0F3A7A]">Ménage à domicile</span>
+            <span className="text-sm font-medium text-[#0F3A7A]">
+              {isFr ? "Ménage à domicile" : "Home Cleaning"}
+            </span>
             <CheckCircle className="h-4 w-4 text-[#0F3A7A] ml-auto" />
           </div>
           <div className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-gray-400">
             <span className="text-lg">👶</span>
-            <span className="text-sm">Nounou & Baby-sitting</span>
+            <span className="text-sm">{isFr ? "Nounou & Baby-sitting" : "Childcare"}</span>
           </div>
         </div>
       </div>
@@ -32,24 +38,30 @@ function BookingCardMockup() {
       {/* Date / time */}
       <div className="mb-4 bg-gray-50 rounded-xl px-4 py-2.5 flex items-center gap-2">
         <Calendar className="h-4 w-4 text-gray-400" />
-        <span className="text-sm text-gray-600">Mer. 12 Mars · 10h00</span>
+        <span className="text-sm text-gray-600">
+          {isFr ? "Mer. 12 Mars · 10h00" : "Wed. Mar 12 · 10:00 AM"}
+        </span>
       </div>
 
-      {/* Provider row */}
+      {/* Provider row — generic, no fake name */}
       <div className="mb-5 flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-2.5">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-200 to-blue-400 flex items-center justify-center text-white text-xs font-bold">
-          SK
+        <div className="w-8 h-8 rounded-full bg-[#0F3A7A]/10 flex items-center justify-center">
+          <User className="h-4 w-4 text-[#0F3A7A]" />
         </div>
         <div>
-          <p className="text-sm font-medium text-gray-800">Sarah K.</p>
+          <p className="text-sm font-medium text-gray-800">
+            {isFr ? "Prestataire vérifié" : "Verified Provider"}
+          </p>
           <p className="text-xs text-yellow-500">⭐ 4.9</p>
         </div>
-        <span className="ml-auto text-xs text-green-500 font-medium">Disponible</span>
+        <span className="ml-auto text-xs text-green-500 font-medium">
+          {isFr ? "Disponible" : "Available"}
+        </span>
       </div>
 
       {/* Confirm button */}
       <button className="w-full bg-[#0F3A7A] text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-[#0d3068] transition-colors">
-        Confirmer
+        {isFr ? "Confirmer" : "Confirm"}
       </button>
     </div>
   );
@@ -77,6 +89,11 @@ const CONTENT = {
 export default function HomeHero() {
   const locale = useLocale() as "en" | "fr";
   const c = CONTENT[locale] ?? CONTENT.fr;
+  const [isProvider, setIsProvider] = useState(false);
+
+  useEffect(() => {
+    setIsProvider(!!localStorage.getItem("provider_token"));
+  }, []);
 
   return (
     <section
@@ -106,13 +123,13 @@ export default function HomeHero() {
           {/* CTA buttons */}
           <div className="flex flex-wrap gap-4 mt-8">
             <Link
-              href={`/${locale}/bookings`}
+              href={`/${locale}/services`}
               className="bg-white text-[#0F3A7A] font-semibold px-6 py-3 rounded-xl hover:bg-gray-50 transition-colors"
             >
               {c.cta1}
             </Link>
             <Link
-              href={`/${locale}/provider`}
+              href={isProvider ? `/${locale}/provider` : `/${locale}/provider/register`}
               className="border border-white/40 text-white px-6 py-3 rounded-xl hover:bg-white/10 transition-colors"
             >
               {c.cta2}
@@ -140,9 +157,9 @@ export default function HomeHero() {
           </p>
         </div>
 
-        {/* Right column — fix 2: hidden on mobile, centered */}
+        {/* Right column — hidden on mobile, centered */}
         <div className="hidden md:flex flex-[2] w-full justify-center">
-          <BookingCardMockup />
+          <BookingCardMockup locale={locale} />
         </div>
       </div>
     </section>

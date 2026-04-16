@@ -36,10 +36,10 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
-import { useAdminStats } from "@/hooks/useAdminApi";
-import { useAdminStore, type AdminBooking, type AdminProvider, type DateRangeOption, type VerificationStatus } from "@/data/adminStore";
+import { useAdminStats, useAdminBookings, useAdminProviders, type ApiBooking } from "@/hooks/useAdminApi";
+import { useAdminStore, type AdminProvider, type DateRangeOption, type VerificationStatus } from "@/data/adminStore";
 import { useToast } from "@/hooks/use-toast";
 import { formatMoney } from "@/lib/currency";
 
@@ -79,12 +79,10 @@ export default function AdminOverview() {
   const dateRangeOptions = dateRangeOptionsDef.map(o => ({ value: o.value, label: isFr ? o.fr : o.en }));
   const getVerifLabel = (s: VerificationStatus) => verificationLabels[s]?.[isFr ? 'fr' : 'en'] ?? s;
   const {
-    dateRange, 
-    setDateRange, 
-    getKPIs, 
-    getFilteredBookings, 
+    dateRange,
+    setDateRange,
+    getKPIs,
     providers,
-    updateBookingStatus,
     updateProviderStatus,
     approveProvider,
     suspendProvider,
@@ -92,6 +90,7 @@ export default function AdminOverview() {
   } = useAdminStore();
   
   const { stats: liveStats } = useAdminStats();
+  const { bookings: liveBookings } = useAdminBookings();
   const mockKpis = getKPIs();
   const kpis = {
     ...mockKpis,
@@ -102,28 +101,35 @@ export default function AdminOverview() {
     cancelledBookings: liveStats?.cancelled ?? mockKpis.cancelledBookings,
     totalProviders: liveStats?.total_providers ?? mockKpis.totalProviders,
   };
-  const filteredBookings = getFilteredBookings();
-  const recentBookings = filteredBookings.slice(0, 5);
-  
-  const topProviders = useMemo(() => {
-    const providerRevenue = new Map<string, number>();
-    filteredBookings
-      .filter(b => b.status === 'completed')
-      .forEach(b => {
-        const current = providerRevenue.get(b.providerId) || 0;
-        providerRevenue.set(b.providerId, current + b.price);
-      });
-    
-    return [...providers]
-      .map(p => ({
-        ...p,
-        filteredRevenue: providerRevenue.get(p.id) || 0,
-      }))
-      .sort((a, b) => b.filteredRevenue - a.filteredRevenue)
-      .slice(0, 5);
-  }, [providers, filteredBookings]);
 
-  const [selectedBooking, setSelectedBooking] = useState<AdminBooking | null>(null);
+  // Recent bookings: real API data, sorted by created_at desc, top 5
+  const recentBookings = useMemo(() =>
+    [...liveBookings]
+      .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))
+      .slice(0, 5),
+    [liveBookings]
+  );
+
+  // Top providers: computed from real completed bookings, grouped by provider_name, sorted by revenue
+  const topProviders = useMemo(() => {
+    const revenueMap = new Map<string, { revenue: number; count: number }>();
+    liveBookings
+      .filter(b => b.status === "completed" && b.provider_name)
+      .forEach(b => {
+        const name = b.provider_name!;
+        const existing = revenueMap.get(name) ?? { revenue: 0, count: 0 };
+        revenueMap.set(name, {
+          revenue: existing.revenue + (b.amount_xof ?? 0),
+          count: existing.count + 1,
+        });
+      });
+    return [...revenueMap.entries()]
+      .map(([name, stats]) => ({ name, ...stats }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+  }, [liveBookings]);
+
+  const [selectedBooking, setSelectedBooking] = useState<ApiBooking | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<AdminProvider | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -362,13 +368,13 @@ export default function AdminOverview() {
                       data-testid={`booking-row-${booking.id}`}
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm truncate">{booking.clientName}</p>
+                        <p className="font-medium text-sm truncate">{booking.client_name}</p>
                         <p className="text-xs text-muted-foreground truncate">
-                          {booking.serviceName} with {booking.providerName}
+                          {booking.service_name}{booking.provider_name ? ` · ${booking.provider_name}` : ""}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 ml-2">
-                        <Badge className={`text-xs ${statusColors[booking.status]}`}>
+                        <Badge className={`text-xs ${statusColors[booking.status] ?? ""}`}>
                           {booking.status}
                         </Badge>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -394,11 +400,10 @@ export default function AdminOverview() {
               ) : (
                 <div className="divide-y" data-testid="list-top-providers">
                   {topProviders.map((provider, index) => (
-                    <button
-                      key={provider.id}
-                      onClick={() => setSelectedProvider(provider)}
-                      className="w-full flex items-center justify-between p-3 hover-elevate text-left"
-                      data-testid={`provider-row-${provider.id}`}
+                    <div
+                      key={provider.name}
+                      className="w-full flex items-center justify-between p-3 text-left"
+                      data-testid={`provider-row-${index}`}
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-xs font-medium">
@@ -406,29 +411,17 @@ export default function AdminOverview() {
                         </div>
                         <div className="min-w-0">
                           <p className="font-medium text-sm truncate">{provider.name}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Star className="h-3 w-3 text-amber-500" />
-                              {provider.rating}
-                            </span>
-                            <Badge 
-                              className={`text-xs ${provider.status === 'active' 
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
-                                : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-                              }`}
-                            >
-                              {provider.status}
-                            </Badge>
-                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {provider.count} {isFr ? "terminée(s)" : "completed"}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 ml-2">
                         <span className="text-sm font-medium text-emerald-600">
-                          {formatMoney(provider.filteredRevenue)}
+                          {formatMoney(provider.revenue)}
                         </span>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -446,100 +439,63 @@ export default function AdminOverview() {
           {selectedBooking && (
             <div className="space-y-6 mt-6">
               <div className="flex items-center justify-between">
-                <Badge className={`${statusColors[selectedBooking.status]}`}>
+                <Badge className={`${statusColors[selectedBooking.status] ?? ""}`}>
                   {selectedBooking.status}
                 </Badge>
-                <span className="text-lg font-bold">{formatMoney(selectedBooking.price)}</span>
+                <span className="text-lg font-bold">
+                  {selectedBooking.amount_xof ? formatMoney(selectedBooking.amount_xof) : "—"}
+                </span>
               </div>
 
               <div className="space-y-4">
                 <div>
                   <h4 className="font-medium text-sm text-muted-foreground mb-2">{isFr ? "Client" : "Client"}</h4>
-                  <p className="font-medium">{selectedBooking.clientName}</p>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                    <Mail className="h-4 w-4" />
-                    <span>{selectedBooking.clientEmail}</span>
-                  </div>
+                  <p className="font-medium">{selectedBooking.client_name}</p>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                     <Phone className="h-4 w-4" />
-                    <span>{selectedBooking.clientPhone}</span>
+                    <span>{selectedBooking.client_phone}</span>
                   </div>
+                  {selectedBooking.client_location && (
+                    <p className="text-sm text-muted-foreground mt-1">{selectedBooking.client_location}</p>
+                  )}
                 </div>
 
                 <div>
                   <h4 className="font-medium text-sm text-muted-foreground mb-2">{isFr ? "Service" : "Service"}</h4>
-                  <p className="font-medium">{selectedBooking.serviceName}</p>
-                  <p className="text-sm text-muted-foreground">{selectedBooking.serviceCategory}</p>
+                  <p className="font-medium">{selectedBooking.service_name}</p>
                 </div>
 
                 <div>
                   <h4 className="font-medium text-sm text-muted-foreground mb-2">{isFr ? "Prestataire" : "Provider"}</h4>
-                  <p className="font-medium">{selectedBooking.providerName}</p>
+                  <p className="font-medium">{selectedBooking.provider_name ?? (isFr ? "Non assigné" : "Unassigned")}</p>
                 </div>
 
                 <div>
                   <h4 className="font-medium text-sm text-muted-foreground mb-2">{isFr ? "Horaire" : "Schedule"}</h4>
-                  <p className="font-medium">{selectedBooking.date}</p>
-                  <p className="text-sm text-muted-foreground">{selectedBooking.time} ({selectedBooking.duration})</p>
+                  <p className="font-medium">
+                    {new Date(selectedBooking.appointment_date).toLocaleDateString(
+                      isFr ? "fr-FR" : "en-US",
+                      { day: "numeric", month: "long", year: "numeric" }
+                    )}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {(() => {
+                      const d = new Date(selectedBooking.appointment_date);
+                      if (isFr) {
+                        return `${d.getHours().toString().padStart(2, "0")}h${d.getMinutes().toString().padStart(2, "0")}`;
+                      }
+                      return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+                    })()}
+                  </p>
                 </div>
-              </div>
 
-              {/* Actions */}
-              {selectedBooking.status === 'pending' && (
-                <div className="flex gap-2 pt-4 border-t">
-                  <Button
-                    className="flex-1"
-                    onClick={() => {
-                      updateBookingStatus(selectedBooking.id, 'confirmed');
-                      setSelectedBooking({ ...selectedBooking, status: 'confirmed' });
-                    }}
-                    data-testid="button-confirm-booking"
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    {isFr ? "Confirmer" : "Confirm"}
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    className="flex-1"
-                    onClick={() => {
-                      updateBookingStatus(selectedBooking.id, 'cancelled');
-                      setSelectedBooking({ ...selectedBooking, status: 'cancelled' });
-                    }}
-                    data-testid="button-cancel-booking"
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    {isFr ? "Annuler" : "Cancel"}
-                  </Button>
-                </div>
-              )}
-              
-              {selectedBooking.status === 'confirmed' && (
-                <div className="flex gap-2 pt-4 border-t">
-                  <Button
-                    className="flex-1"
-                    onClick={() => {
-                      updateBookingStatus(selectedBooking.id, 'completed');
-                      setSelectedBooking({ ...selectedBooking, status: 'completed' });
-                    }}
-                    data-testid="button-complete-booking"
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    {isFr ? "Marquer terminée" : "Mark Completed"}
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    className="flex-1"
-                    onClick={() => {
-                      updateBookingStatus(selectedBooking.id, 'cancelled');
-                      setSelectedBooking({ ...selectedBooking, status: 'cancelled' });
-                    }}
-                    data-testid="button-cancel-confirmed"
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    {isFr ? "Annuler" : "Cancel"}
-                  </Button>
-                </div>
-              )}
+                {selectedBooking.notes && (
+                  <div>
+                    <h4 className="font-medium text-sm text-muted-foreground mb-2">{isFr ? "Notes" : "Notes"}</h4>
+                    <p className="text-sm">{selectedBooking.notes}</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </SheetContent>
