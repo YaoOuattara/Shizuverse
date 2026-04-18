@@ -106,29 +106,32 @@ export default function ProviderBookingCard({
   };
 
   const statusStyles: Record<ProviderBookingStatus, string> = {
-    confirmed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-    cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-    completed: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+    confirmed:  "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+    pending:    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+    requested:  "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
+    cancelled:  "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+    completed:  "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
   };
 
   const statusLabels: Record<ProviderBookingStatus, string> = {
-    confirmed: t("status.confirmed"),
-    pending: t("status.pending"),
-    cancelled: t("status.cancelled"),
-    completed: t("status.completed"),
+    confirmed:  t("status.confirmed"),
+    pending:    t("status.pending"),
+    requested:  t("status.pending"),   // treat "requested" same as "pending" in display
+    cancelled:  t("status.cancelled"),
+    completed:  t("status.completed"),
   };
 
   const statusIcons: Record<ProviderBookingStatus, typeof CheckCircle2> = {
     confirmed: CheckCircle2,
-    pending: CircleDashed,
+    pending:   CircleDashed,
+    requested: CircleDashed,
     cancelled: XCircle,
     completed: Check,
   };
 
   const StatusIcon = statusIcons[booking.status];
-  const isPending = booking.status === "pending";
-  const isActionable = booking.status === "pending" || booking.status === "confirmed";
+  const isPending = booking.status === "pending" || booking.status === "requested";
+  const isActionable = isPending || booking.status === "confirmed";
   const isAnyLoading = isAccepting || isRejecting || isRescheduling;
 
   return (
@@ -218,7 +221,7 @@ export default function ProviderBookingCard({
               </div>
             )}
 
-            {conflictWarning && booking.status === "pending" && (
+            {conflictWarning && isPending && (
               <div
                 className="flex items-start gap-2 pt-2 border-t text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2"
                 data-testid={`conflict-warning-${booking.id}`}

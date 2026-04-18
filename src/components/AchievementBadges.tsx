@@ -236,34 +236,38 @@ export function AchievementBadges({
               </Badge>
             )}
 
-            {!isUnlocked && !isComingSoon && (
-              <div className="w-full space-y-1.5">
-                {badge.notEnoughHistory ? (
-                  <p className="text-xs text-center text-muted-foreground italic">
-                    {badge.requirement}
-                  </p>
-                ) : badge.progress ? (
+            {/* Progress bar — shown for all badges (locked and unlocked) */}
+            {!isComingSoon && !badge.notEnoughHistory && (
+              <div className="w-full space-y-1">
+                {badge.progress ? (
                   <>
                     <Progress
-                      value={(badge.progress.current / badge.progress.target) * 100}
-                      className="h-2"
+                      value={isUnlocked ? 100 : (badge.progress.current / badge.progress.target) * 100}
+                      className={`h-1.5 ${isUnlocked ? "[&>div]:bg-green-500" : ""}`}
                     />
-                    <p className="text-xs text-center text-muted-foreground font-medium">
-                      {badge.progress.displayFormat === "goal"
-                        ? `${badge.progress.current}${badge.progress.suffix || ""} / ${badge.progress.target}${badge.progress.suffix || ""}`
-                        : `${badge.progress.current}/${badge.progress.target}${badge.progress.suffix || ""}`
+                    <p className={`text-xs text-center font-medium ${isUnlocked ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                      {isUnlocked
+                        ? `${badge.progress.target}${badge.progress.suffix || ""} ✓`
+                        : badge.progress.displayFormat === "goal"
+                          ? `${badge.progress.current}${badge.progress.suffix || ""} / ${badge.progress.target}${badge.progress.suffix || ""}`
+                          : `${badge.progress.current} / ${badge.progress.target}${badge.progress.suffix || ""}`
                       }
                     </p>
-                    <p className="text-xs text-center text-muted-foreground/70 italic leading-snug">
-                      {badge.requirement}
-                    </p>
                   </>
-                ) : (
-                  <p className="text-xs text-center text-muted-foreground italic">
+                ) : null}
+                {!isUnlocked && (
+                  <p className="text-xs text-center text-muted-foreground/70 italic leading-snug">
                     {badge.requirement}
                   </p>
                 )}
               </div>
+            )}
+
+            {/* Not-enough-history: show requirement text only */}
+            {badge.notEnoughHistory && !isComingSoon && (
+              <p className="text-xs text-center text-muted-foreground italic">
+                {badge.requirement}
+              </p>
             )}
           </div>
         </TooltipTrigger>

@@ -337,8 +337,11 @@ export default function ProviderDashboard() {
       booking.serviceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       booking.customerEmail.toLowerCase().includes(searchQuery.toLowerCase());
 
+    // "pending" filter tab shows both pending and requested bookings
     const matchesStatus =
-      filters.status === "all" || booking.status === filters.status;
+      filters.status === "all" ||
+      booking.status === filters.status ||
+      (filters.status === "pending" && booking.status === "requested");
 
     let matchesDateRange = true;
     if (filters.dateRange.startDate || filters.dateRange.endDate) {
@@ -362,10 +365,10 @@ export default function ProviderDashboard() {
     return matchesSearch && matchesStatus && matchesDate && matchesDateRange && matchesService;
   });
 
-  // Status counts
+  // Status counts — "pending" bucket includes "requested" (both are new requests)
   const statusCounts = {
     all: bookings.length,
-    pending: bookings.filter((b) => b.status === "pending").length,
+    pending: bookings.filter((b) => b.status === "pending" || b.status === "requested").length,
     confirmed: bookings.filter((b) => b.status === "confirmed").length,
     completed: bookings.filter((b) => b.status === "completed").length,
     cancelled: bookings.filter((b) => b.status === "cancelled").length,
@@ -520,7 +523,7 @@ export default function ProviderDashboard() {
       <main className="flex-1 overflow-auto p-4 sm:p-6">
         {/* FIX 4B — Nouvelles demandes: pending bookings at the very top */}
         {(() => {
-          const pending = bookings.filter((b) => b.status === "pending");
+          const pending = bookings.filter((b) => b.status === "pending" || b.status === "requested");
           if (pending.length === 0) return null;
           return (
             <div className="mb-6" data-testid="section-new-requests">

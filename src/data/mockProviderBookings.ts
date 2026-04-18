@@ -1,6 +1,6 @@
 // todo: remove mock functionality - replace with API call to Flask backend
 
-export type ProviderBookingStatus = "confirmed" | "pending" | "cancelled" | "completed";
+export type ProviderBookingStatus = "confirmed" | "pending" | "requested" | "cancelled" | "completed";
 
 export interface ProviderBooking {
   id: string;
@@ -168,7 +168,8 @@ export function getBookingsByStatus(status: ProviderBookingStatus): ProviderBook
 // Helper function to count bookings by status
 export function getBookingCounts(): Record<ProviderBookingStatus, number> {
   return {
-    pending: mockProviderBookings.filter((b) => b.status === "pending").length,
+    pending:   mockProviderBookings.filter((b) => b.status === "pending").length,
+    requested: mockProviderBookings.filter((b) => b.status === "requested").length,
     confirmed: mockProviderBookings.filter((b) => b.status === "confirmed").length,
     completed: mockProviderBookings.filter((b) => b.status === "completed").length,
     cancelled: mockProviderBookings.filter((b) => b.status === "cancelled").length,
