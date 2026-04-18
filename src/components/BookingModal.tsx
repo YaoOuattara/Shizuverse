@@ -30,11 +30,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Clock, Zap, Banknote, Loader2, User, Phone } from "lucide-react";
+import { Clock, Zap, Banknote, Loader2, User, Phone, Sparkles } from "lucide-react";
 import { format, parse } from "date-fns";
 import type { BookingCardProps } from "./BookingCard";
 import {
-  ZONES_LIST,
   getPricingSuggestion,
   type UrgencyLevel,
   type TimePreference,
@@ -44,6 +43,7 @@ import { formatMoney } from "@/lib/currency";
 import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/hooks/use-toast";
 import { trackEvent } from "@/lib/analytics";
+import CommuneAutocomplete, { COMMUNES } from "@/components/CommuneAutocomplete";
 
 
 const SLUG_TO_CATEGORY: Record<string, string> = {
@@ -144,6 +144,11 @@ export default function BookingModal({
 }: BookingModalProps) {
   const [availableProviders, setAvailableProviders] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // AI intake state
+  const [intakeInput, setIntakeInput] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [dateHint, setDateHint] = useState<string | null>(null);
 
   const isEditMode = mode === "edit";
   const { services } = useAdminStore();
@@ -248,6 +253,31 @@ export default function BookingModal({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedServiceTypeForEffect, isEditMode, open]);
+
+  const handleAnalyze = async () => {
+    if (!intakeInput.trim() || isAnalyzing) return;
+    setIsAnalyzing(true);
+    const serviceName = form.getValues("serviceType") || "";
+    try {
+      const res = await fetch("/api/booking-intake", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_input: intakeInput, service_name: serviceName, locale }),
+      });
+      const data = await res.json();
+      if (data.suggested_notes) form.setValue("notes", data.suggested_notes);
+      if (data.suggested_date_hint) setDateHint(data.suggested_date_hint);
+      if (data.suggested_location_hint) {
+        const hint = (data.suggested_location_hint as string).toLowerCase();
+        const match = COMMUNES.find((c) => hint.includes(c.toLowerCase()));
+        if (match) form.setValue("zone", match);
+      }
+    } catch (err) {
+      console.error("[booking-intake] error:", err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const handleFormSubmit = async (data: BookingFormValues) => {
     // ── CREATE mode: call real Flask API ─────────────────────────────────────
@@ -393,6 +423,8 @@ export default function BookingModal({
     if (!isOpen) {
       form.reset();
       setAvailableProviders([]);
+      setIntakeInput("");
+      setDateHint(null);
     }
     onOpenChange(isOpen);
   };
@@ -436,6 +468,46 @@ export default function BookingModal({
           <div className="overflow-y-auto flex-1 px-6">
             <form id="booking-form" onSubmit={form.handleSubmit(handleFormSubmit)}>
             <div className="space-y-4 py-2">
+            {/* ── AI intake assistant — create mode only ───────────────── */}
+            {!isEditMode && (
+              <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-4 space-y-3">
+                <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {locale === "fr" ? "Assistant IA" : "AI Assistant"}
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={intakeInput}
+                    onChange={(e) => setIntakeInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
+                    placeholder={
+                      locale === "fr"
+                        ? "Décrivez votre besoin en quelques mots..."
+                        : "Describe your need in a few words..."
+                    }
+                    className="flex-1 border border-purple-200 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAnalyze}
+                    disabled={!intakeInput.trim() || isAnalyzing}
+                    className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors"
+                  >
+                    {isAnalyzing && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {locale === "fr" ? "Analyser" : "Analyze"}
+                  </button>
+                </div>
+                {(dateHint || form.getValues("notes")) && (
+                  <p className="text-xs text-purple-600">
+                    {locale === "fr"
+                      ? "✓ Formulaire pré-rempli — vous pouvez modifier les champs."
+                      : "✓ Form pre-filled — you can still edit all fields."}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* ── Client info — create mode only ───────────────────────── */}
             {!isEditMode && (
               <>
@@ -577,6 +649,13 @@ export default function BookingModal({
               )}
             />
 
+            {/* ── Date hint from AI ────────────────────────────────────── */}
+            {dateHint && !isEditMode && (
+              <p className="text-xs text-purple-600 -mt-2">
+                💡 {locale === "fr" ? `Suggestion : ${dateHint}` : `Suggestion: ${dateHint}`}
+              </p>
+            )}
+
             {/* ── Time ─────────────────────────────────────────────────── */}
             <FormField
               control={form.control}
@@ -602,35 +681,21 @@ export default function BookingModal({
               )}
             />
 
-            {/* ── Zone (location) ──────────────────────────────────────── */}
+            {/* ── Zone (location) — CommuneAutocomplete ────────────────── */}
             <FormField
               control={form.control}
               name="zone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{locale === "fr" ? "Localisation (Zone)" : "Location (Zone)"}</FormLabel>
                   <FormControl>
-                    <div>
-                      <input
-                        list="zones-list"
+                    <div data-testid={`${testIdPrefix}-combobox-zone`}>
+                      <CommuneAutocomplete
+                        label={locale === "fr" ? "Adresse ou quartier *" : "Location *"}
                         value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value)}
-                        placeholder={locale === "fr" ? "Sélectionnez ou saisissez une zone" : "Select or type a zone"}
-                        data-testid={`${testIdPrefix}-combobox-zone`}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        onChange={field.onChange}
                       />
-                      <datalist id="zones-list">
-                        {ZONES_LIST.map((zone) => (
-                          <option key={zone.value} value={zone.label} />
-                        ))}
-                      </datalist>
                     </div>
                   </FormControl>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {locale === "fr"
-                      ? "Sélectionnez une zone d'Abidjan ou saisissez un lieu personnalisé"
-                      : "Select an Abidjan zone or type a custom location"}
-                  </p>
                   <FormMessage />
                 </FormItem>
               )}
