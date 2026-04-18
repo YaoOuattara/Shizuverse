@@ -81,11 +81,22 @@ const providerIdMap: Record<string, string> = {
   "Maya Patel":       "provider-6",
 };
 
+// Internal values are 24h "HH:MM"; display is locale-aware
 const timeSlots = [
-  "9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM",
-  "12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM",
-  "3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM",
+  "09:00","09:30","10:00","10:30","11:00","11:30",
+  "12:00","12:30","13:00","13:30","14:00","14:30",
+  "15:00","15:30","16:00","16:30","17:00","17:30","18:00",
 ];
+
+function formatTimeSlot(slot: string, locale: "en" | "fr"): string {
+  const [h, m] = slot.split(":").map(Number);
+  if (locale === "fr") {
+    return `${String(h).padStart(2, "0")}h${String(m).padStart(2, "0")}`;
+  }
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
 
 const bookingFormSchema = z.object({
   client_name:    z.string().optional(),
@@ -251,12 +262,9 @@ export default function BookingModal({
         return;
       }
 
-      // Combine date + time → ISO 8601
+      // Combine date + time → ISO 8601 (time values are 24h "HH:MM")
       const dateObj = new Date(data.date);
-      const [timePart, meridiem] = data.time.split(" ");
-      let [hours, minutes] = timePart.split(":").map(Number);
-      if (meridiem === "PM" && hours !== 12) hours += 12;
-      if (meridiem === "AM" && hours === 12) hours = 0;
+      const [hours, minutes] = data.time.split(":").map(Number);
       dateObj.setHours(hours, minutes, 0, 0);
 
       const selectedService = ABIDJAN_SERVICES.find((s) => s.label === data.serviceType);
@@ -585,7 +593,7 @@ export default function BookingModal({
                     >
                       <option value="" disabled>{t("timePlaceholder")}</option>
                       {timeSlots.map((slot) => (
-                        <option key={slot} value={slot}>{slot}</option>
+                        <option key={slot} value={slot}>{formatTimeSlot(slot, locale)}</option>
                       ))}
                     </select>
                   </FormControl>

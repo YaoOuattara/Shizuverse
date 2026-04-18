@@ -105,12 +105,13 @@ export default function ProviderDashboard() {
     localStorage.setItem(STORAGE_KEYS.FILTERS, JSON.stringify(filters));
   }, [filters]);
 
-  // Fetch bookings from real API
+  // Fetch bookings from real API — auto-redirect to login if no token
   useEffect(() => {
     const token = localStorage.getItem("provider_token");
     if (!token) {
       setHasToken(false);
       setIsLoading(false);
+      router.replace(`/${locale}/provider/login`);
       return;
     }
     setHasToken(true);
