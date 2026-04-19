@@ -89,12 +89,14 @@ const CONTENT = {
 export default function HomeHero() {
   const locale = useLocale() as "en" | "fr";
   const c = CONTENT[locale] ?? CONTENT.fr;
+  const [mounted, setMounted] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isProvider, setIsProvider] = useState(false);
 
   useEffect(() => {
-    setIsClient(!!localStorage.getItem("client_token"));
     setIsProvider(!!localStorage.getItem("provider_token"));
+    setIsClient(!!localStorage.getItem("client_token"));
+    setMounted(true);
   }, []);
 
   return (
@@ -130,14 +132,16 @@ export default function HomeHero() {
             >
               {c.cta1}
             </Link>
-            <Link
-              href={isProvider ? `/${locale}/provider` : `/${locale}/provider/register`}
-              className="border border-white/40 text-white px-6 py-3 rounded-xl hover:bg-white/10 transition-colors"
-            >
-              {isProvider
-                ? (locale === "fr" ? "Mon tableau de bord" : "My Dashboard")
-                : (locale === "fr" ? "Devenir prestataire" : "Become a provider")}
-            </Link>
+            {mounted && (
+              <Link
+                href={isProvider ? `/${locale}/provider` : `/${locale}/provider/register`}
+                className="border border-white/40 text-white px-6 py-3 rounded-xl hover:bg-white/10 transition-colors"
+              >
+                {isProvider
+                  ? (locale === "fr" ? "Mon tableau de bord" : "My Dashboard")
+                  : (locale === "fr" ? "Rejoindre Shizu" : "Join Shizu")}
+              </Link>
+            )}
           </div>
 
           {/* Trust row */}
@@ -151,7 +155,7 @@ export default function HomeHero() {
           </div>
 
           {/* Returning client link — only for logged-in clients */}
-          {isClient && (
+          {mounted && isClient && (
             <p className="mt-4 text-white/40 text-sm">
               <Link
                 href={`/${locale}/bookings`}
