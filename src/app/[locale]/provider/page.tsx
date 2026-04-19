@@ -41,10 +41,11 @@ import {
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
 import { useTranslations } from "next-intl";
 
-// localStorage keys for filter persistence
+// localStorage keys for filter and booking cache persistence
 const STORAGE_KEYS = {
   FILTERS: "provider_dashboard_filters",
   STATS_VISIBLE: "provider_dashboard_stats_visible",
+  BOOKINGS: "provider_cached_bookings",
 };
 
 // Check if viewport is mobile width
@@ -116,6 +117,16 @@ export default function ProviderDashboard() {
       return;
     }
     setHasToken(true);
+
+    // Load localStorage cache immediately so the UI isn't blank while fetching
+    try {
+      const cached = JSON.parse(localStorage.getItem(STORAGE_KEYS.BOOKINGS) || "null");
+      if (Array.isArray(cached) && cached.length > 0) {
+        setBookings(cached);
+        setIsLoading(false); // show cached data right away
+      }
+    } catch { /* ignore */ }
+
     let providerId: string | null = null;
     try {
       const info = JSON.parse(localStorage.getItem("provider_info") || "null");
@@ -135,14 +146,30 @@ export default function ProviderDashboard() {
       })
       .then((data) => {
         if (Array.isArray(data)) {
-          setBookings(data.map((b) => ({
+          const mapped = data.map((b) => ({
             ...b,
             id: String(b.id),
             location: b.location ?? b.client_location ?? undefined,
-          })));
+          }));
+          setBookings(mapped);
+          localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(mapped));
         }
       })
-      .catch(() => { /* network error — leave empty */ })
+      .catch(() => {
+        // Network/server error — if we have cached data already shown, warn the user
+        const hasCached = (() => {
+          try { return Array.isArray(JSON.parse(localStorage.getItem(STORAGE_KEYS.BOOKINGS) || "null")); } catch { return false; }
+        })();
+        if (hasCached) {
+          toast({
+            title: locale === "fr" ? "Données non actualisées" : "Stale data",
+            description: locale === "fr"
+              ? "Impossible de rafraîchir les réservations. Les données affichées peuvent ne pas être à jour."
+              : "Could not refresh bookings. Displayed data may be out of date.",
+            variant: "destructive",
+          });
+        }
+      })
       .finally(() => setIsLoading(false));
   }, []);
 

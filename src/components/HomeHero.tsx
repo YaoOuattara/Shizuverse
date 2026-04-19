@@ -132,7 +132,9 @@ export default function HomeHero() {
               href={isProvider ? `/${locale}/provider` : `/${locale}/provider/register`}
               className="border border-white/40 text-white px-6 py-3 rounded-xl hover:bg-white/10 transition-colors"
             >
-              {c.cta2}
+              {isProvider
+                ? (locale === "fr" ? "Mon tableau de bord" : "My Dashboard")
+                : (locale === "fr" ? "Rejoindre Shizu" : "Join Shizu")}
             </Link>
           </div>
 
