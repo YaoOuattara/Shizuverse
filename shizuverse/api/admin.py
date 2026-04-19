@@ -282,42 +282,110 @@ def provider_register():
 
 
 @provider_bp.route('/bookings', methods=['GET'])
+@require_provider_token
 def get_provider_bookings():
-    provider_id = request.args.get('provider_id', type=int)
-    query = Appointment.query
-    if provider_id:
-        query = query.filter_by(provider_id=provider_id)
-    appointments = query.order_by(Appointment.appointment_date.desc()).all()
+    # Decode JWT to identify the provider
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header[7:]
+    payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+    provider_sp_id = payload.get('provider_id')
+    sp = ServiceProvider.query.get(provider_sp_id) if provider_sp_id else None
+    provider_company_name = sp.company_name if sp else None
+
+    # New requests: all unassigned ClientBookings with status "requested" / "pending"
+    open_requests = ClientBooking.query.filter(
+        ClientBooking.status.in_(['requested', 'pending']),
+    ).order_by(ClientBooking.appointment_date.asc()).all()
+
+    # Provider's own bookings (confirmed / completed / cancelled)
+    own_bookings = []
+    if provider_company_name:
+        own_bookings = ClientBooking.query.filter(
+            ClientBooking.provider_name == provider_company_name,
+            ClientBooking.status.notin_(['requested', 'pending']),
+        ).order_by(ClientBooking.appointment_date.desc()).all()
+
+    # Deduplicate (a booking may have been accepted by this provider already)
+    seen_ids = set()
     result = []
-    for a in appointments:
+    for b in open_requests + own_bookings:
+        if b.id in seen_ids:
+            continue
+        seen_ids.add(b.id)
         result.append({
-            'id': a.id,
-            'customerId': a.client_id,
-            'customerName': a.client.username if a.client else 'Unknown',
-            'customerEmail': a.client.email if a.client else '',
-            'serviceName': a.service.name if a.service else 'Unknown',
-            'serviceType': a.service.category if a.service and hasattr(a.service, 'category') else '',
-            'providerId': a.provider_id,
-            'date': a.appointment_date.strftime('%Y-%m-%d') if a.appointment_date else '',
-            'time': a.appointment_date.strftime('%H:%M') if a.appointment_date else '',
-            'duration': a.service.duration_minutes if a.service and hasattr(a.service, 'duration_minutes') else 60,
-            'price': a.service.price if a.service and hasattr(a.service, 'price') else 0,
-            'status': a.status,
-            'notes': a.notes,
-            'requestedAt': a.created_at.isoformat() if hasattr(a, 'created_at') and a.created_at else None,
+            'id': b.id,
+            'customerName': b.client_name,
+            'customerPhone': b.client_phone,
+            'location': b.client_location,
+            'serviceName': b.service_name,
+            'date': b.appointment_date.strftime('%Y-%m-%d') if b.appointment_date else '',
+            'time': b.appointment_date.strftime('%H:%M') if b.appointment_date else '',
+            'duration': b.service.duration_minutes if b.service and hasattr(b.service, 'duration_minutes') else 60,
+            'price': b.service.price if b.service and hasattr(b.service, 'price') else 0,
+            'status': b.status,
+            'notes': b.notes,
+            'requestedAt': b.created_at.isoformat() if b.created_at else None,
         })
     return jsonify(result)
 
+
+@provider_bp.route('/bookings/<int:booking_id>/accept', methods=['PATCH'])
+@require_provider_token
+def accept_provider_booking(booking_id):
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header[7:]
+    payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+    provider_sp_id = payload.get('provider_id')
+    sp = ServiceProvider.query.get(provider_sp_id) if provider_sp_id else None
+
+    booking = ClientBooking.query.get_or_404(booking_id)
+    if booking.status not in ('requested', 'pending'):
+        return jsonify({'error': 'Booking is not available to accept'}), 400
+
+    booking.status = 'confirmed'
+    booking.provider_name = sp.company_name if sp else None
+    booking.provider_phone = sp.phone_number if sp else None
+    booking.reviewed_by = 'provider'
+    db.session.commit()
+    return jsonify({'success': True, 'status': 'confirmed'})
+
+
+@provider_bp.route('/bookings/<int:booking_id>/decline', methods=['PATCH'])
+@require_provider_token
+def decline_provider_booking(booking_id):
+    data = request.get_json() or {}
+    reason = (data.get('reason') or '').strip()
+
+    booking = ClientBooking.query.get_or_404(booking_id)
+    if booking.status not in ('requested', 'pending', 'confirmed'):
+        return jsonify({'error': 'Cannot decline booking in current status'}), 400
+
+    booking.status = 'cancelled'
+    booking.decline_reason = reason
+    booking.reviewed_by = 'provider'
+    db.session.commit()
+    return jsonify({'success': True, 'status': 'cancelled'})
+
+
 @provider_bp.route('/bookings/<int:booking_id>/status', methods=['PATCH'])
 def update_provider_booking_status(booking_id):
+    """Legacy endpoint — kept for backwards compat."""
     data = request.get_json()
-    appointment = Appointment.query.get_or_404(booking_id)
+    booking = ClientBooking.query.get(booking_id)
+    if not booking:
+        appointment = Appointment.query.get_or_404(booking_id)
+        new_status = data.get('status')
+        if new_status not in ('confirmed', 'completed', 'cancelled'):
+            return jsonify({'error': 'Invalid status'}), 400
+        appointment.status = new_status
+        db.session.commit()
+        return jsonify({'success': True, 'status': appointment.status})
     new_status = data.get('status')
     if new_status not in ('confirmed', 'completed', 'cancelled'):
         return jsonify({'error': 'Invalid status'}), 400
-    appointment.status = new_status
+    booking.status = new_status
     db.session.commit()
-    return jsonify({'success': True, 'status': appointment.status})
+    return jsonify({'success': True, 'status': booking.status})
 
 
 @provider_bp.route('/profile', methods=['PATCH'])
