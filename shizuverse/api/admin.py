@@ -139,18 +139,66 @@ def verify_provider(provider_id):
 @admin_bp.route('/services', methods=['GET'])
 @require_admin_token
 def get_services():
-    services = Service.query.all()
+    from sqlalchemy import inspect as sa_inspect, text as sa_text
+    from shizuverse.models.service_models import ServiceSubcategory, ServiceCategory
+
+    inspector = sa_inspect(db.engine)
+    cat_cols  = {c['name'] for c in inspector.get_columns('service_categories')}
+    svc_cols  = {c['name'] for c in inspector.get_columns('services')}
+    has_cat_fr  = 'name_fr' in cat_cols
+    has_svc_fr  = 'name_fr' in svc_cols
+
+    services = Service.query.order_by(Service.subcategory_id, Service.id).all()
     result = []
     for s in services:
+        # Resolve category name through subcategory relationship
+        sub = ServiceSubcategory.query.get(s.subcategory_id) if s.subcategory_id else None
+        cat = ServiceCategory.query.get(sub.category_id) if sub else None
+
+        if cat and has_cat_fr:
+            row = db.session.execute(
+                sa_text("SELECT name_fr, name FROM service_categories WHERE id=:id"), {"id": cat.id}
+            ).first()
+            cat_name = (row[0] or row[1]) if row else (cat.name if cat else '')
+        else:
+            cat_name = cat.name if cat else ''
+
+        svc_name = s.name
+        if has_svc_fr:
+            row = db.session.execute(
+                sa_text("SELECT name_fr FROM services WHERE id=:id"), {"id": s.id}
+            ).first()
+            if row and row[0]:
+                svc_name = row[0]
+
         result.append({
             'id': s.id,
-            'name': s.name,
-            'category': s.category if hasattr(s, 'category') else '',
-            'price': s.price if hasattr(s, 'price') else 0,
-            'duration': s.duration_minutes if hasattr(s, 'duration_minutes') else 0,
-            'active': s.active if hasattr(s, 'active') else True,
+            'name': svc_name,
+            'category': cat_name,
+            'active': s.is_active,
+            'is_priority': s.is_priority,
+            'featured': s.featured,
         })
     return jsonify(result)
+
+
+@admin_bp.route('/services/<int:service_id>', methods=['PATCH'])
+@require_admin_token
+def patch_service(service_id):
+    service = Service.query.get_or_404(service_id)
+    data = request.get_json() or {}
+
+    if 'is_active' in data:
+        service.is_active = bool(data['is_active'])
+    if 'is_priority' in data:
+        service.is_priority = bool(data['is_priority'])
+    if 'featured' in data:
+        service.featured = bool(data['featured'])
+    if 'name' in data and str(data['name']).strip():
+        service.name = str(data['name']).strip()
+
+    db.session.commit()
+    return jsonify({'success': True, 'id': service.id, 'is_active': service.is_active})
 
 provider_bp = Blueprint('provider', __name__)
 
