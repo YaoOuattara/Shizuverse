@@ -260,11 +260,12 @@ export default function AdminProviders() {
     setIsUpdating(true);
     const action = currentStatus === "active" ? "pause" : "activate";
     const newStatus = action === "activate" ? "active" : "paused";
+    updateLocalProvider(providerId, { status: newStatus });
     try {
       await adminApi.portalToggleActivation(Number(providerId), action);
-      updateLocalProvider(providerId, { status: newStatus });
-      toast({ title: "Status Updated", description: `Provider is now ${newStatus}.` });
+      toast({ title: isFr ? "Statut mis à jour" : "Status Updated", description: isFr ? `Prestataire maintenant ${newStatus === "active" ? "actif" : "en pause"}.` : `Provider is now ${newStatus}.` });
     } catch (err) {
+      updateLocalProvider(providerId, { status: currentStatus });
       console.error("Failed to update status:", err);
       toast({ title: "Error", description: "Failed to update provider status.", variant: "destructive" });
     } finally {
@@ -348,11 +349,12 @@ export default function AdminProviders() {
       return;
     }
     setIsUpdating(true);
+    updateLocalProvider(providerId, { listed: true });
     try {
       await adminApi.portalToggleListing(Number(providerId), "list");
-      updateLocalProvider(providerId, { listed: true });
-      toast({ title: "Provider Listed", description: "Provider is now visible to clients." });
+      toast({ title: isFr ? "Prestataire listé" : "Provider Listed", description: isFr ? "Le prestataire est maintenant visible aux clients." : "Provider is now visible to clients." });
     } catch (err) {
+      updateLocalProvider(providerId, { listed: false });
       console.error("Failed to list provider:", err);
       toast({ title: "Error", description: "Failed to list provider.", variant: "destructive" });
     } finally {
@@ -364,17 +366,20 @@ export default function AdminProviders() {
     const idToUnlist = pendingActionProviderId ?? selectedProvider?.id;
     if (!idToUnlist) return;
     setIsUpdating(true);
+    updateLocalProvider(idToUnlist, { listed: false });
+    setUnlistModalOpen(false);
+    setUnlistReason("");
+    setPendingActionProviderId(null);
     try {
       await adminApi.portalToggleListing(Number(idToUnlist), "unlist");
-      updateLocalProvider(idToUnlist, { listed: false });
       toast({
-        title: "Provider Unlisted",
-        description: unlistReason ? `Provider hidden. Reason: ${unlistReason}` : "Provider is now hidden from clients.",
+        title: isFr ? "Prestataire délisté" : "Provider Unlisted",
+        description: unlistReason
+          ? (isFr ? `Prestataire masqué. Raison : ${unlistReason}` : `Provider hidden. Reason: ${unlistReason}`)
+          : (isFr ? "Le prestataire est maintenant masqué aux clients." : "Provider is now hidden from clients."),
       });
-      setUnlistModalOpen(false);
-      setUnlistReason("");
-      setPendingActionProviderId(null);
     } catch (err) {
+      updateLocalProvider(idToUnlist, { listed: true });
       console.error("Failed to unlist provider:", err);
       toast({ title: "Error", description: "Failed to unlist provider.", variant: "destructive" });
     } finally {
