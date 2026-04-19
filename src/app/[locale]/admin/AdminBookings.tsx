@@ -367,6 +367,16 @@ export default function AdminBookings() {
   const [assigningBookingId, setAssigningBookingId] = useState<string | null>(null);
   const [inlineProviderName, setInlineProviderName] = useState("");
   const [inlineProviderPhone, setInlineProviderPhone] = useState("");
+  const [inlineSelectedProviderId, setInlineSelectedProviderId] = useState("");
+
+  const handleInlineProviderSelect = (providerId: string) => {
+    setInlineSelectedProviderId(providerId);
+    const p = eligibleProviders.find((p: ApiProvider) => String(p.id) === providerId);
+    if (p) {
+      setInlineProviderName(p.company_name || p.name || "");
+      setInlineProviderPhone(p.phone_number || "");
+    }
+  };
 
   // Quote modal state
   const [quoteModalOpen, setQuoteModalOpen] = useState(false);
@@ -814,30 +824,38 @@ export default function AdminBookings() {
                         <>
                           {assigningBookingId === booking.id ? (
                             <div className="flex flex-wrap gap-1 items-center">
-                              <input
-                                className="text-xs border rounded px-2 py-1 w-32"
-                                placeholder="Nom prestataire"
-                                value={inlineProviderName}
-                                onChange={(e) => setInlineProviderName(e.target.value)}
-                              />
-                              <input
-                                className="text-xs border rounded px-2 py-1 w-28"
-                                placeholder="Téléphone"
-                                value={inlineProviderPhone}
-                                onChange={(e) => setInlineProviderPhone(e.target.value)}
-                              />
+                              <Select
+                                value={inlineSelectedProviderId}
+                                onValueChange={handleInlineProviderSelect}
+                              >
+                                <SelectTrigger className="h-7 text-xs w-52">
+                                  <SelectValue placeholder={isFr ? "Choisir un prestataire…" : "Choose provider…"} />
+                                </SelectTrigger>
+                                <SelectContent className="z-50">
+                                  {eligibleProviders.length === 0 ? (
+                                    <div className="px-3 py-2 text-xs text-muted-foreground">
+                                      {isFr ? "Aucun prestataire approuvé" : "No approved providers"}
+                                    </div>
+                                  ) : eligibleProviders.map((p: ApiProvider) => (
+                                    <SelectItem key={p.id} value={String(p.id)}>
+                                      {p.company_name || p.name || `#${p.id}`}
+                                      {p.phone_number ? ` · ${p.phone_number}` : ""}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                               <button
                                 className="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700 disabled:opacity-50"
                                 disabled={!inlineProviderName.trim()}
                                 onClick={() => handleStatusChange(booking.id, 'assigned', { provider_name: inlineProviderName, provider_phone: inlineProviderPhone })}
                               >
-                                Assigner
+                                {isFr ? "Assigner" : "Assign"}
                               </button>
                               <button
                                 className="text-xs text-muted-foreground px-2 py-1 rounded border hover:bg-muted"
-                                onClick={() => setAssigningBookingId(null)}
+                                onClick={() => { setAssigningBookingId(null); setInlineSelectedProviderId(""); }}
                               >
-                                Annuler
+                                {isFr ? "Annuler" : "Cancel"}
                               </button>
                             </div>
                           ) : (
@@ -1234,29 +1252,49 @@ export default function AdminBookings() {
                 
                 {/* Under Review Actions */}
                 {selectedBooking.status === "under_review" && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="space-y-2">
-                      <input
-                        className="w-full text-sm border rounded px-3 py-2"
-                        placeholder="Nom du prestataire"
-                        value={inlineProviderName}
-                        onChange={(e) => setInlineProviderName(e.target.value)}
-                      />
-                      <input
-                        className="w-full text-sm border rounded px-3 py-2"
-                        placeholder="Téléphone prestataire"
-                        value={inlineProviderPhone}
-                        onChange={(e) => setInlineProviderPhone(e.target.value)}
-                      />
-                      <Button
-                        className="w-full"
-                        disabled={!inlineProviderName.trim() || isUpdating}
-                        onClick={() => handleStatusChange(selectedBooking.id, 'assigned', { provider_name: inlineProviderName, provider_phone: inlineProviderPhone })}
+                      <Label>{isFr ? "Choisir un prestataire" : "Select Provider"}</Label>
+                      <Select
+                        value={inlineSelectedProviderId}
+                        onValueChange={handleInlineProviderSelect}
                       >
-                        <User className="h-4 w-4 mr-2" />
-                        Assigner le prestataire
-                      </Button>
+                        <SelectTrigger>
+                          <SelectValue placeholder={isFr ? "Choisir un prestataire approuvé…" : "Choose an approved provider…"} />
+                        </SelectTrigger>
+                        <SelectContent className="z-50">
+                          {eligibleProviders.length === 0 ? (
+                            <div className="px-3 py-2 text-sm text-muted-foreground">
+                              {isFr ? "Aucun prestataire approuvé et actif" : "No approved active providers"}
+                            </div>
+                          ) : eligibleProviders.map((p: ApiProvider) => (
+                            <SelectItem key={p.id} value={String(p.id)}>
+                              {p.company_name || p.name || `#${p.id}`}
+                              {p.phone_number ? ` · ${p.phone_number}` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
+                    {inlineProviderName && (
+                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg text-sm">
+                        <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div>
+                          <p className="font-medium">{inlineProviderName}</p>
+                          {inlineProviderPhone && (
+                            <p className="text-xs text-muted-foreground">{inlineProviderPhone}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    <Button
+                      className="w-full"
+                      disabled={!inlineProviderName.trim() || isUpdating}
+                      onClick={() => handleStatusChange(selectedBooking.id, 'assigned', { provider_name: inlineProviderName, provider_phone: inlineProviderPhone })}
+                    >
+                      <User className="h-4 w-4 mr-2" />
+                      {isFr ? "Assigner le prestataire" : "Assign Provider"}
+                    </Button>
                   </div>
                 )}
 
@@ -1410,23 +1448,40 @@ export default function AdminBookings() {
               <Label>{isFr ? "Choisir un prestataire" : "Select Provider"}</Label>
               <Select value={selectedProviderId} onValueChange={setSelectedProviderId}>
                 <SelectTrigger data-testid="select-assign-provider">
-                  <SelectValue placeholder={isFr ? "Choisir un prestataire..." : "Choose a provider..."} />
+                  <SelectValue placeholder={isFr ? "Choisir un prestataire…" : "Choose a provider…"} />
                 </SelectTrigger>
                 <SelectContent className="z-50">
                   {eligibleProviders.length === 0 ? (
                     <div className="px-3 py-2 text-sm text-muted-foreground">
-                      {isFr ? "Aucun prestataire approuvé" : "No approved providers"}
+                      {isFr ? "Aucun prestataire approuvé et actif" : "No approved active providers"}
                     </div>
-                  ) : (
-                    eligibleProviders.map((provider: ApiProvider) => (
-                      <SelectItem key={provider.id} value={String(provider.id)}>
-                        {provider.company_name || provider.name || `#${provider.id}`}
-                      </SelectItem>
-                    ))
-                  )}
+                  ) : eligibleProviders.map((p: ApiProvider) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.company_name || p.name || `#${p.id}`}
+                      {p.phone_number ? ` · ${p.phone_number}` : ""}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
+            {selectedProviderId && (() => {
+              const p = eligibleProviders.find((p: ApiProvider) => String(p.id) === selectedProviderId);
+              if (!p) return null;
+              return (
+                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                  <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">{p.company_name || p.name}</p>
+                    {p.phone_number && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Phone className="h-3 w-3" />
+                        {p.phone_number}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignModalOpen(false)}>
