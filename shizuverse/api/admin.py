@@ -436,6 +436,51 @@ def update_provider_booking_status(booking_id):
     return jsonify({'success': True, 'status': booking.status})
 
 
+@provider_bp.route('/profile', methods=['GET'])
+@require_provider_token
+def get_provider_profile():
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header[7:]
+    payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+    provider_id = payload.get('provider_id')
+
+    sp = ServiceProvider.query.get_or_404(provider_id)
+    user = User.query.get(sp.user_id)
+
+    # Collect all service names offered by this user across their ServiceProvider rows
+    all_rows = ServiceProvider.query.filter_by(user_id=sp.user_id).all()
+    services = []
+    for row in all_rows:
+        svc = Service.query.get(row.service_id) if row.service_id else None
+        if svc and svc.name not in services:
+            services.append(svc.name)
+
+    return jsonify({
+        'id': sp.id,
+        'user_id': sp.user_id,
+        'name': sp.company_name or (user.email.split('@')[0] if user else ''),
+        'phone': sp.phone_number,
+        'email': user.email if user else None,
+        'bio': sp.bio,
+        'address': sp.address,
+        'profile_photo_url': sp.profile_photo_url,
+        'id_document_url': sp.id_document_url,
+        'experience_text': sp.experience_text,
+        'experience_photo_url': sp.experience_photo_url,
+        'mobile_money_number': sp.mobile_money_number,
+        'mobile_money_name': sp.mobile_money_name,
+        'mobile_money_operator': sp.mobile_money_operator,
+        'verification_status': sp.verification_status,
+        'listed_status': sp.listed_status,
+        'provider_status': sp.provider_status,
+        'rejection_reason': sp.rejection_reason,
+        'rejection_note': sp.rejection_note,
+        'submitted_at': sp.submitted_at.isoformat() if sp.submitted_at else None,
+        'reviewed_at': sp.reviewed_at.isoformat() if sp.reviewed_at else None,
+        'services': services,
+    })
+
+
 @provider_bp.route('/profile', methods=['PATCH'])
 @require_provider_token
 def update_provider_profile():
