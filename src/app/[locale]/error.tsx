@@ -16,7 +16,11 @@ export default function LocaleError({
   const isFr = locale === "fr";
 
   useEffect(() => {
-    console.error("[error-boundary]", error);
+    // Log full detail so it's readable in Vercel Functions logs and browser console
+    console.error("[error-boundary] message:", error?.message);
+    console.error("[error-boundary] stack:", error?.stack);
+    console.error("[error-boundary] digest:", error?.digest);
+    console.error("[error-boundary] full:", error);
   }, [error]);
 
   return (
@@ -29,6 +33,20 @@ export default function LocaleError({
           ? "Veuillez réessayer. Si le problème persiste, contactez le support."
           : "Please try again. If the problem persists, contact support."}
       </p>
+
+      {/* Error detail — visible on the page so we can diagnose without DevTools */}
+      {error?.message && (
+        <details className="max-w-lg w-full text-left">
+          <summary className="text-xs text-muted-foreground cursor-pointer select-none">
+            {isFr ? "Détail de l'erreur" : "Error detail"}
+          </summary>
+          <pre className="mt-2 rounded-md bg-muted px-4 py-3 text-xs text-destructive whitespace-pre-wrap break-all overflow-auto max-h-48">
+            {error.message}
+            {error.digest ? `\n\ndigest: ${error.digest}` : ""}
+          </pre>
+        </details>
+      )}
+
       <div className="flex gap-3">
         <Button onClick={reset}>
           {isFr ? "Réessayer" : "Try again"}
