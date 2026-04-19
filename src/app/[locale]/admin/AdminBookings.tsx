@@ -371,7 +371,7 @@ export default function AdminBookings() {
 
   const eligibleProviders = useMemo(() => {
     return liveProviders.filter((p: ApiProvider) =>
-      p.verification_status === 'approved'
+      p.verification_status === 'approved' && p.provider_status === 'active'
     );
   }, [liveProviders]);
 

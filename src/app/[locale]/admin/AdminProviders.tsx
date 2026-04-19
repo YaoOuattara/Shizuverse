@@ -204,19 +204,25 @@ export default function AdminProviders() {
     };
   }, [providers]);
 
+  const isJunk = (v: string) => {
+    const t = v.trim().toLowerCase();
+    return t.length < 3 || ['test', 'xxx', 'aaa', 'bbb', 'n/a', 'na'].includes(t);
+  };
+
   const allCategories = useMemo(() => {
     const cats = new Set<string>();
-    providers.forEach(p => p.services.forEach(s => { if (s && s.trim() !== "") cats.add(s); }));
+    providers.forEach(p => p.services.forEach(s => { if (s && s.trim() !== "" && !isJunk(s)) cats.add(s.trim()); }));
     return Array.from(cats).sort();
   }, [providers]);
 
   // Only show communes that actually appear in at least one provider's serviceArea
   const allZones = useMemo(() => {
     return COMMUNES.filter(commune =>
+      !isJunk(commune) &&
       providers.some(p =>
         p.serviceArea?.toLowerCase().includes(commune.toLowerCase())
       )
-    );
+    ).sort();
   }, [providers]);
 
   const hasActiveFilters = searchQuery !== "" || verificationFilter !== "all" || categoryFilter !== "__all__" || zoneFilter !== "__all__";

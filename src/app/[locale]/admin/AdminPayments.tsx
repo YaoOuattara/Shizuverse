@@ -443,7 +443,7 @@ export default function AdminPayments() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">
-                  Payments ({paymentsBookings.length})
+                  {isFr ? "Paiements" : "Payments"} ({paymentsBookings.length})
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
@@ -638,7 +638,7 @@ export default function AdminPayments() {
 
               {/* Booking Info */}
               <div className="space-y-3">
-                <h4 className="font-medium text-sm text-muted-foreground">Booking Info</h4>
+                <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Informations de réservation" : "Booking Info"}</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground" />
@@ -682,7 +682,7 @@ export default function AdminPayments() {
                     data-testid="button-record-payment"
                   >
                     {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                    Record Payment
+                    {isFr ? "Enregistrer le paiement" : "Record Payment"}
                   </Button>
                 )}
 
@@ -811,7 +811,7 @@ export default function AdminPayments() {
               data-testid="button-confirm-payment"
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Record Payment
+              {isFr ? "Enregistrer le paiement" : "Record Payment"}
             </Button>
           </DialogFooter>
         </DialogContent>
