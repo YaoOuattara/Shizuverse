@@ -23,6 +23,13 @@ class ServiceProvider(db.Model):
     address = db.Column(db.String(255))
     bio = db.Column(db.Text)
     profile_picture = db.Column(db.String(255))
+    profile_photo_url = db.Column(db.String(500))
+    id_document_url = db.Column(db.String(500))
+    experience_text = db.Column(db.Text)
+    experience_photo_url = db.Column(db.String(500))
+    mobile_money_number = db.Column(db.String(30))
+    mobile_money_name = db.Column(db.String(120))
+    mobile_money_operator = db.Column(db.String(50))
     verified = db.Column(db.Boolean, default=False)
 
     verification_status = db.Column(

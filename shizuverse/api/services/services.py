@@ -60,8 +60,7 @@ def list_categories():
         subs = ServiceSubcategory.query.filter_by(category_id=c.id).all()
         sub_list = []
         for s in subs:
-            svc = Service.query.filter_by(subcategory_id=s.id, is_active=True).first() \
-                  or Service.query.filter_by(subcategory_id=s.id).first()
+            svc = Service.query.filter_by(subcategory_id=s.id, is_active=True).first()
             sub_list.append({
                 "id": s.id,
                 "name": s.name,

@@ -399,11 +399,62 @@ def update_provider_profile():
     sp = ServiceProvider.query.get_or_404(provider_id)
 
     data = request.get_json() or {}
-    if 'bio' in data:
-        sp.bio = (data['bio'] or '').strip()
+
+    # Simple text/URL fields — update only if key is present in request
+    str_fields = [
+        'bio',
+        'profile_photo_url',
+        'id_document_url',
+        'experience_text',
+        'experience_photo_url',
+        'mobile_money_number',
+        'mobile_money_name',
+        'mobile_money_operator',
+    ]
+    for field in str_fields:
+        if field in data:
+            setattr(sp, field, (data[field] or '').strip() or None)
+
+    # If any verification document is submitted, move status to "submitted"
+    verification_triggers = {'id_document_url', 'experience_text', 'experience_photo_url', 'profile_photo_url'}
+    if verification_triggers & set(data.keys()):
+        if sp.verification_status in ('draft', 'rejected'):
+            sp.verification_status = 'submitted'
+            sp.submitted_at = datetime.utcnow()
+
+    # Apply same profile fields to all other ServiceProvider rows for this user
+    # (one user can have multiple rows, one per service offered)
+    siblings = ServiceProvider.query.filter(
+        ServiceProvider.user_id == sp.user_id,
+        ServiceProvider.id != sp.id,
+    ).all()
+    for sib in siblings:
+        for field in str_fields:
+            if field in data:
+                setattr(sib, field, getattr(sp, field))
+        if verification_triggers & set(data.keys()):
+            if sib.verification_status in ('draft', 'rejected'):
+                sib.verification_status = sp.verification_status
+                sib.submitted_at = sp.submitted_at
 
     db.session.commit()
-    return jsonify({'success': True, 'bio': sp.bio})
+
+    return jsonify({
+        'success': True,
+        'provider': {
+            'id': sp.id,
+            'bio': sp.bio,
+            'profile_photo_url': sp.profile_photo_url,
+            'id_document_url': sp.id_document_url,
+            'experience_text': sp.experience_text,
+            'experience_photo_url': sp.experience_photo_url,
+            'mobile_money_number': sp.mobile_money_number,
+            'mobile_money_name': sp.mobile_money_name,
+            'mobile_money_operator': sp.mobile_money_operator,
+            'verification_status': sp.verification_status,
+            'submitted_at': sp.submitted_at.isoformat() if sp.submitted_at else None,
+        }
+    })
 
 
 @admin_bp.route('/stats', methods=['GET'])
