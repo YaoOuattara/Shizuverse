@@ -48,6 +48,8 @@ export const adminApi = {
   verifyProvider: (id: number) =>
     adminFetch(`/api/admin/providers/${id}/verify`, { method: "PATCH" }),
   getServices: () => adminFetch("/api/admin/services"),
+  patchService: (id: number, body: { is_active?: boolean; is_priority?: boolean; featured?: boolean; name?: string }) =>
+    adminFetch(`/api/admin/services/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
 
   // New admin portal endpoints (/admin/* blueprint)
   portalGetProviders: (params?: { verification_status?: string; listed_status?: string; provider_status?: string }) => {
