@@ -141,6 +141,9 @@ export default function ProviderRegisterPage() {
 
   // Step 1
   const [account, setAccount] = useState({ full_name: "", phone: "", password: "" });
+  const [accountType, setAccountType] = useState<"individual" | "company">("individual");
+  const [businessName, setBusinessName] = useState("");
+  const [rccmNumber, setRccmNumber] = useState("");
 
   // Step 2
   const [categories, setCategories] = useState<ApiCategory[]>([]);
@@ -165,7 +168,8 @@ export default function ProviderRegisterPage() {
   const step1Valid =
     account.full_name.trim().length >= 2 &&
     account.phone.trim().length >= 8 &&
-    account.password.length >= 6;
+    account.password.length >= 6 &&
+    (accountType === "individual" || businessName.trim().length >= 2);
   const step2Valid = selectedServices.length > 0;
   const step3Valid = selectedZones.length > 0;
 
@@ -238,6 +242,9 @@ export default function ProviderRegisterPage() {
             services: selectedServices,
             zones: selectedZones,
             bio,
+            account_type: accountType,
+            company_name: accountType === "company" ? businessName.trim() : undefined,
+            rccm_number: accountType === "company" && rccmNumber.trim() ? rccmNumber.trim() : undefined,
           }),
         }
       );
@@ -296,6 +303,59 @@ export default function ProviderRegisterPage() {
           {/* ── Step 1: Account ── */}
           {step === 1 && (
             <div className="space-y-5">
+              {/* Account type toggle */}
+              <div className="space-y-2">
+                <Label>{isFr ? "Type de compte" : "Account type"}</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  {(["individual", "company"] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setAccountType(type)}
+                      className={`flex flex-col items-center gap-1 p-4 rounded-xl border-2 transition-all text-sm font-medium
+                        ${accountType === type
+                          ? "border-[#0F3A7A] bg-[#0F3A7A]/5 text-[#0F3A7A]"
+                          : "border-gray-100 bg-white text-gray-600 hover:border-gray-200"
+                        }`}
+                    >
+                      <span className="text-xl">{type === "individual" ? "👤" : "🏢"}</span>
+                      <span>{type === "individual" ? (isFr ? "Particulier" : "Individual") : (isFr ? "Entreprise" : "Company")}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Company-only fields */}
+              {accountType === "company" && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="business_name">
+                      {isFr ? "Nom de l'entreprise" : "Company name"} <span className="text-red-500">*</span>
+                    </Label>
+                    <input
+                      id="business_name"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      placeholder={isFr ? "Ex: Shizu Services SARL" : "e.g. Shizu Services Ltd"}
+                      value={businessName}
+                      onChange={(e) => setBusinessName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="rccm">
+                      {isFr ? "Numéro RCCM ou registre commerce" : "RCCM / Business registration number"}
+                      <span className="ml-1 text-xs text-gray-400">({isFr ? "optionnel" : "optional"})</span>
+                    </Label>
+                    <input
+                      id="rccm"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      placeholder="CI-ABJ-2024-XXXX"
+                      value={rccmNumber}
+                      onChange={(e) => setRccmNumber(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
               <div className="space-y-1.5">
                 <Label htmlFor="full_name">{t("fullName")}</Label>
                 <Input
