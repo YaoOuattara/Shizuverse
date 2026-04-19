@@ -48,6 +48,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
   const navItems = getNavItems(locale, isFr);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const pathWithoutLocale = location.replace(/^\/[a-z]{2}(?=\/|$)/, "") || "";
 
   useEffect(() => {
     if (!isAdminAuthenticated()) {
@@ -66,10 +67,26 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
 
   const NavContent = () => (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 pb-4 border-b mb-4">
-        <Shield className="h-5 w-5 text-primary" />
-        <span className="font-semibold">{isFr ? "Panneau Admin" : "Admin Panel"}</span>
-
+      <div className="flex items-center justify-between pb-4 border-b mb-4">
+        <div className="flex items-center gap-2">
+          <Shield className="h-5 w-5 text-primary" />
+          <span className="font-semibold">{isFr ? "Panneau Admin" : "Admin Panel"}</span>
+        </div>
+        <div className="flex items-center bg-gray-100 rounded-full p-0.5 text-xs font-medium">
+          {(["en", "fr"] as const).map((code) => (
+            <Link
+              key={code}
+              href={`/${code}${pathWithoutLocale}`}
+              className={`px-2.5 py-1 rounded-full transition-all ${
+                locale === code
+                  ? "bg-white text-[#0F3A7A] shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {code.toUpperCase()}
+            </Link>
+          ))}
+        </div>
       </div>
 
       <nav className="flex-1 space-y-1" data-testid="admin-nav">
@@ -125,7 +142,23 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
           <Shield className="h-5 w-5 text-primary" />
           <span className="font-semibold text-sm">{title}</span>
         </div>
-        <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-gray-100 rounded-full p-0.5 text-xs font-medium">
+            {(["en", "fr"] as const).map((code) => (
+              <Link
+                key={code}
+                href={`/${code}${pathWithoutLocale}`}
+                className={`px-2.5 py-1 rounded-full transition-all ${
+                  locale === code
+                    ? "bg-white text-[#0F3A7A] shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {code.toUpperCase()}
+              </Link>
+            ))}
+          </div>
+          <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
           <SheetTrigger asChild>
             <Button
               variant="ghost"
@@ -142,6 +175,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
             <NavContent />
           </SheetContent>
         </Sheet>
+        </div>
       </div>
 
       {/* Desktop sidebar */}

@@ -289,25 +289,64 @@ export default function ProviderProfilePage() {
   const [forceForm, setForceForm] = useState(false)
 
   useEffect(() => {
+    // 1. Show localStorage immediately (no flicker)
     try {
       const info = JSON.parse(localStorage.getItem('provider_info') || 'null')
-      if (!info) return
-      setProviderName(info.name ?? info.full_name ?? info.company_name ?? '')
-      setServices(Array.isArray(info.services) ? info.services : [])
-      setProfile({
-        bio:                   info.bio ?? '',
-        profile_photo_url:     info.profile_photo_url ?? '',
-        id_document_url:       info.id_document_url ?? '',
-        document_type:         info.document_type ?? '',
-        experience_text:       info.experience_text ?? '',
-        experience_photo_url:  info.experience_photo_url ?? '',
-        mobile_money_number:   info.mobile_money_number ?? '',
-        mobile_money_name:     info.mobile_money_name ?? '',
-        mobile_money_operator: info.mobile_money_operator ?? '',
-        verification_status:   info.verification_status ?? 'draft',
-        rejection_reason:      info.rejection_reason ?? '',
-      })
+      if (info) {
+        setProviderName(info.name ?? info.full_name ?? info.company_name ?? '')
+        setServices(Array.isArray(info.services) ? info.services : [])
+        setProfile({
+          bio:                   info.bio ?? '',
+          profile_photo_url:     info.profile_photo_url ?? '',
+          id_document_url:       info.id_document_url ?? '',
+          document_type:         info.document_type ?? '',
+          experience_text:       info.experience_text ?? '',
+          experience_photo_url:  info.experience_photo_url ?? '',
+          mobile_money_number:   info.mobile_money_number ?? '',
+          mobile_money_name:     info.mobile_money_name ?? '',
+          mobile_money_operator: info.mobile_money_operator ?? '',
+          verification_status:   info.verification_status ?? 'draft',
+          rejection_reason:      info.rejection_reason ?? '',
+        })
+      }
     } catch { /* ignore */ }
+
+    // 2. Fetch fresh data from API and override (catches admin status changes)
+    const token = localStorage.getItem('provider_token')
+    if (!token) return
+    fetch(`${FLASK_API}/api/provider/profile`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (!data) return
+        const fresh: ProfileState = {
+          bio:                   data.bio ?? '',
+          profile_photo_url:     data.profile_photo_url ?? '',
+          id_document_url:       data.id_document_url ?? '',
+          document_type:         data.document_type ?? '',
+          experience_text:       data.experience_text ?? '',
+          experience_photo_url:  data.experience_photo_url ?? '',
+          mobile_money_number:   data.mobile_money_number ?? '',
+          mobile_money_name:     data.mobile_money_name ?? '',
+          mobile_money_operator: data.mobile_money_operator ?? '',
+          verification_status:   (data.verification_status as VerificationStatus) ?? 'draft',
+          rejection_reason:      data.rejection_reason ?? '',
+        }
+        setProfile(fresh)
+        setProviderName(data.name ?? '')
+        setServices(Array.isArray(data.services) ? data.services : [])
+        // Keep localStorage in sync
+        try {
+          const existing = JSON.parse(localStorage.getItem('provider_info') || '{}')
+          localStorage.setItem('provider_info', JSON.stringify({
+            ...existing, ...fresh,
+            name: data.name,
+            services: data.services,
+          }))
+        } catch { /* ignore */ }
+      })
+      .catch(() => { /* silently fall back to localStorage data already shown */ })
   }, [])
 
   const set = (field: keyof ProfileState, value: string) =>
