@@ -176,8 +176,8 @@ export default function AdminProviders() {
   
   const [searchQuery, setSearchQuery] = useState("");
   const [verificationFilter, setVerificationFilter] = useState<VerificationFilterTab>("all");
-  const [categoryFilter, setCategoryFilter] = useState("");
-  const [zoneFilter, setZoneFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("__all__");
+  const [zoneFilter, setZoneFilter] = useState("__all__");
   const [selectedProvider, setSelectedProvider] = useState<AdminProvider | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("missing_id");
@@ -206,7 +206,7 @@ export default function AdminProviders() {
 
   const allCategories = useMemo(() => {
     const cats = new Set<string>();
-    providers.forEach(p => p.services.forEach(s => { if (s) cats.add(s); }));
+    providers.forEach(p => p.services.forEach(s => { if (s && s.trim() !== "") cats.add(s); }));
     return Array.from(cats).sort();
   }, [providers]);
 
@@ -219,7 +219,7 @@ export default function AdminProviders() {
     );
   }, [providers]);
 
-  const hasActiveFilters = searchQuery !== "" || verificationFilter !== "all" || categoryFilter !== "" || zoneFilter !== "";
+  const hasActiveFilters = searchQuery !== "" || verificationFilter !== "all" || categoryFilter !== "__all__" || zoneFilter !== "__all__";
 
   const filteredProviders = useMemo(() => {
     return providers.filter((provider) => {
@@ -234,11 +234,11 @@ export default function AdminProviders() {
         provider.verificationStatus === verificationFilter;
 
       const matchesCategory =
-        categoryFilter === "" ||
+        categoryFilter === "__all__" ||
         provider.services.some(s => s === categoryFilter);
 
       const matchesZone =
-        zoneFilter === "" ||
+        zoneFilter === "__all__" ||
         provider.serviceArea?.toLowerCase().includes(zoneFilter.toLowerCase());
 
       return matchesSearch && matchesVerification && matchesCategory && matchesZone;
@@ -455,8 +455,8 @@ export default function AdminProviders() {
                   <SelectValue placeholder={isFr ? "Catégorie" : "Category"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{isFr ? "Toutes les catégories" : "All categories"}</SelectItem>
-                  {allCategories.map(cat => (
+                  <SelectItem value="__all__">{isFr ? "Toutes les catégories" : "All categories"}</SelectItem>
+                  {allCategories.filter(cat => cat && cat.trim() !== "").map(cat => (
                     <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                   ))}
                 </SelectContent>
@@ -467,8 +467,8 @@ export default function AdminProviders() {
                   <SelectValue placeholder={isFr ? "Zone / Commune" : "Zone / Commune"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{isFr ? "Toutes les zones" : "All zones"}</SelectItem>
-                  {(allZones.length > 0 ? allZones : COMMUNES).map(commune => (
+                  <SelectItem value="__all__">{isFr ? "Toutes les zones" : "All zones"}</SelectItem>
+                  {(allZones.length > 0 ? allZones : COMMUNES).filter(z => z && z.trim() !== "").map(commune => (
                     <SelectItem key={commune} value={commune}>{commune}</SelectItem>
                   ))}
                 </SelectContent>
@@ -481,8 +481,8 @@ export default function AdminProviders() {
                   onClick={() => {
                     setSearchQuery("");
                     setVerificationFilter("all");
-                    setCategoryFilter("");
-                    setZoneFilter("");
+                    setCategoryFilter("__all__");
+                    setZoneFilter("__all__");
                   }}
                   className="shrink-0 text-muted-foreground hover:text-foreground"
                   data-testid="button-reset-filters"

@@ -147,7 +147,7 @@ export default function AdminServices() {
   }, [services, searchQuery, categoryFilter]);
 
   const usedCategories = useMemo(() => {
-    return Array.from(new Set(services.map(s => s.category)));
+    return Array.from(new Set(services.map(s => s.category).filter(c => c && c.trim() !== "")));
   }, [services]);
 
   const getServiceBookingCount = (serviceName: string) => {
