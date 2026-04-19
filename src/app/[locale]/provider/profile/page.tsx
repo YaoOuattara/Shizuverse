@@ -1,15 +1,35 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Loader2, Sparkles, Save, CheckCircle2, XCircle,
-  ShieldCheck, ShieldAlert, ShieldX, Clock,
+  ShieldCheck, ShieldAlert, ShieldX, Clock, Upload,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? 'https://shizu-verse.onrender.com'
+
+// ── Cloudinary upload ──────────────────────────────────────────────────────────
+
+async function uploadToCloudinary(file: File): Promise<string> {
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
+  if (!cloudName || !uploadPreset) throw new Error('Cloudinary env vars not set')
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('upload_preset', uploadPreset)
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/upload`, {
+    method: 'POST',
+    body: fd,
+  })
+  if (!res.ok) throw new Error('Upload failed')
+  const data = await res.json()
+  return data.secure_url as string
+}
+
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 type VerificationStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'suspended'
 
@@ -17,6 +37,7 @@ interface ProfileState {
   bio: string
   profile_photo_url: string
   id_document_url: string
+  document_type: string
   experience_text: string
   experience_photo_url: string
   mobile_money_number: string
@@ -30,6 +51,7 @@ const EMPTY: ProfileState = {
   bio: '',
   profile_photo_url: '',
   id_document_url: '',
+  document_type: '',
   experience_text: '',
   experience_photo_url: '',
   mobile_money_number: '',
@@ -43,7 +65,7 @@ const inputCls =
   'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ' +
   'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0'
 
-// ── sub-components ────────────────────────────────────────────────────────────
+// ── Sub-components ─────────────────────────────────────────────────────────────
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -63,6 +85,101 @@ function CheckItem({ done, label }: { done: boolean; label: string }) {
       }
       <span className={done ? 'text-foreground' : 'text-muted-foreground'}>{label}</span>
     </li>
+  )
+}
+
+// Three button states: idle → uploading → uploaded (thumbnail + Modifier)
+function ImageUpload({
+  value,
+  onChange,
+  isFr,
+  accept = 'image/*',
+  previewRound = false,
+}: {
+  value: string
+  onChange: (url: string) => void
+  isFr: boolean
+  accept?: string
+  previewRound?: boolean
+}) {
+  const [uploading, setUploading] = useState(false)
+  const { toast } = useToast()
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const url = await uploadToCloudinary(file)
+      onChange(url)
+    } catch (err) {
+      console.error('[cloudinary]', err)
+      toast({
+        title: isFr ? 'Erreur upload' : 'Upload error',
+        description: isFr ? "Impossible d'envoyer le fichier." : 'Could not upload the file.',
+        variant: 'destructive',
+      })
+    } finally {
+      setUploading(false)
+      if (inputRef.current) inputRef.current.value = ''
+    }
+  }
+
+  if (value) {
+    return (
+      <div className="flex items-center gap-3">
+        <img
+          src={value}
+          alt=""
+          className={`h-16 w-16 object-cover border border-border ${
+            previewRound ? 'rounded-full' : 'rounded-lg'
+          }`}
+          onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+        />
+        <label
+          className={`inline-flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted/50 transition-colors ${
+            uploading ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+          }`}
+        >
+          {uploading ? (
+            <><Loader2 className="h-3.5 w-3.5 animate-spin" />{isFr ? 'Envoi en cours...' : 'Uploading...'}</>
+          ) : (
+            <><Upload className="h-3.5 w-3.5" />{isFr ? 'Modifier' : 'Change'}</>
+          )}
+          <input
+            ref={inputRef}
+            type="file"
+            accept={accept}
+            className="hidden"
+            onChange={handleFile}
+            disabled={uploading}
+          />
+        </label>
+      </div>
+    )
+  }
+
+  return (
+    <label
+      className={`inline-flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border border-dashed border-border hover:bg-muted/50 text-sm text-muted-foreground transition-colors ${
+        uploading ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+      }`}
+    >
+      {uploading ? (
+        <><Loader2 className="h-4 w-4 animate-spin" />{isFr ? 'Envoi en cours...' : 'Uploading...'}</>
+      ) : (
+        <><Upload className="h-4 w-4" />{isFr ? 'Choisir un fichier' : 'Choose a file'}</>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={handleFile}
+        disabled={uploading}
+      />
+    </label>
   )
 }
 
@@ -120,7 +237,7 @@ function StatusCard({ status, rejectionReason, isFr, onResubmit }: StatusCardPro
           </p>
           <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
             {isFr
-              ? 'Votre compte a été suspendu. Contactez le support Shizu pour plus d\'informations.'
+              ? "Votre compte a été suspendu. Contactez le support Shizu pour plus d'informations."
               : 'Your account has been suspended. Contact Shizu support for more information.'}
           </p>
         </div>
@@ -154,7 +271,7 @@ function StatusCard({ status, rejectionReason, isFr, onResubmit }: StatusCardPro
   return null
 }
 
-// ── main page ─────────────────────────────────────────────────────────────────
+// ── Main page ──────────────────────────────────────────────────────────────────
 
 export default function ProviderProfilePage() {
   const params = useParams()
@@ -169,7 +286,6 @@ export default function ProviderProfilePage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isImproving, setIsImproving] = useState(false)
-  // Allows re-showing the form from a status card (e.g. after rejection)
   const [forceForm, setForceForm] = useState(false)
 
   useEffect(() => {
@@ -179,16 +295,17 @@ export default function ProviderProfilePage() {
       setProviderName(info.name ?? info.full_name ?? info.company_name ?? '')
       setServices(Array.isArray(info.services) ? info.services : [])
       setProfile({
-        bio:                  info.bio ?? '',
-        profile_photo_url:    info.profile_photo_url ?? '',
-        id_document_url:      info.id_document_url ?? '',
-        experience_text:      info.experience_text ?? '',
-        experience_photo_url: info.experience_photo_url ?? '',
-        mobile_money_number:  info.mobile_money_number ?? '',
-        mobile_money_name:    info.mobile_money_name ?? '',
+        bio:                   info.bio ?? '',
+        profile_photo_url:     info.profile_photo_url ?? '',
+        id_document_url:       info.id_document_url ?? '',
+        document_type:         info.document_type ?? '',
+        experience_text:       info.experience_text ?? '',
+        experience_photo_url:  info.experience_photo_url ?? '',
+        mobile_money_number:   info.mobile_money_number ?? '',
+        mobile_money_name:     info.mobile_money_name ?? '',
         mobile_money_operator: info.mobile_money_operator ?? '',
-        verification_status:  info.verification_status ?? 'draft',
-        rejection_reason:     info.rejection_reason ?? '',
+        verification_status:   info.verification_status ?? 'draft',
+        rejection_reason:      info.rejection_reason ?? '',
       })
     } catch { /* ignore */ }
   }, [])
@@ -203,7 +320,6 @@ export default function ProviderProfilePage() {
     } catch { /* ignore */ }
   }
 
-  // Required to enable the Submit button
   const requiredFilled =
     profile.bio.trim() !== '' &&
     profile.id_document_url.trim() !== ''
@@ -227,10 +343,7 @@ export default function ProviderProfilePage() {
       })
       if (res.ok) {
         patchLocalStorage(body)
-        toast({
-          title: isFr ? 'Sauvegardé' : 'Saved',
-          description: isFr ? 'Modifications enregistrées.' : 'Changes saved.',
-        })
+        toast({ title: isFr ? 'Sauvegardé' : 'Saved', description: isFr ? 'Modifications enregistrées.' : 'Changes saved.' })
       } else {
         toast({ title: isFr ? 'Erreur' : 'Error', description: isFr ? 'Échec de la sauvegarde.' : 'Save failed.', variant: 'destructive' })
       }
@@ -250,6 +363,7 @@ export default function ProviderProfilePage() {
         bio:                   profile.bio,
         profile_photo_url:     profile.profile_photo_url,
         id_document_url:       profile.id_document_url,
+        document_type:         profile.document_type,
         experience_text:       profile.experience_text,
         experience_photo_url:  profile.experience_photo_url,
         mobile_money_number:   profile.mobile_money_number,
@@ -332,7 +446,7 @@ export default function ProviderProfilePage() {
         onResubmit={() => setForceForm(true)}
       />
 
-      {/* ── Bio ─────────────────────────────────────────────────────────────── */}
+      {/* ── Bio ───────────────────────────────────────────────────────────── */}
       <Section title={isFr ? 'Présentation *' : 'Bio *'}>
         <textarea
           value={profile.bio}
@@ -356,47 +470,53 @@ export default function ProviderProfilePage() {
         </button>
       </Section>
 
-      {/* ── Profile photo ────────────────────────────────────────────────────── */}
+      {/* ── Profile photo ─────────────────────────────────────────────────── */}
       <Section title={isFr ? 'Photo de profil' : 'Profile photo'}>
         <p className="text-xs text-muted-foreground">
           {isFr
-            ? 'Collez le lien (URL) d\'une photo de vous. Ex : photo WhatsApp partagée en lien, Google Drive, etc.'
-            : 'Paste a link (URL) to a photo of yourself. E.g. a shared WhatsApp photo, Google Drive, etc.'}
+            ? 'Une photo claire de votre visage aide les clients à vous reconnaître.'
+            : 'A clear photo of your face helps clients recognise you.'}
         </p>
-        <input
-          type="url"
+        <ImageUpload
           value={profile.profile_photo_url}
-          onChange={e => set('profile_photo_url', e.target.value)}
-          placeholder="https://..."
-          className={inputCls}
+          onChange={url => set('profile_photo_url', url)}
+          isFr={isFr}
+          accept="image/*"
+          previewRound
         />
-        {profile.profile_photo_url && (
-          <img
-            src={profile.profile_photo_url}
-            alt={isFr ? 'Aperçu' : 'Preview'}
-            className="mt-2 h-16 w-16 rounded-full object-cover border border-border"
-            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-          />
-        )}
       </Section>
 
-      {/* ── ID document ─────────────────────────────────────────────────────── */}
+      {/* ── ID document ───────────────────────────────────────────────────── */}
       <Section title={isFr ? "Pièce d'identité *" : 'ID Document *'}>
+        <label className="block text-xs text-muted-foreground mb-1">
+          {isFr ? 'Type de document' : 'Document type'}
+        </label>
+        <select
+          value={profile.document_type}
+          onChange={e => set('document_type', e.target.value)}
+          className={inputCls}
+        >
+          <option value="">{isFr ? '— Choisir —' : '— Select —'}</option>
+          <option value="cni">{isFr ? "Carte nationale d'identité (CNI)" : "National ID Card (CNI)"}</option>
+          <option value="passeport">Passeport</option>
+          <option value="permis">{isFr ? 'Permis de conduire' : "Driver's License"}</option>
+          <option value="extrait">{isFr ? 'Extrait de naissance' : 'Birth Certificate'}</option>
+          <option value="autre">{isFr ? 'Autre' : 'Other'}</option>
+        </select>
         <p className="text-xs text-muted-foreground">
           {isFr
-            ? "Photo de votre CNI ou passeport (recto). Partagez un lien vers la photo."
-            : 'Photo of your national ID or passport (front). Share a link to the photo.'}
+            ? 'Photo recto de votre document. Formats acceptés : image ou PDF.'
+            : 'Front-facing photo of your document. Accepted: image or PDF.'}
         </p>
-        <input
-          type="url"
+        <ImageUpload
           value={profile.id_document_url}
-          onChange={e => set('id_document_url', e.target.value)}
-          placeholder="https://..."
-          className={inputCls}
+          onChange={url => set('id_document_url', url)}
+          isFr={isFr}
+          accept="image/*,.pdf"
         />
       </Section>
 
-      {/* ── Experience ──────────────────────────────────────────────────────── */}
+      {/* ── Experience ────────────────────────────────────────────────────── */}
       <Section title={isFr ? 'Expérience professionnelle' : 'Professional experience'}>
         <textarea
           value={profile.experience_text}
@@ -410,18 +530,17 @@ export default function ProviderProfilePage() {
           className={`${inputCls} resize-none`}
         />
         <label className="block text-xs text-muted-foreground mt-3 mb-1">
-          {isFr ? 'Photo de vos travaux (lien URL)' : 'Photo of your work (URL link)'}
+          {isFr ? 'Photo de vos travaux' : 'Photo of your work'}
         </label>
-        <input
-          type="url"
+        <ImageUpload
           value={profile.experience_photo_url}
-          onChange={e => set('experience_photo_url', e.target.value)}
-          placeholder="https://..."
-          className={inputCls}
+          onChange={url => set('experience_photo_url', url)}
+          isFr={isFr}
+          accept="image/*"
         />
       </Section>
 
-      {/* ── Mobile Money ────────────────────────────────────────────────────── */}
+      {/* ── Mobile Money ──────────────────────────────────────────────────── */}
       <Section title={isFr ? 'Mobile Money (pour les paiements)' : 'Mobile Money (for payments)'}>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -465,7 +584,7 @@ export default function ProviderProfilePage() {
         />
       </Section>
 
-      {/* ── Verification checklist + action buttons ──────────────────────────── */}
+      {/* ── Verification checklist + action buttons ───────────────────────── */}
       {!showStatusCard && (
         <div className="rounded-xl border bg-muted/30 p-4 space-y-4">
           <h3 className="text-sm font-semibold">
@@ -526,7 +645,7 @@ export default function ProviderProfilePage() {
         </div>
       )}
 
-      {/* Save button when status card is shown (profile already submitted/approved) */}
+      {/* Save button when status card is shown */}
       {showStatusCard && (
         <Button variant="outline" size="sm" onClick={handleSave} disabled={isSaving} className="mt-2">
           {isSaving
