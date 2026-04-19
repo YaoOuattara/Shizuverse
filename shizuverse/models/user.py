@@ -14,6 +14,10 @@ class User(UserMixin, db.Model):
     user_type = db.Column(db.String(20), nullable=False)  # 'client' or 'provider'
     preferred_language = db.Column(db.String(10), default='fr')
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
+    account_type = db.Column(db.String(20), default='individual')  # 'individual' or 'company'
+    company_name = db.Column(db.String(120), nullable=True)
+    full_name = db.Column(db.String(120), nullable=True)
+    phone = db.Column(db.String(30), nullable=True)
 
     # Many-to-many: User <-> Service via service_providers junction table
     services = db.relationship(

@@ -605,7 +605,15 @@ def client_register():
     if User.query.filter_by(email=synthetic_email).first():
         return jsonify({'error': 'A client with this phone number already exists'}), 409
 
-    user = User(email=synthetic_email, user_type='client', preferred_language='fr')
+    user = User(
+        email=synthetic_email,
+        user_type='client',
+        preferred_language='fr',
+        account_type=account_type,
+        company_name=company_name,
+        full_name=full_name,
+        phone=phone,
+    )
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
