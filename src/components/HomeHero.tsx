@@ -90,9 +90,11 @@ export default function HomeHero() {
   const locale = useLocale() as "en" | "fr";
   const c = CONTENT[locale] ?? CONTENT.fr;
   const [isClient, setIsClient] = useState(false);
+  const [isProvider, setIsProvider] = useState(false);
 
   useEffect(() => {
     setIsClient(!!localStorage.getItem("client_token"));
+    setIsProvider(!!localStorage.getItem("provider_token"));
   }, []);
 
   return (
@@ -127,6 +129,14 @@ export default function HomeHero() {
               className="bg-white text-[#0F3A7A] font-semibold px-6 py-3 rounded-xl hover:bg-gray-50 transition-colors"
             >
               {c.cta1}
+            </Link>
+            <Link
+              href={isProvider ? `/${locale}/provider` : `/${locale}/provider/register`}
+              className="border border-white/40 text-white px-6 py-3 rounded-xl hover:bg-white/10 transition-colors"
+            >
+              {isProvider
+                ? (locale === "fr" ? "Mon tableau de bord" : "My Dashboard")
+                : (locale === "fr" ? "Devenir prestataire" : "Become a provider")}
             </Link>
           </div>
 
