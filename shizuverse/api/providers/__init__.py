@@ -1,5 +1,4 @@
 from flask import Blueprint
-from .controller import get_all_users
 
 users_bp = Blueprint('providers', __name__)
 
