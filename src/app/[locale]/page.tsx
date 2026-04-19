@@ -121,8 +121,8 @@ function ProviderCTA({ locale }: { locale: string }) {
           </h2>
           <p className="text-gray-500 mt-3 leading-relaxed">
             {locale === 'fr'
-              ? "Rejoignez le réseau Shizuverse et développez votre clientèle à Abidjan. Gérez vos réservations, suivez vos revenus et construisez votre réputation en ligne."
-              : "Join the Shizuverse network and grow your client base in Abidjan. Manage bookings, track your earnings, and build your online reputation."}
+              ? "Rejoignez le réseau Shizu et développez votre clientèle à Abidjan. Gérez vos réservations, suivez vos revenus et construisez votre réputation en ligne."
+              : "Join the Shizu network and grow your client base in Abidjan. Manage bookings, track your earnings, and build your online reputation."}
           </p>
           <ProviderCTAButton locale={locale} />
         </div>
@@ -195,7 +195,7 @@ function Footer({ locale }: { locale: string }) {
 
         {/* Bottom bar */}
         <div className="border-t border-white/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/40">
-          <p>© 2025 Shizuverse. {locale === 'fr' ? 'Tous droits réservés.' : 'All rights reserved.'}</p>
+          <p>© 2025 Shizu. {locale === 'fr' ? 'Tous droits réservés.' : 'All rights reserved.'}</p>
           <div className="flex gap-4">
             <Link href="/en" className="hover:text-white transition-colors">EN</Link>
             <Link href="/fr" className="hover:text-white transition-colors">FR</Link>

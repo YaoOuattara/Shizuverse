@@ -10,19 +10,26 @@ export default function Navbar() {
   const locale = useLocale();
   const pathname = usePathname();
   const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}(?=\/|$)/, '') || '';
+  const [mounted, setMounted] = useState(false);
   const [isProvider, setIsProvider] = useState(false);
 
   useEffect(() => {
     setIsProvider(!!localStorage.getItem('provider_token'));
+    setMounted(true);
   }, []);
 
   const providerHref = isProvider ? `/${locale}/provider` : `/${locale}/provider/register`;
+  const providerLabel = isProvider
+    ? (locale === 'fr' ? 'Mon tableau de bord' : 'My Dashboard')
+    : (locale === 'fr' ? 'Devenir prestataire' : 'Become a Provider');
 
-  const navLinks = [
+  const staticLinks = [
     { label: locale === 'fr' ? 'Accueil' : 'Home', href: `/${locale}` },
     { label: locale === 'fr' ? 'Réservations' : 'Bookings', href: `/${locale}/bookings` },
-    { label: locale === 'fr' ? 'Devenir prestataire' : 'Become a Provider', href: providerHref },
   ];
+  const navLinks = mounted
+    ? [...staticLinks, { label: providerLabel, href: providerHref }]
+    : staticLinks;
 
   return (
     <nav className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-50">
