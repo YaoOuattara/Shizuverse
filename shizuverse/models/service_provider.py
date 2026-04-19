@@ -18,7 +18,9 @@ class ServiceProvider(db.Model):
     service_id = db.Column(db.Integer, db.ForeignKey("services.id"), nullable=False, index=True)
 
     # Optional provider profile fields
+    account_type = db.Column(db.String(20), default='individual')  # 'individual' or 'company'
     company_name = db.Column(db.String(120))
+    rccm_number = db.Column(db.String(100), nullable=True)
     phone_number = db.Column(db.String(20))
     address = db.Column(db.String(255))
     bio = db.Column(db.Text)

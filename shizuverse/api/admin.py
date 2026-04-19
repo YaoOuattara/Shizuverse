@@ -274,11 +274,16 @@ def provider_register():
     password = data.get('password', '')
     bio = (data.get('bio') or '').strip()
     service_names = data.get('services') or []
+    account_type = (data.get('account_type') or 'individual').strip()
+    business_name = (data.get('company_name') or '').strip()  # only used when account_type='company'
+    rccm_number = (data.get('rccm_number') or '').strip() or None
 
     if not full_name or not phone or not password:
         return jsonify({'error': 'full_name, phone, and password are required'}), 400
     if len(password) < 6:
         return jsonify({'error': 'password must be at least 6 characters'}), 400
+    if account_type == 'company' and not business_name:
+        return jsonify({'error': 'company_name is required for company accounts'}), 400
 
     # Use phone as synthetic email so User.email constraint is satisfied
     synthetic_email = f"{phone.replace(' ', '').replace('+', '')}@shizu.ci"
@@ -289,6 +294,9 @@ def provider_register():
     user.set_password(password)
     db.session.add(user)
     db.session.flush()  # get user.id before commit
+
+    # display_name: business name for companies, full name for individuals
+    display_name = business_name if account_type == 'company' else full_name
 
     # Match submitted service names against the services table (case-insensitive)
     matched_services = []
@@ -308,12 +316,14 @@ def provider_register():
         sp_row = ServiceProvider(
             user_id=user.id,
             service_id=svc.id,
-            company_name=full_name,
+            company_name=display_name,
             phone_number=phone,
             bio=bio,
             verified=False,
             verification_status='submitted',
             submitted_at=datetime.utcnow(),
+            account_type=account_type,
+            rccm_number=rccm_number,
         )
         db.session.add(sp_row)
         if i == 0:
@@ -567,3 +577,59 @@ def get_stats():
         'cancelled': cancelled,
         'total_providers': providers,
     })
+
+
+# ── Client Blueprint ───────────────────────────────────────────────────────────
+
+client_bp = Blueprint('client', __name__)
+
+
+@client_bp.route('/register', methods=['POST'])
+def client_register():
+    """Register a new client (individual or company). Returns JWT client_token."""
+    data = request.get_json() or {}
+    full_name = (data.get('full_name') or '').strip()
+    phone = (data.get('phone') or '').strip()
+    password = data.get('password', '')
+    account_type = (data.get('account_type') or 'individual').strip()
+    company_name = (data.get('company_name') or '').strip() or None
+
+    if not full_name or not phone or not password:
+        return jsonify({'error': 'full_name, phone, and password are required'}), 400
+    if len(password) < 6:
+        return jsonify({'error': 'password must be at least 6 characters'}), 400
+    if account_type == 'company' and not company_name:
+        return jsonify({'error': 'company_name is required for company accounts'}), 400
+
+    synthetic_email = f"{phone.replace(' ', '').replace('+', '')}@client.shizu.ci"
+    if User.query.filter_by(email=synthetic_email).first():
+        return jsonify({'error': 'A client with this phone number already exists'}), 409
+
+    user = User(email=synthetic_email, user_type='client', preferred_language='fr')
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+
+    token = jwt.encode({
+        'sub': str(user.id),
+        'type': 'client',
+        'client_id': user.id,
+        'name': full_name,
+        'phone': phone,
+        'account_type': account_type,
+        'company_name': company_name,
+        'iat': datetime.utcnow(),
+        'exp': datetime.utcnow() + timedelta(days=30),
+    }, current_app.config['SECRET_KEY'], algorithm='HS256')
+
+    return jsonify({
+        'success': True,
+        'token': token,
+        'client': {
+            'id': user.id,
+            'name': full_name,
+            'phone': phone,
+            'account_type': account_type,
+            'company_name': company_name,
+        },
+    }), 201
