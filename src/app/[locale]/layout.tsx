@@ -3,7 +3,6 @@ import * as React from 'react';
 import {NextIntlClientProvider} from 'next-intl';
 import {notFound} from 'next/navigation';
 import {locales, type Locale, loadMessages} from '@/i18n';
-import LocaleSwitcher from '@/components/LocaleSwitcher';
 import AnalyticsProvider from '@/components/AnalyticsProvider';
 import { ProviderAuthProvider } from '@/context/ProviderAuthContext';
 
@@ -23,7 +22,6 @@ export default async function RootLayout({children, params}: Props) {
     <html lang={locale}>
       <body>
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <LocaleSwitcher />
           <ProviderAuthProvider>
             <AnalyticsProvider>
               {children}

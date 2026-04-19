@@ -263,6 +263,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           </label>
           <input
             type="date"
+            lang="fr-FR"
             value={date}
             onChange={(e) => setDate(e.target.value)}
             min={new Date().toISOString().split("T")[0]}
