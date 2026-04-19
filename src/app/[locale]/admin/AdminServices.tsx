@@ -107,7 +107,7 @@ export default function AdminServices() {
   const [services, setServices] = useState<AdminService[]>([]);
 
   useEffect(() => {
-    if (apiServices.length > 0) {
+    if (Array.isArray(apiServices) && apiServices.length > 0) {
       setServices(apiServices.map(adaptApiService));
     }
   }, [apiServices]);

@@ -8,11 +8,12 @@ export interface ProviderBooking {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  location?: string;        // commune / client_location from API
   serviceName: string;
   serviceType: string;
   providerId: string;
-  date: string;
-  time: string;
+  date: string;             // YYYY-MM-DD
+  time: string;             // HH:MM (24h)
   duration: string;
   price: number;
   status: ProviderBookingStatus;

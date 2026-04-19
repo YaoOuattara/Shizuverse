@@ -66,6 +66,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { type AdminProvider, type VerificationStatus } from "@/data/adminStore";
+import { COMMUNES } from "@/components/CommuneAutocomplete";
 import { useAdminProviders, type ApiProvider } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
 import { formatMoney } from "@/lib/currency";
@@ -176,6 +177,7 @@ export default function AdminProviders() {
   const [searchQuery, setSearchQuery] = useState("");
   const [verificationFilter, setVerificationFilter] = useState<VerificationFilterTab>("all");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [zoneFilter, setZoneFilter] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<AdminProvider | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("missing_id");
@@ -188,6 +190,9 @@ export default function AdminProviders() {
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
   const [unlistReason, setUnlistReason] = useState("");
   const [isGeneratingMessage, setIsGeneratingMessage] = useState(false);
+  // Preserves the provider ID when a Dialog opens on top of the Sheet
+  // (the Sheet's onOpenChange fires and clears selectedProvider)
+  const [pendingActionProviderId, setPendingActionProviderId] = useState<string | null>(null);
 
   const tabCounts = useMemo(() => {
     return {
@@ -205,6 +210,17 @@ export default function AdminProviders() {
     return Array.from(cats).sort();
   }, [providers]);
 
+  // Only show communes that actually appear in at least one provider's serviceArea
+  const allZones = useMemo(() => {
+    return COMMUNES.filter(commune =>
+      providers.some(p =>
+        p.serviceArea?.toLowerCase().includes(commune.toLowerCase())
+      )
+    );
+  }, [providers]);
+
+  const hasActiveFilters = searchQuery !== "" || verificationFilter !== "all" || categoryFilter !== "" || zoneFilter !== "";
+
   const filteredProviders = useMemo(() => {
     return providers.filter((provider) => {
       const matchesSearch =
@@ -221,9 +237,13 @@ export default function AdminProviders() {
         categoryFilter === "" ||
         provider.services.some(s => s === categoryFilter);
 
-      return matchesSearch && matchesVerification && matchesCategory;
+      const matchesZone =
+        zoneFilter === "" ||
+        provider.serviceArea?.toLowerCase().includes(zoneFilter.toLowerCase());
+
+      return matchesSearch && matchesVerification && matchesCategory && matchesZone;
     });
-  }, [providers, searchQuery, verificationFilter, categoryFilter]);
+  }, [providers, searchQuery, verificationFilter, categoryFilter, zoneFilter]);
 
   const updateLocalProvider = (id: string, patch: Partial<AdminProvider>) => {
     setLocalProviders(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
@@ -287,15 +307,15 @@ export default function AdminProviders() {
   };
 
   const handleSuspend = async () => {
-    console.log('[AdminProviders] handleSuspend called, selectedProvider:', selectedProvider?.id, 'reason:', suspensionReason);
-    if (!selectedProvider) return;
+    const idToSuspend = pendingActionProviderId ?? selectedProvider?.id;
+    if (!idToSuspend) return;
     setIsUpdating(true);
     const fullReason = suspensionNote
       ? `${suspensionReasons.find(r => r.value === suspensionReason)?.label}: ${suspensionNote}`
       : suspensionReasons.find(r => r.value === suspensionReason)?.label || suspensionReason;
     try {
-      await adminApi.portalSuspendProvider(Number(selectedProvider.id), fullReason);
-      updateLocalProvider(selectedProvider.id, {
+      await adminApi.portalSuspendProvider(Number(idToSuspend), fullReason);
+      updateLocalProvider(idToSuspend, {
         verificationStatus: 'suspended',
         listed: false,
         status: 'paused',
@@ -305,6 +325,7 @@ export default function AdminProviders() {
       toast({ title: "Provider Suspended", description: `Provider has been suspended.`, variant: "destructive" });
       setSuspendModalOpen(false);
       setSuspensionNote("");
+      setPendingActionProviderId(null);
     } catch (err) {
       console.error("Failed to suspend provider:", err);
       toast({ title: "Error", description: "Failed to suspend provider.", variant: "destructive" });
@@ -315,6 +336,7 @@ export default function AdminProviders() {
 
   const handleToggleListed = async (providerId: string, currentListed: boolean) => {
     if (currentListed) {
+      setPendingActionProviderId(providerId);
       setUnlistReason("");
       setUnlistModalOpen(true);
       return;
@@ -333,18 +355,19 @@ export default function AdminProviders() {
   };
 
   const handleUnlist = async () => {
-    console.log('[AdminProviders] handleUnlist called, selectedProvider:', selectedProvider?.id);
-    if (!selectedProvider) return;
+    const idToUnlist = pendingActionProviderId ?? selectedProvider?.id;
+    if (!idToUnlist) return;
     setIsUpdating(true);
     try {
-      await adminApi.portalToggleListing(Number(selectedProvider.id), "unlist");
-      updateLocalProvider(selectedProvider.id, { listed: false });
+      await adminApi.portalToggleListing(Number(idToUnlist), "unlist");
+      updateLocalProvider(idToUnlist, { listed: false });
       toast({
         title: "Provider Unlisted",
         description: unlistReason ? `Provider hidden. Reason: ${unlistReason}` : "Provider is now hidden from clients.",
       });
       setUnlistModalOpen(false);
       setUnlistReason("");
+      setPendingActionProviderId(null);
     } catch (err) {
       console.error("Failed to unlist provider:", err);
       toast({ title: "Error", description: "Failed to unlist provider.", variant: "destructive" });
@@ -378,6 +401,7 @@ export default function AdminProviders() {
   };
 
   const openSuspendModal = () => {
+    if (selectedProvider) setPendingActionProviderId(selectedProvider.id);
     setSuspensionReason("customer_complaints");
     setSuspensionNote("");
     setSuspendModalOpen(true);
@@ -411,11 +435,11 @@ export default function AdminProviders() {
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
 
-        {/* Search + Category Filter */}
+        {/* Search + Category + Zone Filters */}
         <Card>
           <CardContent className="py-4">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
+            <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+              <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder={isFr ? "Rechercher par nom, email ou service..." : "Search providers by name, email, or service..."}
@@ -425,18 +449,46 @@ export default function AdminProviders() {
                   data-testid="input-search-providers"
                 />
               </div>
-              {allCategories.length > 0 && (
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-full sm:w-52" data-testid="select-category-filter">
-                    <SelectValue placeholder={isFr ? "Toutes les catégories" : "All categories"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">{isFr ? "Toutes les catégories" : "All categories"}</SelectItem>
-                    {allCategories.map(cat => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full sm:w-48" data-testid="select-category-filter">
+                  <SelectValue placeholder={isFr ? "Catégorie" : "Category"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">{isFr ? "Toutes les catégories" : "All categories"}</SelectItem>
+                  {allCategories.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={zoneFilter} onValueChange={setZoneFilter}>
+                <SelectTrigger className="w-full sm:w-44" data-testid="select-zone-filter">
+                  <SelectValue placeholder={isFr ? "Zone / Commune" : "Zone / Commune"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">{isFr ? "Toutes les zones" : "All zones"}</SelectItem>
+                  {(allZones.length > 0 ? allZones : COMMUNES).map(commune => (
+                    <SelectItem key={commune} value={commune}>{commune}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {hasActiveFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setVerificationFilter("all");
+                    setCategoryFilter("");
+                    setZoneFilter("");
+                  }}
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                  data-testid="button-reset-filters"
+                >
+                  {isFr ? "Réinitialiser" : "Reset"}
+                </Button>
               )}
             </div>
           </CardContent>

@@ -118,28 +118,33 @@ export const ServiceList = () => {
                 <p className="text-sm text-muted-foreground">{t("noSubcategories")}</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {selected.subcategories.map((sub) => (
-                    <button
-                      key={sub.id}
-                      type="button"
-                      onClick={() => {
-                        const targetId = sub.service_id ?? sub.id;
-                        const serviceName =
-                          locale === 'fr'
-                            ? (sub.name_fr || sub.name)
-                            : (sub.name_en || sub.name);
-                        router.push(
-                          `/${locale}/booking/${targetId}?service=${encodeURIComponent(serviceName)}`
-                        );
-                      }}
-                      className="px-4 py-2 rounded-full border-2 border-indigo-200 bg-white dark:bg-zinc-900 dark:border-indigo-800
-                                 text-sm font-medium text-indigo-800 dark:text-indigo-300
-                                 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/40
-                                 transition-all active:scale-95"
-                    >
-                      {displayName(sub, locale)}
-                    </button>
-                  ))}
+                  {selected.subcategories.map((sub) => {
+                    const isBookable = sub.service_id !== null;
+                    const serviceName =
+                      locale === "fr"
+                        ? sub.name_fr || sub.name
+                        : sub.name_en || sub.name;
+                    return (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        disabled={!isBookable}
+                        onClick={() => {
+                          if (!isBookable) return;
+                          router.push(
+                            `/${locale}/booking/${sub.service_id}?service=${encodeURIComponent(serviceName)}`
+                          );
+                        }}
+                        className={`px-4 py-2 rounded-full border-2 text-sm font-medium transition-all
+                          ${isBookable
+                            ? "border-indigo-200 bg-white dark:bg-zinc-900 dark:border-indigo-800 text-indigo-800 dark:text-indigo-300 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 active:scale-95 cursor-pointer"
+                            : "border-gray-200 bg-gray-50 dark:bg-zinc-900 dark:border-zinc-700 text-gray-400 dark:text-zinc-500 cursor-not-allowed opacity-60"
+                          }`}
+                      >
+                        {serviceName}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 

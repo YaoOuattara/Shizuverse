@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import ProviderBookingCard from "@/components/ProviderBookingCard";
+import NewRequestCard from "@/components/NewRequestCard";
 import dynamic from "next/dynamic";
 const RevenueBreakdown = dynamic(() => import("@/components/RevenueBreakdown"), { ssr: false });
 import AchievementBadges from "@/components/AchievementBadges";
@@ -134,7 +135,11 @@ export default function ProviderDashboard() {
       })
       .then((data) => {
         if (Array.isArray(data)) {
-          setBookings(data.map((b) => ({ ...b, id: String(b.id) })));
+          setBookings(data.map((b) => ({
+            ...b,
+            id: String(b.id),
+            location: b.location ?? b.client_location ?? undefined,
+          })));
         }
       })
       .catch(() => { /* network error — leave empty */ })
@@ -198,7 +203,6 @@ export default function ProviderDashboard() {
         bookings.filter((b) => b.status === "confirmed"),
         bookingId
       );
-
       if (conflict.hasConflict) {
         const warning = formatConflictWarning(conflict.conflictingBookings);
         toast({
@@ -210,10 +214,10 @@ export default function ProviderDashboard() {
     }
 
     const token = localStorage.getItem("provider_token");
-    const res = await fetch(`${FLASK_API}/api/provider/bookings/${bookingId}/status`, {
+    const res = await fetch(`${FLASK_API}/api/provider/bookings/${bookingId}/accept`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ status: "confirmed" }),
+      body: JSON.stringify({}),
     });
 
     if (!res.ok) {
@@ -225,6 +229,7 @@ export default function ProviderDashboard() {
       throw new Error("Accept failed");
     }
 
+    // Remove from pending list immediately — moves to confirmed in full list
     setBookings((prev) =>
       prev.map((b) =>
         b.id === bookingId ? { ...b, status: "confirmed" as ProviderBookingStatus } : b
@@ -240,14 +245,14 @@ export default function ProviderDashboard() {
     });
   };
 
-  const handleRejectBooking = async (bookingId: string): Promise<void> => {
+  const handleRejectBooking = async (bookingId: string, reason?: string): Promise<void> => {
     const booking = bookings.find((b) => b.id === bookingId);
 
     const token = localStorage.getItem("provider_token");
-    const res = await fetch(`${FLASK_API}/api/provider/bookings/${bookingId}/status`, {
+    const res = await fetch(`${FLASK_API}/api/provider/bookings/${bookingId}/decline`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ status: "cancelled" }),
+      body: JSON.stringify({ reason: reason ?? "" }),
     });
 
     if (!res.ok) {
@@ -256,9 +261,10 @@ export default function ProviderDashboard() {
         description: t("failedRejectDesc"),
         variant: "destructive",
       });
-      throw new Error("Reject failed");
+      throw new Error("Decline failed");
     }
 
+    // Remove from pending list immediately
     setBookings((prev) =>
       prev.map((b) =>
         b.id === bookingId ? { ...b, status: "cancelled" as ProviderBookingStatus } : b
@@ -521,10 +527,9 @@ export default function ProviderDashboard() {
       </header>
 
       <main className="flex-1 overflow-auto p-4 sm:p-6">
-        {/* FIX 4B — Nouvelles demandes: pending bookings at the very top */}
+        {/* Nouvelles demandes: pending bookings at the very top — always visible */}
         {(() => {
           const pending = bookings.filter((b) => b.status === "pending" || b.status === "requested");
-          if (pending.length === 0) return null;
           return (
             <div className="mb-6" data-testid="section-new-requests">
               <div className="flex items-center gap-2 mb-3">
@@ -532,22 +537,35 @@ export default function ProviderDashboard() {
                 <h2 className="text-base font-semibold text-foreground">
                   {locale === "fr" ? "Nouvelles demandes" : "New Requests"}
                 </h2>
-                <Badge variant="destructive" className="text-xs">
-                  {pending.length}
-                </Badge>
+                {pending.length > 0 && (
+                  <Badge variant="destructive" className="text-xs">
+                    {pending.length}
+                  </Badge>
+                )}
               </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {pending.map((booking) => (
-                  <ProviderBookingCard
-                    key={booking.id}
-                    booking={booking}
-                    conflictWarning={getBookingConflict(booking.id)}
-                    onAccept={handleAcceptBooking}
-                    onReject={handleRejectBooking}
-                    onReschedule={handleRescheduleBooking}
-                  />
-                ))}
-              </div>
+
+              {pending.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-muted-foreground/25 bg-muted/20 px-6 py-8 text-center">
+                  <Bell className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
+                  <p className="text-sm text-muted-foreground">
+                    {locale === "fr"
+                      ? "Aucune nouvelle demande pour le moment."
+                      : "No new requests at the moment."}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {pending.map((booking) => (
+                    <NewRequestCard
+                      key={booking.id}
+                      booking={booking}
+                      locale={locale}
+                      onAccept={handleAcceptBooking}
+                      onDecline={(id, reason) => handleRejectBooking(id, reason)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           );
         })()}

@@ -14,6 +14,7 @@ import {
 import Navbar from "@/components/Navbar";
 import HomeHero from "@/components/HomeHero";
 import ServicesGrid from "@/components/ServicesGrid";
+import ProviderCTAButton from "@/components/ProviderCTAButton";
 
 
 
@@ -123,12 +124,7 @@ function ProviderCTA({ locale }: { locale: string }) {
               ? "Rejoignez le réseau Shizuverse et développez votre clientèle à Abidjan. Gérez vos réservations, suivez vos revenus et construisez votre réputation en ligne."
               : "Join the Shizuverse network and grow your client base in Abidjan. Manage bookings, track your earnings, and build your online reputation."}
           </p>
-          <Link
-            href={`/${locale}/provider/register`}
-            className="inline-block mt-6 bg-[#0F3A7A] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#0d3068] transition-colors"
-          >
-            {locale === 'fr' ? "Rejoindre Shizu" : "Join Shizu"}
-          </Link>
+          <ProviderCTAButton locale={locale} />
         </div>
 
         {/* Right: 2×2 benefits */}

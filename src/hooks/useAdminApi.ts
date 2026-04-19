@@ -124,7 +124,7 @@ export function useAdminServices() {
 
   useEffect(() => {
     adminApi.getServices()
-      .then(setServices)
+      .then((data: ApiService[]) => setServices(Array.isArray(data) ? data : []))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);

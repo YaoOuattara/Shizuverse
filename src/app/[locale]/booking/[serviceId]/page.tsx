@@ -1,3 +1,4 @@
+import Navbar from "@/components/Navbar";
 import BookingForm from "@/components/BookingForm";
 
 interface Props {
@@ -10,10 +11,13 @@ export default async function BookingPage({ params, searchParams }: Props) {
   const { service } = await searchParams;
 
   return (
-    <BookingForm
-      serviceId={serviceId}
-      locale={locale}
-      serviceName={service}
-    />
+    <>
+      <Navbar />
+      <BookingForm
+        serviceId={serviceId}
+        locale={locale}
+        serviceName={service}
+      />
+    </>
   );
 }
