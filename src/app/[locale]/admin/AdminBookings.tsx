@@ -6,7 +6,7 @@
  * Uses centralized admin store for state management.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import AdminLayout from "./AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -311,38 +311,46 @@ export default function AdminBookings() {
   const { bookings: apiBookings, loading: bookingsLoading } = useAdminBookings();
   const { providers: liveProviders } = useAdminProviders();
   const { reviews, services } = useAdminStore();
-  const bookings = useMemo<AdminBooking[]>(
-    () =>
-      apiBookings.map((b: ApiBooking): AdminBooking => ({
-        id: String(b.id),
-        clientName: b.client_name,
-        clientEmail: "",
-        clientPhone: b.client_phone,
-        providerName: b.provider_name || "En attente",
-        providerPhone: b.provider_phone || undefined,
-        providerId: "",
-        serviceName: b.service_name,
-        serviceCategory: b.service_slug,
-        date: b.appointment_date,
-        time: "",
-        duration: "",
-        status: (b.status as AdminBooking["status"]) || "pending",
-        price: b.amount_xof ?? 0,
-        currency: "XOF",
-        baseAmount: b.amount_xof ?? 0,
-        platformFeeAmount: 0,
-        providerPayoutAmount: 0,
-        paymentStatus: (b.payment_status as AdminBooking["paymentStatus"]) || "unpaid",
-        payoutStatus: (b.payout_status as AdminBooking["payoutStatus"]) || "not_due",
-        notes: b.notes || "",
-        createdAt: b.created_at || "",
-      })),
-    [apiBookings]
-  );
-  
+
+  const mapApiBooking = (b: ApiBooking): AdminBooking => ({
+    id: String(b.id),
+    clientName: b.client_name,
+    clientEmail: "",
+    clientPhone: b.client_phone,
+    providerName: b.provider_name || "En attente",
+    providerPhone: b.provider_phone || undefined,
+    providerId: "",
+    serviceName: b.service_name,
+    serviceCategory: b.service_slug,
+    date: b.appointment_date,
+    time: "",
+    duration: "",
+    status: (b.status as AdminBooking["status"]) || "pending",
+    price: b.amount_xof ?? 0,
+    currency: "XOF",
+    baseAmount: b.amount_xof ?? 0,
+    platformFeeAmount: 0,
+    providerPayoutAmount: 0,
+    paymentStatus: (b.payment_status as AdminBooking["paymentStatus"]) || "unpaid",
+    payoutStatus: (b.payout_status as AdminBooking["payoutStatus"]) || "not_due",
+    notes: b.notes || "",
+    createdAt: b.created_at || "",
+  });
+
+  const [bookings, setBookings] = useState<AdminBooking[]>([]);
+  useEffect(() => {
+    setBookings(apiBookings.map(mapApiBooking));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiBookings]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedBooking, setSelectedBooking] = useState<AdminBooking | null>(null);
+
+  const updateLocalBooking = (id: string, patch: Partial<AdminBooking>) => {
+    setBookings(prev => prev.map(b => b.id === id ? { ...b, ...patch } : b));
+    setSelectedBooking(prev => prev?.id === id ? { ...prev, ...patch } : prev);
+  };
   const [adminNote, setAdminNote] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
   
@@ -397,44 +405,40 @@ export default function AdminBookings() {
 
   const handleUpdateStatus = async (bookingId: string, newStatus: AdminBooking["status"]) => {
     setIsUpdating(true);
+    updateLocalBooking(bookingId, { status: newStatus });
     try {
       await adminApi.updateBookingStatus(Number(bookingId), newStatus);
+      toast({
+        title: isFr ? "Statut mis à jour" : "Status Updated",
+        description: isFr
+          ? `Réservation → ${statusLabels[newStatus] || newStatus}`
+          : `Booking status changed to ${newStatus}.`,
+        duration: 3000,
+      });
     } catch (err) {
       console.error("Failed to update booking status:", err);
+      toast({ title: "Erreur", description: "Impossible de mettre à jour le statut.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
     }
-
-    if (selectedBooking?.id === bookingId) {
-      setSelectedBooking(prev => prev ? { ...prev, status: newStatus } : null);
-    }
-
-    toast({
-      title: isFr ? "Statut mis à jour" : "Status Updated",
-      description: isFr
-        ? `Réservation → ${statusLabels[newStatus] || newStatus}`
-        : `Booking status changed to ${newStatus}.`,
-      duration: 3000,
-    });
-    setIsUpdating(false);
   };
 
   const handleStatusChange = async (bookingId: string, newStatus: string, extra?: { provider_name?: string; provider_phone?: string }) => {
+    const patch: Partial<AdminBooking> = {
+      status: newStatus as AdminBooking['status'],
+      ...(extra?.provider_name ? { providerName: extra.provider_name, providerPhone: extra.provider_phone } : {}),
+    };
+    updateLocalBooking(bookingId, patch);
     try {
       if (newStatus === 'assigned' && extra?.provider_name) {
         await adminApi.assignBooking(Number(bookingId), extra.provider_name, extra.provider_phone || '');
       } else {
         await adminApi.updateBookingStatusPut(Number(bookingId), newStatus);
       }
-      if (selectedBooking?.id === bookingId) {
-        setSelectedBooking(prev => prev ? {
-          ...prev,
-          status: newStatus as AdminBooking['status'],
-          ...(extra?.provider_name ? { providerName: extra.provider_name, providerPhone: extra.provider_phone } : {}),
-        } : null);
-      }
       setAssigningBookingId(null);
       setInlineProviderName("");
       setInlineProviderPhone("");
-      toast({ title: "Statut mis à jour", description: `Réservation → ${statusLabels[newStatus] || newStatus}` });
+      toast({ title: isFr ? "Statut mis à jour" : "Status Updated", description: `→ ${statusLabels[newStatus] || newStatus}` });
     } catch (err) {
       console.error("handleStatusChange error:", err);
       toast({ title: "Erreur", description: "Impossible de mettre à jour le statut.", variant: "destructive" });
@@ -443,29 +447,28 @@ export default function AdminBookings() {
 
   const handleCancelWithReason = async () => {
     if (!selectedBooking || !cancelReason.trim()) return;
-    
     setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    setSelectedBooking(prev => prev ? {
-      ...prev, 
-      status: 'cancelled', 
-      cancellationReason: cancelReason,
-      cancelledBy: 'admin',
-      paymentStatus: 'refunded',
-    } : null);
-
-    toast({
-      title: isFr ? "Réservation annulée" : "Booking Cancelled",
-      description: isFr
-        ? "La réservation a été annulée et le remboursement initié."
-        : "The booking has been cancelled and refund initiated.",
-      variant: "destructive",
-    });
-    
+    const prevStatus = selectedBooking.status;
+    updateLocalBooking(selectedBooking.id, { status: 'cancelled', cancellationReason: cancelReason, cancelledBy: 'admin' });
     setCancelModalOpen(false);
+    const reasonSnapshot = cancelReason;
     setCancelReason("");
-    setIsUpdating(false);
+    try {
+      await adminApi.portalCancelBooking(Number(selectedBooking.id), reasonSnapshot);
+      toast({
+        title: isFr ? "Réservation annulée" : "Booking Cancelled",
+        description: isFr
+          ? "La réservation a été annulée."
+          : "The booking has been cancelled.",
+        variant: "destructive",
+      });
+    } catch (err) {
+      updateLocalBooking(selectedBooking.id, { status: prevStatus });
+      console.error("Failed to cancel booking:", err);
+      toast({ title: "Erreur", description: "Impossible d'annuler la réservation.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleReschedule = async () => {
@@ -495,29 +498,30 @@ export default function AdminBookings() {
 
   const handleAssignProvider = async () => {
     if (!selectedBooking || !selectedProviderId) return;
-
     const provider = liveProviders.find((p: ApiProvider) => String(p.id) === selectedProviderId);
     const providerName = provider ? (provider.company_name || provider.name || selectedProviderId) : selectedProviderId;
-
+    const providerPhone = provider?.phone_number || '';
     setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    setSelectedBooking(prev => prev ? {
-      ...prev,
-      providerId: selectedProviderId,
-      providerName,
-    } : null);
-
-    toast({
-      title: isFr ? "Prestataire assigné" : "Provider Assigned",
-      description: isFr
-        ? `${providerName} a été assigné à cette réservation.`
-        : `${providerName} has been assigned to this booking.`,
-    });
-    
+    const prevStatus = selectedBooking.status;
+    const prevProviderName = selectedBooking.providerName;
+    updateLocalBooking(selectedBooking.id, { providerId: selectedProviderId, providerName, status: 'assigned' });
     setAssignModalOpen(false);
     setSelectedProviderId("");
-    setIsUpdating(false);
+    try {
+      await adminApi.assignBooking(Number(selectedBooking.id), providerName, providerPhone);
+      toast({
+        title: isFr ? "Prestataire assigné" : "Provider Assigned",
+        description: isFr
+          ? `${providerName} a été assigné à cette réservation.`
+          : `${providerName} has been assigned to this booking.`,
+      });
+    } catch (err) {
+      updateLocalBooking(selectedBooking.id, { status: prevStatus, providerName: prevProviderName });
+      console.error("Failed to assign provider:", err);
+      toast({ title: "Erreur", description: "Impossible d'assigner le prestataire.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleAddNote = async () => {
@@ -544,47 +548,58 @@ export default function AdminBookings() {
 
   const handleMarkCompleted = async () => {
     if (!selectedBooking || selectedBooking.status !== 'confirmed') return;
-    
     setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    setSelectedBooking(prev => prev ? {
-      ...prev, 
+    const prevStatus = selectedBooking.status;
+    const prevPayoutStatus = selectedBooking.payoutStatus;
+    updateLocalBooking(selectedBooking.id, {
       status: 'completed',
       payoutStatus: 'due',
       payoutDueAt: new Date().toISOString().split('T')[0],
-    } : null);
-
-    toast({
-      title: isFr ? "Réservation terminée" : "Booking Completed",
-      description: isFr
-        ? "La réservation est marquée comme terminée. Le paiement du prestataire est dû."
-        : "The booking has been marked as completed. Provider payout is now due.",
-      duration: 3000,
     });
-    setIsUpdating(false);
+    try {
+      await adminApi.updateBookingStatusPut(Number(selectedBooking.id), 'completed');
+      toast({
+        title: isFr ? "Réservation terminée" : "Booking Completed",
+        description: isFr
+          ? "La réservation est marquée comme terminée. Le paiement du prestataire est dû."
+          : "The booking has been marked as completed. Provider payout is now due.",
+        duration: 3000,
+      });
+    } catch (err) {
+      updateLocalBooking(selectedBooking.id, { status: prevStatus, payoutStatus: prevPayoutStatus });
+      console.error("Failed to complete booking:", err);
+      toast({ title: "Erreur", description: "Impossible de terminer la réservation.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleMarkPaid = async () => {
     if (!selectedBooking || selectedBooking.status === 'cancelled' || selectedBooking.paymentStatus === 'paid') return;
     if (selectedBooking.status !== 'confirmed' && selectedBooking.status !== 'completed') return;
-    
     setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    setSelectedBooking(prev => prev ? {
-      ...prev, 
+    const prevPaymentStatus = selectedBooking.paymentStatus;
+    updateLocalBooking(selectedBooking.id, {
       paymentStatus: 'paid',
       paidAt: new Date().toISOString().split('T')[0],
       paymentMethod: 'cash',
-    } : null);
-
-    toast({
-      title: "Payment Recorded",
-      description: `Payment of ${formatMoney(selectedBooking.price, selectedBooking.currency)} has been recorded.`,
-      duration: 3000,
     });
-    setIsUpdating(false);
+    try {
+      await adminApi.portalUpdateFinance(selectedBooking.id, { payment_status: 'paid' });
+      toast({
+        title: isFr ? "Paiement enregistré" : "Payment Recorded",
+        description: isFr
+          ? `Paiement de ${formatMoney(selectedBooking.price, selectedBooking.currency)} enregistré.`
+          : `Payment of ${formatMoney(selectedBooking.price, selectedBooking.currency)} has been recorded.`,
+        duration: 3000,
+      });
+    } catch (err) {
+      updateLocalBooking(selectedBooking.id, { paymentStatus: prevPaymentStatus });
+      console.error("Failed to record payment:", err);
+      toast({ title: "Erreur", description: "Impossible d'enregistrer le paiement.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const openCancelModal = () => {
