@@ -89,10 +89,10 @@ const CONTENT = {
 export default function HomeHero() {
   const locale = useLocale() as "en" | "fr";
   const c = CONTENT[locale] ?? CONTENT.fr;
-  const [isProvider, setIsProvider] = useState(false);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsProvider(!!localStorage.getItem("provider_token"));
+    setIsClient(!!localStorage.getItem("client_token"));
   }, []);
 
   return (
@@ -128,14 +128,6 @@ export default function HomeHero() {
             >
               {c.cta1}
             </Link>
-            <Link
-              href={isProvider ? `/${locale}/provider` : `/${locale}/provider/register`}
-              className="border border-white/40 text-white px-6 py-3 rounded-xl hover:bg-white/10 transition-colors"
-            >
-              {isProvider
-                ? (locale === "fr" ? "Mon tableau de bord" : "My Dashboard")
-                : (locale === "fr" ? "Rejoindre Shizu" : "Join Shizu")}
-            </Link>
           </div>
 
           {/* Trust row */}
@@ -148,15 +140,17 @@ export default function HomeHero() {
             ))}
           </div>
 
-          {/* Returning client link */}
-          <p className="mt-4 text-white/40 text-sm">
-            <Link
-              href={`/${locale}/bookings`}
-              className="underline underline-offset-2 hover:text-white/70 transition-colors"
-            >
-              {locale === 'fr' ? "Voir mes réservations →" : "View my bookings →"}
-            </Link>
-          </p>
+          {/* Returning client link — only for logged-in clients */}
+          {isClient && (
+            <p className="mt-4 text-white/40 text-sm">
+              <Link
+                href={`/${locale}/bookings`}
+                className="underline underline-offset-2 hover:text-white/70 transition-colors"
+              >
+                {locale === 'fr' ? "Voir mes réservations →" : "View my bookings →"}
+              </Link>
+            </p>
+          )}
         </div>
 
         {/* Right column — hidden on mobile, centered */}
