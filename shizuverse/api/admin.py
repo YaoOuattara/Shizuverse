@@ -381,6 +381,8 @@ def get_provider_bookings():
             'duration': b.service.duration_minutes if b.service and hasattr(b.service, 'duration_minutes') else 60,
             'price': b.service.price if b.service and hasattr(b.service, 'price') else 0,
             'status': b.status,
+            'payment_status': b.payment_status,
+            'amount_xof': b.amount_xof,
             'notes': b.notes,
             'requestedAt': b.created_at.isoformat() if b.created_at else None,
         })
