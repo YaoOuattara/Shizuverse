@@ -42,6 +42,39 @@ import {
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
 import { useTranslations } from "next-intl";
 
+// Compute earnings totals from provider bookings
+function computeEarnings(bookings: ProviderBooking[]) {
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1)); // Monday
+  startOfWeek.setHours(0, 0, 0, 0);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  let week = 0, month = 0, total = 0;
+
+  for (const b of bookings) {
+    if (b.status !== "completed") continue;
+    // payment_status comes from the API but ProviderBooking type may not include it
+    const raw = b as ProviderBooking & { payment_status?: string; amount_xof?: number };
+    if (raw.payment_status && raw.payment_status !== "paid") continue;
+    const amount = raw.amount_xof ?? (typeof b.price === "number" ? b.price : 0);
+    if (!amount) continue;
+
+    total += amount;
+    const d = b.date ? new Date(b.date) : null;
+    if (d) {
+      if (d >= startOfMonth) month += amount;
+      if (d >= startOfWeek) week += amount;
+    }
+  }
+
+  return { week, month, total };
+}
+
+function formatFCFA(amount: number) {
+  return new Intl.NumberFormat("fr-CI", { maximumFractionDigits: 0 }).format(amount) + " FCFA";
+}
+
 // localStorage keys for filter and booking cache persistence
 const STORAGE_KEYS = {
   FILTERS: "provider_dashboard_filters",
@@ -626,6 +659,31 @@ export default function ProviderDashboard() {
             />
           </button>
         </div>
+
+        {/* Earnings summary */}
+        {(() => {
+          const { week, month, total } = computeEarnings(bookings);
+          const cards = [
+            { label: locale === "fr" ? "Cette semaine" : "This week", value: week },
+            { label: locale === "fr" ? "Ce mois" : "This month", value: month },
+            { label: locale === "fr" ? "Total" : "Total", value: total },
+          ];
+          return (
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              {cards.map(({ label, value }) => (
+                <div
+                  key={label}
+                  className="rounded-2xl border border-gray-100 bg-white px-4 py-4 shadow-sm"
+                >
+                  <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
+                  <p className="text-lg font-bold text-foreground tabular-nums leading-tight">
+                    {formatFCFA(value)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Nouvelles demandes: pending bookings at the very top — always visible */}
         {(() => {
