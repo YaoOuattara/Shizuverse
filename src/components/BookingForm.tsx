@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, Sparkles, CheckCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Loader2, Sparkles, CheckCircle, MessageCircle, CalendarCheck, ShieldCheck, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CommuneAutocomplete, { COMMUNES } from "@/components/CommuneAutocomplete";
 
@@ -81,6 +81,15 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [bookingId, setBookingId] = useState<number | null>(null);
+  const [showNudge, setShowNudge] = useState(false);
+
+  // Check for client_token after success to decide whether to show nudge
+  useEffect(() => {
+    if (success) {
+      setShowNudge(!localStorage.getItem("client_token"));
+    }
+  }, [success]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,15 +124,15 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
         }),
       });
 
+      const data = await res.json().catch(() => ({})) as { id?: number; error?: string };
+
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          (data as { error?: string }).error ?? `Erreur ${res.status}`
-        );
+        throw new Error(data.error ?? `Erreur ${res.status}`);
       }
 
       // Save phone for future booking lookups (same as BookingModal)
       localStorage.setItem("shizu_client_phone", phone.trim());
+      setBookingId(data.id ?? null);
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -134,34 +143,118 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
   // ── Success state ────────────────────────────────────────────────────────────
   if (success) {
+    const year = new Date().getFullYear();
+    const ref = bookingId ? `#SHZ-${year}-${bookingId}` : `#SHZ-${year}-???`;
+
+    // WhatsApp support link — set NEXT_PUBLIC_SHIZU_WHATSAPP in .env to override
+    const waNumber = process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "2250700000000";
+    const waText = encodeURIComponent(
+      isFr
+        ? `Bonjour Shizu, j'ai une question concernant ma réservation ${ref}`
+        : `Hello Shizu, I have a question about my booking ${ref}`
+    );
+    const waUrl = `https://wa.me/${waNumber}?text=${waText}`;
+
     return (
-      <main className="max-w-lg mx-auto px-4 py-16 text-center">
-        <CheckCircle className="mx-auto mb-4 h-14 w-14 text-green-500" />
-        <h1 className="text-2xl font-semibold mb-2">
-          {isFr ? "Demande envoyée !" : "Request sent!"}
-        </h1>
-        <p className="text-muted-foreground mb-6">
-          {isFr
-            ? "Nous vous contacterons bientôt pour confirmer votre réservation."
-            : "We will contact you soon to confirm your booking."}
-        </p>
-        <div className="flex justify-center gap-3">
-          <Button
-            variant="outline"
-            onClick={() => {
-              setSuccess(false);
-              setName(""); setPhone(""); setLocation(""); setDate("");
-              setTime(""); setNotes(""); setDateHint(null); setIntakeInput("");
-            }}
-          >
-            {isFr ? "Nouvelle réservation" : "New booking"}
-          </Button>
-          <Button asChild>
-            <a href={`/${locale}/bookings`}>
-              {isFr ? "Mes réservations" : "My bookings"}
+      <main className="max-w-md mx-auto px-4 py-12">
+        {/* Success card */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+          <div className="flex justify-center mb-5">
+            <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
+              <CheckCircle className="h-8 w-8 text-green-500" />
+            </div>
+          </div>
+
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isFr ? "Demande envoyée !" : "Request sent!"}
+          </h1>
+          <p className="text-gray-500 mt-2 text-sm leading-relaxed">
+            {isFr
+              ? "Votre demande a bien été transmise. Un prestataire va vous contacter très prochainement."
+              : "Your request has been submitted. A provider will contact you very soon."}
+          </p>
+
+          {/* Booking reference */}
+          <div className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gray-50 border border-gray-200 px-4 py-2.5">
+            <CalendarCheck className="h-4 w-4 text-[#0F3A7A] shrink-0" />
+            <span className="font-mono font-semibold text-[#0F3A7A] text-sm tracking-wide">
+              {ref}
+            </span>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-col gap-3 mt-6">
+            <a
+              href={`/${locale}/bookings`}
+              className="w-full inline-flex items-center justify-center gap-2 bg-[#0F3A7A] text-white text-sm font-semibold py-3 rounded-xl hover:bg-[#0d3068] transition-colors"
+            >
+              <CalendarCheck className="h-4 w-4" />
+              {isFr ? "Suivre ma demande" : "Track my request"}
             </a>
-          </Button>
+            <a
+              href={waUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full inline-flex items-center justify-center gap-2 bg-green-500 text-white text-sm font-semibold py-3 rounded-xl hover:bg-green-600 transition-colors"
+            >
+              <MessageCircle className="h-4 w-4" />
+              {isFr ? "Contacter sur WhatsApp" : "Contact on WhatsApp"}
+            </a>
+            <button
+              onClick={() => {
+                setSuccess(false);
+                setBookingId(null);
+                setName(""); setPhone(""); setLocation(""); setDate("");
+                setTime(""); setNotes(""); setDateHint(null); setIntakeInput("");
+              }}
+              className="text-sm text-gray-400 hover:text-gray-600 transition-colors py-1"
+            >
+              {isFr ? "Nouvelle réservation" : "New booking"}
+            </button>
+          </div>
         </div>
+
+        {/* Registration nudge — only for anonymous users */}
+        {showNudge && (
+          <div className="mt-4 bg-blue-50 border border-blue-100 rounded-2xl p-5 relative">
+            <button
+              onClick={() => setShowNudge(false)}
+              className="absolute top-4 right-4 text-blue-300 hover:text-blue-500 transition-colors"
+              aria-label="Dismiss"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                <UserPlus className="h-4 w-4 text-[#0F3A7A]" />
+              </div>
+              <div>
+                <p className="font-semibold text-[#0F3A7A] text-sm">
+                  {isFr ? "Suivez vos réservations en temps réel" : "Track your bookings in real time"}
+                </p>
+                <p className="text-blue-700/70 text-xs mt-1 leading-relaxed">
+                  {isFr
+                    ? "Créez un compte gratuit pour consulter l'état de vos demandes et gérer vos réservations."
+                    : "Create a free account to check your request status and manage your bookings."}
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 mt-3">
+                  <a
+                    href={`/${locale}/auth/register`}
+                    className="bg-[#0F3A7A] text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-[#0d3068] transition-colors text-center"
+                  >
+                    {isFr ? "Créer mon compte" : "Create my account"}
+                  </a>
+                  <button
+                    onClick={() => setShowNudge(false)}
+                    className="text-xs text-blue-400 hover:text-blue-600 transition-colors px-2 text-left"
+                  >
+                    {isFr ? "Non merci" : "No thanks"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     );
   }
@@ -353,10 +446,16 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           <p className="text-sm font-medium text-destructive">{error}</p>
         )}
 
+        {/* Trust note */}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-green-500" />
+          {isFr ? "Paiement après validation du prestataire" : "Payment after provider confirmation"}
+        </div>
+
         {/* Submit */}
         <Button
           type="submit"
-          className="w-full"
+          className="w-full bg-green-600 hover:bg-green-700 text-white"
           disabled={isSubmitting}
         >
           {isSubmitting ? (
@@ -365,7 +464,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
               {isFr ? "Envoi... (peut prendre 30s)" : "Sending... (may take 30s)"}
             </>
           ) : (
-            isFr ? "Soumettre la demande" : "Submit Request"
+            isFr ? "Confirmer la réservation" : "Confirm booking"
           )}
         </Button>
       </form>
