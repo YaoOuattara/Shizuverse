@@ -70,29 +70,24 @@ function HowItWorks({ locale }: { locale: string }) {
   );
 }
 
-// ── Section 4: Trust Stats ─────────────────────────────────────────────────
+// ── Section 4: Trust Chips ────────────────────────────────────────────────
 
-function TrustStats({ locale }: { locale: string }) {
-  const STATS = [
-    { value: "500+", label: locale === 'fr' ? "Réservations effectuées" : "Bookings completed" },
-    { value: "120+", label: locale === 'fr' ? "Prestataires actifs"     : "Active providers" },
-    { value: "4.8★", label: locale === 'fr' ? "Note moyenne"            : "Average rating" },
-    { value: "3",    label: locale === 'fr' ? "Communes desservies"     : "Districts served" },
-  ];
+function TrustChips({ locale }: { locale: string }) {
+  const CHIPS = locale === 'fr'
+    ? ["Prestataires vérifiés", "Paiement sécurisé", "Support 7j/7"]
+    : ["Verified providers",    "Secure payment",    "7-day support"];
 
   return (
-    <section className="bg-[#0F3A7A] py-14 px-6">
-      <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
-        {STATS.map((stat, i) => (
-          <div
-            key={stat.label}
-            className={`text-center text-white ${
-              i < STATS.length - 1 ? "md:border-r md:border-white/10" : ""
-            }`}
+    <section className="bg-white border-b border-gray-100 py-6 px-6">
+      <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-center gap-3">
+        {CHIPS.map((chip) => (
+          <span
+            key={chip}
+            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700"
           >
-            <p className="text-4xl font-bold">{stat.value}</p>
-            <p className="text-white/60 text-sm mt-1">{stat.label}</p>
-          </div>
+            <span className="h-2 w-2 rounded-full bg-[#0F3A7A]" />
+            {chip}
+          </span>
         ))}
       </div>
     </section>
@@ -219,10 +214,10 @@ export default async function HomePage({
     <>
       <Navbar />
       <HomeHero />
+      <TrustChips locale={locale} />
       <ServicesGrid locale={locale} />
-      <HowItWorks locale={locale} />
-      <TrustStats locale={locale} />
       <ProviderCTA locale={locale} />
+      <HowItWorks locale={locale} />
       <Footer locale={locale} />
     </>
   );

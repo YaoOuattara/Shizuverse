@@ -69,7 +69,7 @@ function BookingCardMockup({ locale }: { locale: "en" | "fr" }) {
 
 const CONTENT = {
   fr: {
-    headline: "Nous prenons le relais, vous respirez",
+    headline: "On s'occupe de tout. Vous gagnez du temps.",
     subtext:
       "Trouvez des prestataires vérifiés pour le ménage, la plomberie, l'électricité et plus encore.",
     cta1: "Réserver un service",
@@ -77,7 +77,7 @@ const CONTENT = {
     trust: ["Prestataires vérifiés", "Paiement sécurisé", "Support 7j/7"],
   },
   en: {
-    headline: "We Take Over, So You Can Breathe",
+    headline: "We handle it all. You save time.",
     subtext:
       "Find verified professionals for cleaning, plumbing, electrical work and more.",
     cta1: "Book a service",
