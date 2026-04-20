@@ -50,6 +50,9 @@ class Service(db.Model):
     is_priority = db.Column(db.Boolean, default=False, nullable=False, index=True)
     featured = db.Column(db.Boolean, default=False, nullable=False, index=True)
 
+    # Indicative base price in XOF (FCFA)
+    base_price = db.Column(db.Integer, nullable=True)
+
     # Classification
     subcategory_id = db.Column(db.Integer, db.ForeignKey("service_subcategories.id"), nullable=False)
 
