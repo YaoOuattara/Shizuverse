@@ -74,7 +74,7 @@ const CONTENT = {
       "Trouvez des prestataires vérifiés pour le ménage, la plomberie, l'électricité et plus encore.",
     cta1: "Réserver un service",
     cta2: "Devenir prestataire",
-    trust: ["Prestataires vérifiés", "Paiement sécurisé", "Support 7j/7"],
+    trust: ["4.8/5 Clients satisfaits", "Prestataires vérifiés", "Intervention rapide", "Support 7j/7"],
   },
   en: {
     headline: "We handle it all. You save time.",
@@ -82,7 +82,7 @@ const CONTENT = {
       "Find verified professionals for cleaning, plumbing, electrical work and more.",
     cta1: "Book a service",
     cta2: "Become a provider",
-    trust: ["Verified providers", "Secure payment", "7-day support"],
+    trust: ["4.8/5 Happy clients", "Verified providers", "Fast response", "7-day support"],
   },
 };
 
@@ -128,14 +128,14 @@ export default function HomeHero() {
           <div className="flex flex-wrap gap-4 mt-8">
             <Link
               href={`/${locale}/services`}
-              className="bg-white text-[#0F3A7A] font-semibold px-6 py-3 rounded-xl hover:bg-gray-50 transition-colors"
+              className="bg-green-600 text-white font-semibold px-6 py-3 rounded-xl hover:bg-green-700 transition-colors"
             >
               {c.cta1}
             </Link>
             {mounted && (
               <Link
                 href={isProvider ? `/${locale}/provider` : `/${locale}/provider/register`}
-                className="border border-white/40 text-white px-6 py-3 rounded-xl hover:bg-white/10 transition-colors"
+                className="border-2 border-white/60 text-white px-6 py-3 rounded-xl hover:bg-white/10 transition-colors"
               >
                 {isProvider
                   ? (locale === "fr" ? "Mon tableau de bord" : "My Dashboard")
@@ -144,15 +144,23 @@ export default function HomeHero() {
             )}
           </div>
 
-          {/* Trust row */}
-          <div className="flex flex-wrap gap-4 mt-6 text-white/60 text-sm">
+          {/* Trust chips */}
+          <div className="flex flex-wrap gap-3 mt-6">
             {c.trust.map((item) => (
-              <span key={item} className="flex items-center gap-1.5">
-                <CheckCircle className="h-3.5 w-3.5 text-white/50" />
+              <span key={item} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white/80">
+                <CheckCircle className="h-3 w-3 text-green-400 shrink-0" />
                 {item}
               </span>
             ))}
           </div>
+
+          {/* Availability line */}
+          <p className="mt-3 flex items-center gap-2 text-xs text-white/60">
+            <span className="inline-block h-2 w-2 rounded-full bg-green-400 shrink-0" />
+            {locale === "fr"
+              ? "Disponible aujourd'hui dans plusieurs quartiers d'Abidjan"
+              : "Available today across multiple Abidjan neighbourhoods"}
+          </p>
 
           {/* Returning client link — only for logged-in clients */}
           {mounted && isClient && (

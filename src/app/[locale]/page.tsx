@@ -65,30 +65,14 @@ function HowItWorks({ locale }: { locale: string }) {
             </div>
           ))}
         </div>
-      </div>
-    </section>
-  );
-}
-
-// ── Section 4: Trust Chips ────────────────────────────────────────────────
-
-function TrustChips({ locale }: { locale: string }) {
-  const CHIPS = locale === 'fr'
-    ? ["Prestataires vérifiés", "Paiement sécurisé", "Support 7j/7"]
-    : ["Verified providers",    "Secure payment",    "7-day support"];
-
-  return (
-    <section className="bg-white border-b border-gray-100 py-6 px-6">
-      <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-center gap-3">
-        {CHIPS.map((chip) => (
-          <span
-            key={chip}
-            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700"
+        <div className="text-center mt-12">
+          <Link
+            href={`/${locale}/services`}
+            className="inline-block bg-green-600 text-white font-semibold px-8 py-3 rounded-xl hover:bg-green-700 transition-colors"
           >
-            <span className="h-2 w-2 rounded-full bg-[#0F3A7A]" />
-            {chip}
-          </span>
-        ))}
+            {locale === 'fr' ? 'Réserver maintenant' : 'Book now'}
+          </Link>
+        </div>
       </div>
     </section>
   );
@@ -214,7 +198,6 @@ export default async function HomePage({
     <>
       <Navbar />
       <HomeHero />
-      <TrustChips locale={locale} />
       <ServicesGrid locale={locale} />
       <ProviderCTA locale={locale} />
       <HowItWorks locale={locale} />

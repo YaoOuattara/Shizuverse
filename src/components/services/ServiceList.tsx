@@ -2,9 +2,34 @@
 import { useEffect, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
-import { Loader2, ArrowLeft } from "lucide-react";
+import {
+  Loader2, ArrowLeft,
+  Sparkles, Wrench, Zap, Hammer, Baby, Scissors, ChefHat, Leaf, Heart, Wind,
+  type LucideIcon,
+} from "lucide-react";
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL || "https://shizu-verse.onrender.com";
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  ménage: Sparkles, nettoyage: Sparkles,
+  plomberie: Wrench,
+  électricité: Zap,
+  bricolage: Hammer,
+  nounou: Baby, baby: Baby, childcare: Baby,
+  beauté: Scissors, beauty: Scissors,
+  traiteur: ChefHat, cuisine: ChefHat, catering: ChefHat,
+  jardinage: Leaf, garden: Leaf,
+  seniors: Heart, senior: Heart,
+  climatisation: Wind, electroménager: Wind, appliance: Wind,
+};
+
+function getCategoryIcon(nameFr: string): LucideIcon {
+  const lower = nameFr.toLowerCase();
+  for (const [key, Icon] of Object.entries(ICON_MAP)) {
+    if (lower.includes(key)) return Icon;
+  }
+  return Sparkles;
+}
 
 interface ApiSubcategory {
   id: number;
@@ -66,10 +91,11 @@ export const ServiceList = () => {
         <p className="text-muted-foreground">{t("empty")}</p>
       ) : (
         <>
-          {/* ── Category grid ─────────────────────────────────────── */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {/* ── Category grid — 3×3 ───────────────────────────────── */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {categories.map((cat) => {
               const isSelected = selected?.id === cat.id;
+              const Icon = getCategoryIcon(cat.name_fr || cat.name);
               return (
                 <button
                   key={cat.id}
@@ -81,12 +107,10 @@ export const ServiceList = () => {
                       : "border-gray-200 bg-white hover:border-gray-300 dark:bg-zinc-900 dark:border-zinc-700"
                     }`}
                 >
+                  <Icon className={`h-6 w-6 mb-2 ${isSelected ? "text-indigo-600" : "text-[#0F3A7A]"}`} />
                   <h3 className={`font-semibold text-sm leading-snug ${isSelected ? "text-indigo-700 dark:text-indigo-400" : ""}`}>
                     {displayName(cat, locale)}
                   </h3>
-                  {cat.description && (
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{cat.description}</p>
-                  )}
                   <p className={`text-xs mt-2 font-medium ${isSelected ? "text-indigo-600" : "text-gray-400"}`}>
                     {cat.subcategories.length} {t("subcategoriesCount")}
                   </p>
