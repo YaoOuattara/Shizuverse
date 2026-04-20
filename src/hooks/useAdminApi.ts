@@ -28,6 +28,8 @@ export interface ApiBooking {
   amount_xof: number | null;
   decline_reason: string | null;
   cancellation_reason: string | null;
+  time_slot?: string;
+  time_preference?: string;
 }
 
 export interface ApiProvider {

@@ -87,12 +87,18 @@ const statusColors: Record<string, string> = {
   disputed:     "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
 };
 
-const formatDate = (iso: string, locale = 'fr') => {
+const formatDate = (iso: string, locale = 'fr', includeWeekday = false) => {
   if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
   if (locale === 'fr') {
-    const datePart = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    const opts: Intl.DateTimeFormatOptions = {
+      ...(includeWeekday && { weekday: 'long' }),
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    };
+    const datePart = d.toLocaleDateString('fr-FR', opts);
     const hh = d.getHours().toString().padStart(2, '0');
     const mm = d.getMinutes().toString().padStart(2, '0');
     return `${datePart} à ${hh}h${mm}`;
@@ -323,9 +329,9 @@ export default function AdminBookings() {
     serviceName: b.service_name,
     serviceCategory: b.service_slug,
     date: b.appointment_date,
-    time: "",
+    time: b.time_slot || (b.time_preference ? (TIME_PREF_LABELS[b.time_preference]?.fr ?? b.time_preference) : ""),
     duration: "",
-    status: (b.status as AdminBooking["status"]) || "pending",
+    status: ((b.status === "requested" ? "pending" : b.status) as AdminBooking["status"]) || "pending",
     price: b.amount_xof ?? 0,
     currency: "XOF",
     baseAmount: b.amount_xof ?? 0,
@@ -1015,12 +1021,14 @@ export default function AdminBookings() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>{selectedBooking.date}</span>
+                    <span>{formatDate(selectedBooking.date, isFr ? 'fr' : 'en', true)}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span>{selectedBooking.time} ({selectedBooking.duration})</span>
-                  </div>
+                  {selectedBooking.time && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span>{selectedBooking.time}</span>
+                    </div>
+                  )}
                   {selectedBooking.address && (
                     <div className="flex items-center gap-2 text-sm">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
