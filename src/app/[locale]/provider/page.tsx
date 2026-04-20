@@ -22,6 +22,7 @@ import {
   ChevronDown,
   ChevronUp,
   Bell,
+  Zap,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import ProviderBookingCard from "@/components/ProviderBookingCard";
@@ -46,6 +47,7 @@ const STORAGE_KEYS = {
   FILTERS: "provider_dashboard_filters",
   STATS_VISIBLE: "provider_dashboard_stats_visible",
   BOOKINGS: "provider_cached_bookings",
+  AVAILABILITY: "provider_available_today",
 };
 
 // Check if viewport is mobile width
@@ -74,6 +76,8 @@ export default function ProviderDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasToken, setHasToken] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [availableToday, setAvailableToday] = useState(false);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
 
   // Stats visibility: default true (expanded); hydrated from localStorage on mount
   const [showStats, setShowStats] = useState(true);
@@ -92,6 +96,8 @@ export default function ProviderDashboard() {
       }
       const savedFilters = localStorage.getItem(STORAGE_KEYS.FILTERS);
       if (savedFilters) setFilters(JSON.parse(savedFilters));
+      const savedAvailability = localStorage.getItem(STORAGE_KEYS.AVAILABILITY);
+      if (savedAvailability !== null) setAvailableToday(JSON.parse(savedAvailability));
     } catch {
       // keep defaults
     }
@@ -172,6 +178,26 @@ export default function ProviderDashboard() {
       })
       .finally(() => setIsLoading(false));
   }, []);
+
+  // Availability toggle
+  const toggleAvailability = async () => {
+    const next = !availableToday;
+    setAvailableToday(next);
+    localStorage.setItem(STORAGE_KEYS.AVAILABILITY, JSON.stringify(next));
+    setAvailabilityLoading(true);
+    try {
+      const token = localStorage.getItem("provider_token");
+      await fetch(`${FLASK_API}/api/provider/availability`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ available_today: next }),
+      });
+    } catch {
+      // silently ignore network errors — localStorage is source of truth for now
+    } finally {
+      setAvailabilityLoading(false);
+    }
+  };
 
   // Filter handlers
   const handleStatusFilter = (value: string) => {
@@ -554,6 +580,53 @@ export default function ProviderDashboard() {
       </header>
 
       <main className="flex-1 overflow-auto p-4 sm:p-6">
+        {/* Availability toggle card */}
+        <div
+          className={`mb-6 flex items-center justify-between gap-4 rounded-2xl border px-5 py-4 transition-colors ${
+            availableToday
+              ? "border-green-200 bg-green-50"
+              : "border-gray-200 bg-gray-50"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                availableToday ? "bg-green-100" : "bg-gray-200"
+              }`}
+            >
+              <Zap
+                className={`h-5 w-5 transition-colors ${
+                  availableToday ? "text-green-600" : "text-gray-400"
+                }`}
+              />
+            </div>
+            <div>
+              <p className={`font-semibold text-sm ${availableToday ? "text-green-800" : "text-gray-700"}`}>
+                {locale === "fr" ? "Disponible aujourd'hui" : "Available today"}
+              </p>
+              <p className={`text-xs mt-0.5 ${availableToday ? "text-green-600" : "text-gray-400"}`}>
+                {availableToday
+                  ? (locale === "fr" ? "Vous apparaissez comme disponible aux clients" : "You appear as available to clients")
+                  : (locale === "fr" ? "Vous n'acceptez pas de nouvelles demandes" : "You are not accepting new requests")}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={toggleAvailability}
+            disabled={availabilityLoading}
+            aria-label={locale === "fr" ? "Basculer la disponibilité" : "Toggle availability"}
+            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+              availableToday ? "bg-green-500" : "bg-gray-300"
+            }`}
+          >
+            <span
+              className={`pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform ${
+                availableToday ? "translate-x-5" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+
         {/* Nouvelles demandes: pending bookings at the very top — always visible */}
         {(() => {
           const pending = bookings.filter((b) => b.status === "pending" || b.status === "requested");
