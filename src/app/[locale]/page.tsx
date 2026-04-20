@@ -129,12 +129,12 @@ function ProviderCTA({ locale }: { locale: string }) {
 function Footer({ locale }: { locale: string }) {
   const FOOTER_LINKS = locale === 'fr'
     ? {
-        Services:   ['Ménage & Nettoyage', 'Nounou & Baby-sitting', 'Beauté à domicile', 'Bricolage & Réparations', 'Traiteur & Cuisine', 'Jardinage & Piscine'],
+        Services:   ['Ménage & Nettoyage', 'Plomberie', 'Électricité', 'Bricolage & Réparations', 'Nounou & Baby-sitting', 'Beauté à domicile', 'Jardinage & Piscine', 'Climatisation & Électroménager', 'Aide aux seniors'],
         Plateforme: ['Comment ça marche', 'Tarifs', 'Prestataires', 'Avis clients'],
         Entreprise: ['À propos', 'Presse', 'Carrières', 'Contact'],
       }
     : {
-        Services:  ['Cleaning', 'Childcare', 'Beauty at Home', 'Handyman', 'Catering & Cooking', 'Garden & Pool'],
+        Services:  ['Cleaning', 'Plumbing', 'Electrical', 'Handyman', 'Childcare', 'Beauty at Home', 'Garden & Pool', 'AC & Appliances', 'Senior Care'],
         Platform:  ['How It Works', 'Pricing', 'Providers', 'Reviews'],
         Company:   ['About', 'Press', 'Careers', 'Contact'],
       };

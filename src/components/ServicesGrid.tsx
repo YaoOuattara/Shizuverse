@@ -90,7 +90,7 @@ export default function ServicesGrid({ locale }: { locale: string }) {
           {cards.map((card) => (
             <Link
               key={card.nameFr}
-              href={card.id ? `/${locale}/booking/${card.id}` : `/${locale}/services`}
+              href={`/${locale}/services`}
               className="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-md hover:border-[#0F3A7A]/20 transition-all cursor-pointer group"
               onClick={() => trackEvent('service_viewed', { service_name: card.name, locale })}
             >
