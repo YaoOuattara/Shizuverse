@@ -560,6 +560,35 @@ def update_provider_profile():
     })
 
 
+@provider_bp.route('/availability', methods=['PATCH'])
+@require_provider_token
+def update_provider_availability():
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header[7:]
+    payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+    provider_id = payload.get('provider_id')
+
+    sp = ServiceProvider.query.get_or_404(provider_id)
+    data = request.get_json() or {}
+
+    if 'available_today' not in data:
+        return jsonify({'error': 'available_today is required'}), 400
+
+    available = bool(data['available_today'])
+    sp.available_today = available
+
+    # Sync to all ServiceProvider rows for this user so every service reflects the same flag
+    siblings = ServiceProvider.query.filter(
+        ServiceProvider.user_id == sp.user_id,
+        ServiceProvider.id != sp.id,
+    ).all()
+    for sib in siblings:
+        sib.available_today = available
+
+    db.session.commit()
+    return jsonify({'success': True, 'available_today': sp.available_today})
+
+
 @admin_bp.route('/stats', methods=['GET'])
 @require_admin_token
 def get_stats():

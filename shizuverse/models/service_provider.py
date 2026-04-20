@@ -50,6 +50,8 @@ class ServiceProvider(db.Model):
     reviewed_at = db.Column(db.DateTime, nullable=True)
     reviewed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
+    available_today = db.Column(db.Boolean, default=False, nullable=False)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
