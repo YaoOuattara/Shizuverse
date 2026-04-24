@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Loader2, Sparkles, CheckCircle, MessageCircle, CalendarCheck,
   ShieldCheck, UserPlus, X, ChevronLeft, ChevronRight, MapPin,
@@ -142,6 +143,7 @@ const inputCls =
 
 export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   const isFr = locale === "fr";
+  const searchParams = useSearchParams();
 
   // ── Service info (resolved from API) ─────────────────────────────────────
   const [categoryName, setCategoryName] = useState<string>("");
@@ -177,11 +179,11 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   const [calDate, setCalDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [date, setDate] = useState<string | null>(null);
 
-  // Step 4
+  // Step 4 — commune/address pre-filled from URL params (rebook flow)
   const [name, setName]       = useState("");
   const [phone, setPhone]     = useState("");
-  const [commune, setCommune] = useState("");
-  const [address, setAddress] = useState("");
+  const [commune, setCommune] = useState(() => searchParams?.get("commune") ?? "");
+  const [address, setAddress] = useState(() => searchParams?.get("address") ?? "");
 
   // ── AI intake ─────────────────────────────────────────────────────────────
   const [aiInput, setAiInput]       = useState("");
@@ -232,7 +234,10 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
     // Map new state to API fields
     const timeStr  = timeSlot === "morning" ? "09:00" : timeSlot === "afternoon" ? "13:00" : "17:00";
-    const urgency  = urgencyChip === "today" ? "same_day" : urgencyChip === "this_week" ? "under_24h" : "normal";
+    const urgency  = urgencyChip === "urgent_2h" ? "urgent_2h"
+                   : urgencyChip === "today"     ? "same_day"
+                   : urgencyChip === "this_week" ? "under_24h"
+                   : "normal";
     const timePref = timeSlot === "morning"  ? "morning"  : timeSlot === "afternoon"   ? "afternoon" : "evening";
     const location = [commune, address].filter(Boolean).join(", ");
 
@@ -377,12 +382,16 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
     (calYear === today.getFullYear() && calMonth > today.getMonth());
 
   // ── Chip helper ───────────────────────────────────────────────────────────
-  const chip = (val: string, active: boolean, onClick: () => void, label: string) => (
+  const chip = (val: string, active: boolean, onClick: () => void, label: string, urgent = false) => (
     <button key={val} type="button" onClick={onClick}
       className={`px-4 py-2 rounded-full border-2 text-sm font-medium transition-all
         ${active
-          ? "border-[#0F3A7A] bg-[#0F3A7A] text-white"
-          : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
+          ? urgent
+            ? "border-red-500 bg-red-500 text-white"
+            : "border-[#0F3A7A] bg-[#0F3A7A] text-white"
+          : urgent
+            ? "border-orange-400 bg-white text-orange-600 hover:border-orange-500"
+            : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
       {label}
     </button>
   );
@@ -422,8 +431,8 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
   // Step 2: Décrire votre besoin
   const urgencyOptions = isFr
-    ? [{ val: "today", label: "Aujourd'hui" }, { val: "this_week", label: "Cette semaine" }, { val: "later", label: "3+ jours" }]
-    : [{ val: "today", label: "Today" },       { val: "this_week", label: "This week" },      { val: "later", label: "3+ days" }];
+    ? [{ val: "urgent_2h", label: "⚡ Urgence — 2h", urgent: true }, { val: "today", label: "Aujourd'hui" }, { val: "this_week", label: "Cette semaine" }, { val: "later", label: "3+ jours" }]
+    : [{ val: "urgent_2h", label: "⚡ Urgent — 2h", urgent: true }, { val: "today", label: "Today" },       { val: "this_week", label: "This week" },      { val: "later", label: "3+ days" }];
 
   const timeOptions = isFr
     ? [{ val: "morning", label: "Matin · 8h–12h" }, { val: "afternoon", label: "Après-midi · 12h–17h" }, { val: "evening", label: "Soirée · 17h–20h" }]
@@ -442,7 +451,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
       <div>
         <p className="text-sm font-semibold text-gray-700 mb-2">{isFr ? "Quand avez-vous besoin du service ?" : "When do you need the service?"}</p>
         <div className="flex flex-wrap gap-2">
-          {urgencyOptions.map((o) => chip(o.val, urgencyChip === o.val, () => setUrgencyChip(o.val), o.label))}
+          {urgencyOptions.map((o) => chip(o.val, urgencyChip === o.val, () => setUrgencyChip(o.val), o.label, o.urgent))}
         </div>
       </div>
 
@@ -659,8 +668,8 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
   // Step 5: Récapitulatif
   const urgencyLabel = isFr
-    ? (urgencyChip === "today" ? "Aujourd'hui" : urgencyChip === "this_week" ? "Cette semaine" : "3+ jours")
-    : (urgencyChip === "today" ? "Today"       : urgencyChip === "this_week" ? "This week"     : "3+ days");
+    ? (urgencyChip === "urgent_2h" ? "⚡ Urgence — 2h" : urgencyChip === "today" ? "Aujourd'hui" : urgencyChip === "this_week" ? "Cette semaine" : "3+ jours")
+    : (urgencyChip === "urgent_2h" ? "⚡ Urgent — 2h"  : urgencyChip === "today" ? "Today"       : urgencyChip === "this_week" ? "This week"     : "3+ days");
 
   const timeLabel = isFr
     ? (timeSlot === "morning" ? "Matin · 8h–12h" : timeSlot === "afternoon" ? "Après-midi · 12h–17h" : "Soirée · 17h–20h")

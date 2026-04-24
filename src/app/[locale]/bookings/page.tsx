@@ -127,12 +127,13 @@ export default function BookingsPage() {
           const res = await fetch(`/api/bookings?client_phone=${encodeURIComponent(clientPhone)}`);
           const data = await res.json();
           if (data.items && data.items.length > 0) {
-            const mapped = data.items.map((b: { id: number; service_name: string; service_slug: string; appointment_date: string; status: BookingStatus; notes?: string; provider_name?: string }) => ({
+            const mapped = data.items.map((b: { id: number; service_name: string; service_slug: string; appointment_date: string; status: BookingStatus; notes?: string; provider_name?: string; client_location?: string }) => ({
               id: String(b.id),
               serviceName: b.service_name,
               serviceType: b.service_slug,
               providerName: b.provider_name || (locale === "fr" ? "En attente d'assignation" : "Awaiting assignment"),
               providerId: "pending",
+              clientLocation: b.client_location || "",
               date: new Date(b.appointment_date).toLocaleDateString(
                 locale === "fr" ? "fr-FR" : "en-US",
                 { month: "short", day: "numeric", year: "numeric" }
@@ -350,6 +351,16 @@ export default function BookingsPage() {
     return reviewedBookings.has(bookingId) || reviews.some((r) => r.bookingId === bookingId);
   };
 
+  const handleRebook = (booking: BookingCardProps) => {
+    const [commune, ...addrParts] = (booking.clientLocation || "").split(", ");
+    const address = addrParts.join(", ");
+    const params = new URLSearchParams();
+    if (commune) params.set("commune", commune);
+    if (address) params.set("address", address);
+    const qs = params.toString();
+    router.push(`/${locale}/booking/${booking.serviceType}${qs ? `?${qs}` : ""}`);
+  };
+
   const filteredBookings = bookings.filter((booking) => {
     const matchesSearch =
       booking.serviceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -551,6 +562,7 @@ export default function BookingsPage() {
                 onLeaveReview={handleOpenReviewModal}
                 onAcceptQuote={handleAcceptQuote}
                 onDeclineQuote={handleDeclineQuote}
+                onRebook={handleRebook}
                 hasReview={hasBookingBeenReviewed(booking.id)}
               />
             ))}

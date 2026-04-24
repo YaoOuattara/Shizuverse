@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, Clock, Calendar, Trash2, ChevronDown, Check, CircleDashed, XCircle, CheckCircle2, UserCircle, Star, Loader2, Banknote, FileText } from "lucide-react";
+import { User, Clock, Calendar, Trash2, ChevronDown, Check, CircleDashed, XCircle, CheckCircle2, UserCircle, Star, Loader2, Banknote, FileText, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { formatMoney } from "@/lib/currency";
 import { useTranslations } from "next-intl";
@@ -43,6 +43,7 @@ export interface BookingCardProps {
   quoteNote?: string;
   quoteExpiry?: string;
   currency?: string;
+  clientLocation?: string;
 }
 
 interface BookingCardComponentProps extends BookingCardProps {
@@ -52,6 +53,7 @@ interface BookingCardComponentProps extends BookingCardProps {
   onLeaveReview?: (booking: BookingCardProps) => void;
   onAcceptQuote?: (bookingId: string) => Promise<void> | void;
   onDeclineQuote?: (bookingId: string) => Promise<void> | void;
+  onRebook?: (booking: BookingCardProps) => void;
   hasReview?: boolean;
 }
 
@@ -70,12 +72,14 @@ export default function BookingCard({
   quoteNote,
   quoteExpiry,
   currency = "XOF",
+  clientLocation,
   onCancel,
   onStatusChange,
   onViewProfile,
   onLeaveReview,
   onAcceptQuote,
   onDeclineQuote,
+  onRebook,
   hasReview = false,
 }: BookingCardComponentProps) {
   const [isCancelling, setIsCancelling] = useState(false);
@@ -101,6 +105,7 @@ export default function BookingCard({
     quoteNote,
     quoteExpiry,
     currency,
+    clientLocation,
   };
 
   const handleCancelConfirm = async () => {
@@ -444,6 +449,17 @@ export default function BookingCard({
               >
                 <Star className="mr-1.5 h-4 w-4" />
                 {t("leaveReview")}
+              </Button>
+            )}
+            {onRebook && status === "completed" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); onRebook(booking); }}
+                data-testid={`button-rebook-${id}`}
+              >
+                <RotateCcw className="mr-1.5 h-4 w-4" />
+                {t("rebook")}
               </Button>
             )}
             {hasReview && status === "completed" && (

@@ -68,6 +68,7 @@
     "viewProfile": "View Profile",
     "viewProviderAriaLabel": "View {name}'s profile",
     "leaveReview": "Leave Review",
+    "rebook": "Rebook",
     "reviewed": "Reviewed",
     "status": {
       "confirmed": "Confirmed",
