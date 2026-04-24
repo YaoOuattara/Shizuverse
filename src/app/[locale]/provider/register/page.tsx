@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, CheckCircle, Sparkles, Droplets, Wrench, Zap, Hammer,
   Baby, Heart, Leaf, Wind, ArrowLeft, Camera, CreditCard,
-  Smartphone, Upload, CheckCircle2,
+  Smartphone, Upload, CheckCircle2, Lock,
 } from "lucide-react";
 import { COMMUNES } from "@/components/CommuneAutocomplete";
 import type { LucideIcon } from "lucide-react";
@@ -51,26 +51,32 @@ function ProgressBar({ step, isFr }: { step: number; isFr: boolean }) {
     : ["About you", "What you offer", "Last step"];
   return (
     <div className="mb-8">
-      <div className="flex justify-between mb-2">
-        {labels.map((label, i) => (
-          <div key={i} className="flex flex-col items-center gap-1 flex-1">
-            <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors
-                ${i + 1 < step  ? "bg-[#0F3A7A] border-[#0F3A7A] text-white" : ""}
-                ${i + 1 === step ? "bg-white border-[#0F3A7A] text-[#0F3A7A]"  : ""}
-                ${i + 1 > step  ? "bg-gray-100 border-gray-200 text-gray-400"  : ""}`}
-            >
-              {i + 1 < step ? <CheckCircle className="h-4 w-4" /> : i + 1}
+      <div className="flex justify-between mb-3">
+        {labels.map((label, i) => {
+          const n = i + 1;
+          const done    = n < step;
+          const current = n === step;
+          return (
+            <div key={i} className="flex flex-col items-center gap-1.5 flex-1">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
+                  ${done    ? "bg-green-500 text-white shadow-sm"                          : ""}
+                  ${current ? "bg-green-500 text-white shadow-md ring-4 ring-green-100"    : ""}
+                  ${!done && !current ? "bg-gray-100 text-gray-400"                        : ""}`}
+              >
+                {done ? <CheckCircle className="h-4 w-4" /> : n}
+              </div>
+              <span className={`text-xs text-center leading-tight max-w-[72px]
+                ${current ? "font-semibold text-green-700" : done ? "text-green-500" : "text-gray-400"}`}>
+                {label}
+              </span>
             </div>
-            <span className={`text-xs text-center leading-tight ${i + 1 === step ? "font-semibold text-[#0F3A7A]" : "text-gray-400"}`}>
-              {label}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
-      <div className="relative h-1.5 bg-gray-100 rounded-full mt-1">
+      <div className="relative h-1.5 bg-gray-100 rounded-full">
         <div
-          className="absolute h-1.5 bg-[#0F3A7A] rounded-full transition-all duration-500"
+          className="absolute h-1.5 bg-green-500 rounded-full transition-all duration-500"
           style={{ width: `${((step - 1) / 2) * 100}%` }}
         />
       </div>
@@ -290,18 +296,23 @@ export default function ProviderRegisterPage() {
 
         <ProgressBar step={step} isFr={isFr} />
 
+        {/* Active step card */}
+        <div className="rounded-2xl border border-gray-100 bg-white border-t-2 border-t-green-500 pt-6 pb-2 px-1">
+
         {/* ══════════════════════════════════════════════════════════════════
             Step 1 — Qui êtes-vous ?
         ══════════════════════════════════════════════════════════════════ */}
         {step === 1 && (
-          <div className="space-y-5">
+          <div className="space-y-7">
             <h2 className="font-semibold text-gray-800 text-lg">
               {isFr ? "Qui êtes-vous ?" : "About you"}
             </h2>
 
             {/* Account type cards */}
             <div className="space-y-2">
-              <Label>{isFr ? "Type de compte" : "Account type"}</Label>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {isFr ? "Type de compte" : "Account type"}
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 {(["individual", "company"] as const).map((type) => (
                   <button
@@ -353,8 +364,11 @@ export default function ProviderRegisterPage() {
             )}
 
             {/* Full name */}
-            <div className="space-y-1.5">
-              <Label htmlFor="full_name">{t("fullName")}</Label>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {isFr ? "Identité" : "Identity"}
+              </p>
+              <Label htmlFor="full_name" className="text-sm text-gray-700">{t("fullName")}</Label>
               <Input
                 id="full_name"
                 placeholder={t("fullNamePlaceholder")}
@@ -384,8 +398,11 @@ export default function ProviderRegisterPage() {
             </div>
 
             {/* Password */}
-            <div className="space-y-1.5">
-              <Label htmlFor="password">{t("password")}</Label>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {isFr ? "Sécurité" : "Security"}
+              </p>
+              <Label htmlFor="password" className="text-sm text-gray-700">{t("password")}</Label>
               <Input
                 id="password"
                 type="password"
@@ -429,14 +446,16 @@ export default function ProviderRegisterPage() {
             Step 2 — Que proposez-vous ?
         ══════════════════════════════════════════════════════════════════ */}
         {step === 2 && (
-          <div className="space-y-6">
+          <div className="space-y-7">
             <h2 className="font-semibold text-gray-800 text-lg">
               {isFr ? "Que proposez-vous ?" : "What do you offer?"}
             </h2>
 
             {/* Category chips */}
             <div className="space-y-2">
-              <Label>{isFr ? "Services proposés *" : "Services offered *"}</Label>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {isFr ? "Services proposés" : "Services offered"} <span className="text-red-400">*</span>
+              </p>
               {categoriesLoading ? (
                 <div className="flex items-center gap-2 text-gray-400 py-3">
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -479,8 +498,10 @@ export default function ProviderRegisterPage() {
 
             {/* Commune chips */}
             <div className="space-y-2">
-              <Label>{isFr ? "Communes d'intervention *" : "Operating districts *"}</Label>
-              <div className="flex flex-wrap gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {isFr ? "Communes d'intervention" : "Operating districts"} <span className="text-red-400">*</span>
+              </p>
+              <div className={`flex flex-wrap gap-2 ${COMMUNES.length > 10 ? "max-h-44 overflow-y-auto pr-1" : ""}`}>
                 {COMMUNES.map((commune) => {
                   const selected = selectedCommunes.includes(commune);
                   return (
@@ -505,8 +526,11 @@ export default function ProviderRegisterPage() {
             </div>
 
             {/* Tarif indicatif */}
-            <div className="space-y-1.5">
-              <Label htmlFor="tarif">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {isFr ? "Tarification" : "Pricing"}
+              </p>
+              <Label htmlFor="tarif" className="text-sm text-gray-700">
                 {isFr ? "Tarif indicatif (FCFA/heure)" : "Indicative rate (FCFA/hour)"}
               </Label>
               <div className="flex items-center gap-2">
@@ -525,7 +549,10 @@ export default function ProviderRegisterPage() {
 
             {/* Bio */}
             <div className="space-y-2">
-              <Label htmlFor="bio">{t("bio")}</Label>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {isFr ? "Présentation" : "About you"}
+              </p>
+              <Label htmlFor="bio" className="text-sm text-gray-700">{t("bio")}</Label>
               <Textarea
                 id="bio"
                 rows={4}
@@ -569,26 +596,34 @@ export default function ProviderRegisterPage() {
             Step 3 — Dernière étape !
         ══════════════════════════════════════════════════════════════════ */}
         {step === 3 && (
-          <div className="space-y-6">
+          <div className="space-y-7">
             <h2 className="font-semibold text-gray-800 text-lg">
               {isFr ? "Dernière étape !" : "Last step!"}
             </h2>
 
             {/* Green motivational nudge */}
-            <div className="flex items-start gap-3 rounded-xl bg-green-50 border border-green-200 px-4 py-3">
-              <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
-              <p className="text-sm text-green-800 font-medium leading-snug">
+            <div className="rounded-xl border border-green-300 px-5 py-4" style={{ backgroundColor: "#f0fdf4" }}>
+              <div className="flex items-center gap-2 mb-1">
+                <CheckCircle className="h-5 w-5 text-green-600 shrink-0" />
+                <p className="text-sm font-bold text-green-800">
+                  {isFr ? "Vous y êtes presque !" : "Almost there!"}
+                </p>
+              </div>
+              <p className="text-sm text-green-700 leading-snug pl-7">
                 {isFr
-                  ? "Vous y êtes presque ! Les prestataires avec une photo reçoivent 3× plus de demandes."
-                  : "Almost there! Providers with a photo receive 3× more requests."}
+                  ? "Les prestataires avec une photo de profil reçoivent 3× plus de demandes. Prenez 30 secondes pour la télécharger."
+                  : "Providers with a profile photo receive 3× more requests. Take 30 seconds to upload yours."}
               </p>
             </div>
 
             {/* Profile photo */}
             <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Camera className="h-4 w-4 text-gray-500" />
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
                 {isFr ? "Photo de profil" : "Profile photo"}
+              </p>
+              <Label className="flex items-center gap-2 text-sm text-gray-700">
+                <Camera className="h-4 w-4 text-gray-500" />
+                {isFr ? "Choisir une photo" : "Choose a photo"}
                 <span className="text-xs text-gray-400 font-normal">({isFr ? "recommandée" : "recommended"})</span>
               </Label>
               <div className="flex items-center gap-4">
@@ -637,10 +672,13 @@ export default function ProviderRegisterPage() {
 
             {/* ID document */}
             <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-gray-500" />
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
                 {isFr ? "Pièce d'identité" : "Identity document"}
-                <span className="text-xs text-gray-400 font-normal">({isFr ? "optionnelle" : "optional"})</span>
+                <span className="ml-1 normal-case font-normal text-gray-300">({isFr ? "optionnelle" : "optional"})</span>
+              </p>
+              <Label className="flex items-center gap-2 text-sm text-gray-700">
+                <CreditCard className="h-4 w-4 text-gray-500" />
+                {isFr ? "Type de document" : "Document type"}
               </Label>
               <select
                 value={idDocType}
@@ -690,10 +728,13 @@ export default function ProviderRegisterPage() {
 
             {/* Mobile Money */}
             <div className="space-y-3">
-              <Label className="flex items-center gap-2">
-                <Smartphone className="h-4 w-4 text-gray-500" />
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
                 Mobile Money
-                <span className="text-xs text-gray-400 font-normal">({isFr ? "optionnel" : "optional"})</span>
+                <span className="ml-1 normal-case font-normal text-gray-300">({isFr ? "optionnel" : "optional"})</span>
+              </p>
+              <Label className="flex items-center gap-2 text-sm text-gray-700">
+                <Smartphone className="h-4 w-4 text-gray-500" />
+                {isFr ? "Opérateur" : "Operator"}
               </Label>
               <div className="flex gap-2">
                 {(["Orange", "MTN", "Wave"] as const).map((op) => (
@@ -733,32 +774,37 @@ export default function ProviderRegisterPage() {
             </div>
 
             {/* CTA */}
-            <div className="flex gap-3 pt-2">
-              <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
-                {t("back")}
-              </Button>
+            <div className="space-y-3 pt-2">
               <Button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold gap-2"
+                className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white font-semibold rounded-xl py-3 gap-2 text-base"
               >
                 {isSubmitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <CheckCircle2 className="h-4 w-4" />
+                  <Lock className="h-4 w-4" />
                 )}
                 {isFr ? "Soumettre mon profil" : "Submit my profile"}
               </Button>
+              <p className="text-center text-xs text-gray-400 flex items-center justify-center gap-1.5">
+                <Lock className="h-3 w-3" />
+                {isFr
+                  ? "Vérification sous 48h · Vous serez notifié par WhatsApp"
+                  : "Verified within 48h · You'll be notified by WhatsApp"}
+              </p>
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="w-full text-sm text-gray-400 hover:text-gray-600 transition-colors py-1"
+              >
+                ← {t("back")}
+              </button>
             </div>
-
-            {/* Footer note */}
-            <p className="text-center text-xs text-gray-400 pt-1">
-              {isFr
-                ? "Vérification sous 48h · Vous serez notifié par WhatsApp"
-                : "Verified within 48h · You'll be notified by WhatsApp"}
-            </p>
           </div>
         )}
+
+        </div>{/* end active step card */}
 
         <p className="text-center text-xs text-gray-400 mt-6">
           {t("alreadyProvider")}{" "}
