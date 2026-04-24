@@ -321,7 +321,7 @@ export default function ProviderRegisterPage() {
                     onClick={() => setAccountType(type)}
                     className={`flex flex-col items-center gap-1 p-4 rounded-xl border-2 transition-all text-sm font-medium
                       ${accountType === type
-                        ? "border-[#0F3A7A] bg-[#0F3A7A]/5 text-[#0F3A7A]"
+                        ? "border-green-500 bg-[#f0fdf4] text-green-800"
                         : "border-gray-100 bg-white text-gray-600 hover:border-gray-200"}`}
                   >
                     <span className="text-xl">{type === "individual" ? "👤" : "🏢"}</span>
@@ -477,15 +477,15 @@ export default function ProviderRegisterPage() {
                         }
                         className={`relative flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all
                           ${selected
-                            ? "border-[#0F3A7A] bg-[#0F3A7A]/5"
+                            ? "border-[#0F3A7A] bg-[#0F3A7A] text-white"
                             : "border-gray-100 hover:border-gray-200 bg-white"}`}
                       >
-                        <Icon className={`h-5 w-5 shrink-0 ${selected ? "text-[#0F3A7A]" : "text-gray-400"}`} />
-                        <span className={`text-sm font-medium leading-tight ${selected ? "text-[#0F3A7A]" : "text-gray-700"}`}>
+                        <Icon className={`h-5 w-5 shrink-0 ${selected ? "text-white" : "text-gray-400"}`} />
+                        <span className={`text-sm font-medium leading-tight ${selected ? "text-white" : "text-gray-700"}`}>
                           {displayCatName(cat, locale)}
                         </span>
                         {selected && (
-                          <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[#0F3A7A] flex items-center justify-center">
+                          <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-white/20 flex items-center justify-center">
                             <CheckCircle className="h-2.5 w-2.5 text-white" />
                           </div>
                         )}
@@ -515,7 +515,7 @@ export default function ProviderRegisterPage() {
                       }
                       className={`px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all
                         ${selected
-                          ? "border-green-500 bg-green-500 text-white"
+                          ? "border-[#16a34a] bg-[#16a34a] text-white"
                           : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"}`}
                     >
                       {commune}
