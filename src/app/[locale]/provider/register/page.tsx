@@ -23,6 +23,11 @@ import {
   Trophy,
   X,
   ArrowLeft,
+  Camera,
+  CreditCard,
+  Smartphone,
+  Upload,
+  CheckCircle2,
 } from "lucide-react";
 
 // ── Data ──────────────────────────────────────────────────────────────────────
@@ -91,8 +96,8 @@ function AchievementPopup({ onClose, isFr }: { onClose: () => void; isFr: boolea
 
 function ProgressBar({ step, total, isFr }: { step: number; total: number; isFr: boolean }) {
   const labels = isFr
-    ? ["Compte", "Services", "Zones", "Bio"]
-    : ["Account", "Services", "Zones", "Bio"];
+    ? ["Compte", "Services", "Zones", "Bio", "Profil"]
+    : ["Account", "Services", "Zones", "Bio", "Profile"];
   return (
     <div className="mb-8">
       <div className="flex justify-between mb-2">
@@ -163,6 +168,61 @@ export default function ProviderRegisterPage() {
 
   // Step 4
   const [bio, setBio] = useState("");
+
+  // Step 5
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [profilePhotoUploading, setProfilePhotoUploading] = useState(false);
+  const [idDocType, setIdDocType] = useState("");
+  const [idDocUrl, setIdDocUrl] = useState<string | null>(null);
+  const [idDocUploading, setIdDocUploading] = useState(false);
+  const [momoOperator, setMomoOperator] = useState<string | null>(null);
+  const [momoNumber, setMomoNumber] = useState("");
+  const [momoName, setMomoName] = useState("");
+
+  // ── Cloudinary upload helper ──
+  const uploadToCloudinary = async (file: File): Promise<string> => {
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const preset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+    if (!cloudName || !preset) throw new Error("Cloudinary non configuré");
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("upload_preset", preset);
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+      method: "POST",
+      body: fd,
+    });
+    if (!res.ok) throw new Error(`Upload échoué: ${res.status}`);
+    const data = await res.json() as { secure_url: string };
+    return data.secure_url;
+  };
+
+  const handleProfilePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setProfilePhotoUploading(true);
+    try {
+      const url = await uploadToCloudinary(file);
+      setProfilePhotoUrl(url);
+    } catch {
+      toast({ title: isFr ? "Erreur upload" : "Upload error", description: isFr ? "Réessayez." : "Try again.", variant: "destructive" });
+    } finally {
+      setProfilePhotoUploading(false);
+    }
+  };
+
+  const handleIdDocChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIdDocUploading(true);
+    try {
+      const url = await uploadToCloudinary(file);
+      setIdDocUrl(url);
+    } catch {
+      toast({ title: isFr ? "Erreur upload" : "Upload error", description: isFr ? "Réessayez." : "Try again.", variant: "destructive" });
+    } finally {
+      setIdDocUploading(false);
+    }
+  };
 
   // ── Step validators ──
   const step1Valid =
@@ -245,6 +305,13 @@ export default function ProviderRegisterPage() {
             account_type: accountType,
             company_name: accountType === "company" ? businessName.trim() : undefined,
             rccm_number: accountType === "company" && rccmNumber.trim() ? rccmNumber.trim() : undefined,
+            profile_photo_url: profilePhotoUrl || undefined,
+            id_doc_type: idDocType || undefined,
+            id_doc_url: idDocUrl || undefined,
+            momo_operator: momoOperator || undefined,
+            momo_number: momoNumber.trim() || undefined,
+            momo_account_name: momoName.trim() || undefined,
+            verification_status: "submitted",
           }),
         }
       );
@@ -298,7 +365,7 @@ export default function ProviderRegisterPage() {
             <p className="text-gray-500 mt-1 text-sm">{t("subtitle")}</p>
           </div>
 
-          <ProgressBar step={step} total={4} isFr={isFr} />
+          <ProgressBar step={step} total={5} isFr={isFr} />
 
           {/* ── Step 1: Account ── */}
           {step === 1 && (
@@ -530,17 +597,199 @@ export default function ProviderRegisterPage() {
                   {t("back")}
                 </Button>
                 <Button
+                  onClick={() => setStep(5)}
+                  className="flex-1 bg-[#0F3A7A] hover:bg-[#0d3068]"
+                >
+                  {t("continue")}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 5: Profil & Documents ── */}
+          {step === 5 && (
+            <div className="space-y-6">
+
+              {/* Motivational nudge */}
+              <div className="flex items-start gap-3 rounded-xl bg-green-50 border border-green-200 px-4 py-3">
+                <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                <p className="text-sm text-green-800 font-medium leading-snug">
+                  {isFr
+                    ? "Vous y êtes presque ! Les prestataires avec une photo reçoivent 3× plus de demandes."
+                    : "Almost there! Providers with a photo receive 3× more requests."}
+                </p>
+              </div>
+
+              {/* ── Profile photo ── */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Camera className="h-4 w-4 text-gray-500" />
+                  {isFr ? "Photo de profil" : "Profile photo"}
+                  <span className="text-xs text-gray-400 font-normal">({isFr ? "recommandée" : "recommended"})</span>
+                </Label>
+                <div className="flex items-center gap-4">
+                  {/* Thumbnail preview */}
+                  <div className="w-20 h-20 rounded-full border-2 border-dashed border-gray-300 overflow-hidden flex items-center justify-center bg-gray-50 shrink-0">
+                    {profilePhotoUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={profilePhotoUrl} alt="preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <Camera className="h-8 w-8 text-gray-300" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <label
+                      htmlFor="profile-photo-input"
+                      className={`inline-flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all
+                        ${profilePhotoUploading ? "opacity-50 cursor-not-allowed" : "border-gray-200 hover:border-[#0F3A7A] hover:text-[#0F3A7A]"}`}
+                    >
+                      {profilePhotoUploading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : profilePhotoUrl ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Upload className="h-4 w-4" />
+                      )}
+                      {profilePhotoUploading
+                        ? (isFr ? "Envoi…" : "Uploading…")
+                        : profilePhotoUrl
+                          ? (isFr ? "Changer la photo" : "Change photo")
+                          : (isFr ? "Choisir une photo" : "Choose a photo")}
+                    </label>
+                    <input
+                      id="profile-photo-input"
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      disabled={profilePhotoUploading}
+                      onChange={handleProfilePhotoChange}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP · max 5 MB</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── ID document ── */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-gray-500" />
+                  {isFr ? "Pièce d'identité" : "Identity document"}
+                  <span className="text-xs text-gray-400 font-normal">({isFr ? "optionnelle" : "optional"})</span>
+                </Label>
+                <select
+                  value={idDocType}
+                  onChange={(e) => { setIdDocType(e.target.value); setIdDocUrl(null); }}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="">{isFr ? "Choisir le type de document…" : "Select document type…"}</option>
+                  <option value="CNI">CNI — {isFr ? "Carte Nationale d'Identité" : "National ID Card"}</option>
+                  <option value="Passeport">Passeport</option>
+                  <option value="Permis">{isFr ? "Permis de conduire" : "Driver's license"}</option>
+                  <option value="Autre">{isFr ? "Autre" : "Other"}</option>
+                </select>
+                {idDocType && (
+                  <div className="flex items-center gap-3 mt-1">
+                    <label
+                      htmlFor="id-doc-input"
+                      className={`inline-flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all
+                        ${idDocUploading ? "opacity-50 cursor-not-allowed" : "border-gray-200 hover:border-[#0F3A7A] hover:text-[#0F3A7A]"}`}
+                    >
+                      {idDocUploading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : idDocUrl ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Upload className="h-4 w-4" />
+                      )}
+                      {idDocUploading
+                        ? (isFr ? "Envoi…" : "Uploading…")
+                        : idDocUrl
+                          ? (isFr ? "Document envoyé ✓" : "Document sent ✓")
+                          : (isFr ? `Envoyer mon ${idDocType}` : `Upload ${idDocType}`)}
+                    </label>
+                    <input
+                      id="id-doc-input"
+                      type="file"
+                      accept="image/*,application/pdf"
+                      className="sr-only"
+                      disabled={idDocUploading}
+                      onChange={handleIdDocChange}
+                    />
+                    <p className="text-xs text-gray-400">JPG, PNG, PDF</p>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Mobile Money ── */}
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2">
+                  <Smartphone className="h-4 w-4 text-gray-500" />
+                  Mobile Money
+                  <span className="text-xs text-gray-400 font-normal">({isFr ? "optionnel" : "optional"})</span>
+                </Label>
+                {/* Operator chips */}
+                <div className="flex gap-2">
+                  {(["Orange", "MTN", "Wave"] as const).map((op) => (
+                    <button
+                      key={op}
+                      type="button"
+                      onClick={() => setMomoOperator(momoOperator === op ? null : op)}
+                      className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all
+                        ${momoOperator === op
+                          ? op === "Orange" ? "border-orange-500 bg-orange-50 text-orange-700"
+                          : op === "MTN"    ? "border-yellow-400 bg-yellow-50 text-yellow-700"
+                                            : "border-blue-500 bg-blue-50 text-blue-700"
+                          : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}
+                    >
+                      {op === "Orange" ? "🟠" : op === "MTN" ? "🟡" : "🔵"} {op}
+                    </button>
+                  ))}
+                </div>
+                {momoOperator && (
+                  <div className="space-y-2">
+                    <input
+                      type="tel"
+                      placeholder={isFr ? "Numéro Mobile Money" : "Mobile Money number"}
+                      value={momoNumber}
+                      onChange={(e) => setMomoNumber(e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <input
+                      type="text"
+                      placeholder={isFr ? "Nom du titulaire du compte" : "Account holder name"}
+                      value={momoName}
+                      onChange={(e) => setMomoName(e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* CTA */}
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" onClick={() => setStep(4)} className="flex-1">
+                  {t("back")}
+                </Button>
+                <Button
                   onClick={handleSubmit}
                   disabled={isSubmitting}
-                  className="flex-1 bg-[#0F3A7A] hover:bg-[#0d3068]"
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold gap-2"
                 >
                   {isSubmitting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    t("submit")
+                    <CheckCircle2 className="h-4 w-4" />
                   )}
+                  {isFr ? "Soumettre mon profil" : "Submit my profile"}
                 </Button>
               </div>
+
+              {/* Footer note */}
+              <p className="text-center text-xs text-gray-400 pt-1">
+                {isFr
+                  ? "Vérification sous 48h · Vous serez notifié par WhatsApp"
+                  : "Verified within 48h · You'll be notified by WhatsApp"}
+              </p>
             </div>
           )}
 
