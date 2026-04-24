@@ -274,6 +274,8 @@ def provider_register():
     password = data.get('password', '')
     bio = (data.get('bio') or '').strip()
     service_names = data.get('services') or []
+    zones = data.get('zones') or []
+    zones_str = ', '.join(str(z).strip() for z in zones if z) if zones else ''
     account_type = (data.get('account_type') or 'individual').strip()
     business_name = (data.get('company_name') or '').strip()  # only used when account_type='company'
     rccm_number = (data.get('rccm_number') or '').strip() or None
@@ -319,6 +321,7 @@ def provider_register():
             company_name=display_name,
             phone_number=phone,
             bio=bio,
+            address=zones_str or None,
             verified=False,
             verification_status='submitted',
             submitted_at=datetime.utcnow(),

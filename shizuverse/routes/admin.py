@@ -256,6 +256,7 @@ def get_all_providers():
             'email': user.email if user else None,
             'bio': p.bio,
             'address': p.address,
+            'zones': [z.strip() for z in p.address.split(',') if z.strip()] if p.address else [],
             'verification_status': p.verification_status,
             'listed_status': p.listed_status,
             'provider_status': p.provider_status,
