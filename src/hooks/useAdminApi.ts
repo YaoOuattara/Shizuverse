@@ -47,6 +47,7 @@ export interface ApiProvider {
   reviewed_at?: string;
   bio?: string;
   address?: string;
+  zones?: string[];
   services?: string[];
   // Old endpoint fields (kept for backwards compat)
   name?: string;

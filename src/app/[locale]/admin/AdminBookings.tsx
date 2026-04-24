@@ -343,6 +343,7 @@ export default function AdminBookings() {
     providerPayoutAmount: 0,
     paymentStatus: (b.payment_status as AdminBooking["paymentStatus"]) || "unpaid",
     payoutStatus: (b.payout_status as AdminBooking["payoutStatus"]) || "not_due",
+    address: b.client_location || "",
     notes: b.notes || "",
     createdAt: b.created_at || "",
   });
@@ -1500,46 +1501,74 @@ export default function AdminBookings() {
               {isFr ? "Sélectionnez un prestataire pour cette réservation." : "Select a provider to assign to this booking."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>{isFr ? "Choisir un prestataire" : "Select Provider"}</Label>
-              <Select value={selectedProviderId} onValueChange={setSelectedProviderId}>
-                <SelectTrigger data-testid="select-assign-provider">
-                  <SelectValue placeholder={isFr ? "Choisir un prestataire…" : "Choose a provider…"} />
-                </SelectTrigger>
-                <SelectContent className="z-50">
-                  {eligibleProviders.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">
-                      {isFr ? "Aucun prestataire approuvé et actif" : "No approved active providers"}
-                    </div>
-                  ) : eligibleProviders.map((p: ApiProvider) => (
-                    <SelectItem key={p.id} value={String(p.id)}>
-                      {p.company_name || p.name || `#${p.id}`}
-                      {p.phone_number ? ` · ${p.phone_number}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {selectedProviderId && (() => {
-              const p = eligibleProviders.find((p: ApiProvider) => String(p.id) === selectedProviderId);
-              if (!p) return null;
-              return (
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">{p.company_name || p.name}</p>
-                    {p.phone_number && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
-                        {p.phone_number}
-                      </p>
-                    )}
-                  </div>
+          {(() => {
+            const commune = (selectedBooking?.address || "").split(",")[0].trim();
+            const zoneMatched = commune
+              ? eligibleProviders.filter((p: ApiProvider) =>
+                  p.zones?.some((z) => z.toLowerCase() === commune.toLowerCase())
+                )
+              : [];
+            const hasZoneMatch = zoneMatched.length > 0;
+            const displayProviders = hasZoneMatch ? zoneMatched : eligibleProviders;
+            return (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>
+                    {commune
+                      ? (isFr ? `Prestataires disponibles à ${commune}` : `Providers available in ${commune}`)
+                      : (isFr ? "Choisir un prestataire" : "Select Provider")}
+                  </Label>
+                  {commune && !hasZoneMatch && eligibleProviders.length > 0 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      {isFr
+                        ? `Aucun prestataire dans cette zone — tous les prestataires disponibles`
+                        : `No provider in this area — showing all available providers`}
+                    </p>
+                  )}
+                  <Select value={selectedProviderId} onValueChange={setSelectedProviderId}>
+                    <SelectTrigger data-testid="select-assign-provider">
+                      <SelectValue placeholder={isFr ? "Choisir un prestataire…" : "Choose a provider…"} />
+                    </SelectTrigger>
+                    <SelectContent className="z-50">
+                      {displayProviders.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          {isFr ? "Aucun prestataire approuvé et actif" : "No approved active providers"}
+                        </div>
+                      ) : displayProviders.map((p: ApiProvider) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.company_name || p.name || `#${p.id}`}
+                          {p.phone_number ? ` · ${p.phone_number}` : ""}
+                          {p.zones?.length ? ` · ${p.zones.join(", ")}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              );
-            })()}
-          </div>
+                {selectedProviderId && (() => {
+                  const p = eligibleProviders.find((p: ApiProvider) => String(p.id) === selectedProviderId);
+                  if (!p) return null;
+                  return (
+                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                      <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium">{p.company_name || p.name}</p>
+                        {p.phone_number && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
+                            {p.phone_number}
+                          </p>
+                        )}
+                        {p.zones?.length ? (
+                          <p className="text-xs text-muted-foreground mt-0.5">{p.zones.join(", ")}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            );
+          })()}
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignModalOpen(false)}>
               {isFr ? "Annuler" : "Cancel"}
