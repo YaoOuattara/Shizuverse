@@ -99,11 +99,13 @@ const formatDate = (iso: string, locale = 'fr', includeWeekday = false) => {
       year: 'numeric',
     };
     const datePart = d.toLocaleDateString('fr-FR', opts);
+    const hasTime = iso.includes('T') || iso.includes(' ');
     const hh = d.getHours().toString().padStart(2, '0');
     const mm = d.getMinutes().toString().padStart(2, '0');
-    return `${datePart} à ${hh}h${mm}`;
+    const timePart = hasTime ? ` à ${hh}h${mm}` : '';
+    return `${datePart}${timePart}`;
   }
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
 const SLUG_DISPLAY: Record<string, string> = {
@@ -329,7 +331,9 @@ export default function AdminBookings() {
     serviceName: b.service_name,
     serviceCategory: b.service_slug,
     date: b.appointment_date,
-    time: b.time_slot || (b.time_preference ? (TIME_PREF_LABELS[b.time_preference]?.fr ?? b.time_preference) : ""),
+    time: (b.time_slot && b.time_slot !== "0")
+      ? b.time_slot
+      : (b.time_preference ? (TIME_PREF_LABELS[b.time_preference]?.fr ?? b.time_preference) : ""),
     duration: "",
     status: ((b.status === "requested" ? "pending" : b.status) as AdminBooking["status"]) || "pending",
     price: b.amount_xof ?? 0,
@@ -563,7 +567,7 @@ export default function AdminBookings() {
   };
 
   const handleMarkCompleted = async () => {
-    if (!selectedBooking || selectedBooking.status !== 'confirmed') return;
+    if (!selectedBooking || !['confirmed', 'assigned'].includes(selectedBooking.status)) return;
     setIsUpdating(true);
     const prevStatus = selectedBooking.status;
     const prevPayoutStatus = selectedBooking.payoutStatus;
@@ -1180,19 +1184,13 @@ export default function AdminBookings() {
                     </Button>
                     <Button
                       className="w-full"
-                      onClick={() => handleUpdateStatus(selectedBooking.id, "confirmed")}
-                      disabled={isUpdating || !selectedBooking.providerId}
+                      onClick={() => handleStatusChange(selectedBooking.id, "confirmed")}
+                      disabled={isUpdating}
                       data-testid="button-confirm-booking"
                     >
                       {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
                       {isFr ? "Confirmer" : "Confirm Booking"}
                     </Button>
-                    {!selectedBooking.providerId && (
-                      <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        {isFr ? "Assignez un prestataire avant de confirmer" : "Assign a provider before confirming"}
-                      </p>
-                    )}
                     <Button
                       variant="destructive"
                       className="w-full"
@@ -1303,6 +1301,26 @@ export default function AdminBookings() {
                       <User className="h-4 w-4 mr-2" />
                       {isFr ? "Assigner le prestataire" : "Assign Provider"}
                     </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={openQuoteModal}
+                      disabled={isUpdating}
+                      data-testid="button-send-quote-review"
+                    >
+                      <Banknote className="h-4 w-4 mr-2" />
+                      {isFr ? "Envoyer un devis" : "Send Quote"}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="w-full"
+                      onClick={openCancelModal}
+                      disabled={isUpdating}
+                      data-testid="button-cancel-review"
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      {isFr ? "Annuler" : "Cancel Booking"}
+                    </Button>
                   </div>
                 )}
 
@@ -1313,9 +1331,40 @@ export default function AdminBookings() {
                       className="w-full"
                       onClick={() => handleStatusChange(selectedBooking.id, 'confirmed')}
                       disabled={isUpdating}
+                      data-testid="button-confirm-assigned"
                     >
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Confirmer la réservation
+                      {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                      {isFr ? "Confirmer" : "Confirm Booking"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={openAssignModal}
+                      disabled={isUpdating}
+                      data-testid="button-reassign-assigned"
+                    >
+                      <User className="h-4 w-4 mr-2" />
+                      {isFr ? "Réassigner le prestataire" : "Reassign Provider"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleMarkCompleted}
+                      disabled={isUpdating}
+                      data-testid="button-complete-assigned"
+                    >
+                      {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                      {isFr ? "Terminer" : "Mark Completed"}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="w-full"
+                      onClick={openCancelModal}
+                      disabled={isUpdating}
+                      data-testid="button-cancel-assigned"
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      {isFr ? "Annuler" : "Cancel Booking"}
                     </Button>
                   </div>
                 )}
