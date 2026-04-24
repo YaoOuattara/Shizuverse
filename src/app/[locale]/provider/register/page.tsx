@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -89,7 +88,6 @@ function ProgressBar({ step, isFr }: { step: number; isFr: boolean }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ProviderRegisterPage() {
-  const t = useTranslations("providerRegister");
   const params = useParams();
   const locale = (params?.locale as string) ?? "fr";
   const isFr = locale === "fr";
@@ -97,9 +95,9 @@ export default function ProviderRegisterPage() {
   const { toast } = useToast();
 
   const [step, setStep] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting]   = useState(false);
   const [isImprovingBio, setIsImprovingBio] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted]         = useState(false);
 
   // ── Step 1 ────────────────────────────────────────────────────────────────
   const [accountType, setAccountType] = useState<"individual" | "company">("individual");
@@ -258,10 +256,16 @@ export default function ProviderRegisterPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 max-w-md w-full text-center">
           <CheckCircle className="h-14 w-14 text-green-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">{t("submittedTitle")}</h1>
-          <p className="text-gray-500 mb-6">{t("submittedDesc")}</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            {isFr ? "Candidature reçue !" : "Application Received!"}
+          </h1>
+          <p className="text-gray-500 mb-6">
+            {isFr
+              ? "Merci. Notre équipe examinera votre profil et vous contactera sous 24h."
+              : "Thank you. Our team will review your profile and contact you within 24 hours."}
+          </p>
           <Button onClick={() => router.push(`/${locale}`)} className="w-full bg-[#0F3A7A] hover:bg-[#0d3068]">
-            {t("backHome")}
+            {isFr ? "Retour à l'accueil" : "Back to Home"}
           </Button>
         </div>
       </div>
@@ -290,8 +294,14 @@ export default function ProviderRegisterPage() {
 
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">{t("title")}</h1>
-          <p className="text-gray-500 mt-1 text-sm">{t("subtitle")}</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isFr ? "Rejoindre Shizu en tant que prestataire" : "Join Shizu as a Provider"}
+          </h1>
+          <p className="text-gray-500 mt-1 text-sm">
+            {isFr
+              ? "Développez votre clientèle à Abidjan. 3 étapes rapides."
+              : "Grow your client base in Abidjan. 3 quick steps."}
+          </p>
         </div>
 
         <ProgressBar step={step} isFr={isFr} />
@@ -368,10 +378,12 @@ export default function ProviderRegisterPage() {
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
                 {isFr ? "Identité" : "Identity"}
               </p>
-              <Label htmlFor="full_name" className="text-sm text-gray-700">{t("fullName")}</Label>
+              <Label htmlFor="full_name" className="text-sm text-gray-700">
+                {isFr ? "Nom complet" : "Full name"} <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="full_name"
-                placeholder={t("fullNamePlaceholder")}
+                placeholder="Kouassi Amon"
                 value={account.full_name}
                 onChange={(e) => setAccount((a) => ({ ...a, full_name: e.target.value }))}
               />
@@ -402,7 +414,9 @@ export default function ProviderRegisterPage() {
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
                 {isFr ? "Sécurité" : "Security"}
               </p>
-              <Label htmlFor="password" className="text-sm text-gray-700">{t("password")}</Label>
+              <Label htmlFor="password" className="text-sm text-gray-700">
+                {isFr ? "Mot de passe" : "Password"} <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -410,7 +424,9 @@ export default function ProviderRegisterPage() {
                 value={account.password}
                 onChange={(e) => setAccount((a) => ({ ...a, password: e.target.value }))}
               />
-              <p className="text-xs text-gray-400">{t("passwordHint")}</p>
+              <p className="text-xs text-gray-400">
+                {isFr ? "Minimum 6 caractères" : "Minimum 6 characters"}
+              </p>
             </div>
 
             {/* Confirm password */}
@@ -437,7 +453,7 @@ export default function ProviderRegisterPage() {
               disabled={!step1Valid}
               className="w-full bg-[#0F3A7A] hover:bg-[#0d3068] mt-2"
             >
-              {t("continue")}
+              {isFr ? "Continuer" : "Continue"}
             </Button>
           </div>
         )}
@@ -499,7 +515,7 @@ export default function ProviderRegisterPage() {
             {/* Commune chips */}
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                {isFr ? "Communes d'intervention" : "Operating districts"} <span className="text-red-400">*</span>
+                {isFr ? "Zones d'intervention" : "Operating districts"} <span className="text-red-400">*</span>
               </p>
               <div className={`flex flex-wrap gap-2 ${COMMUNES.length > 10 ? "max-h-44 overflow-y-auto pr-1" : ""}`}>
                 {COMMUNES.map((commune) => {
@@ -550,13 +566,17 @@ export default function ProviderRegisterPage() {
             {/* Bio */}
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                {isFr ? "Présentation" : "About you"}
+                {isFr ? "Présentez-vous" : "About you"}
               </p>
-              <Label htmlFor="bio" className="text-sm text-gray-700">{t("bio")}</Label>
+              <Label htmlFor="bio" className="text-sm text-gray-700">
+                {isFr ? "Décrivez votre expérience" : "Describe your experience"}
+              </Label>
               <Textarea
                 id="bio"
                 rows={4}
-                placeholder={t("bioPlaceholder")}
+                placeholder={isFr
+                  ? "J'ai 5 ans d'expérience et je livre toujours des résultats impeccables…"
+                  : "I have 5 years of experience and always deliver excellent results..."}
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 className="resize-none"
@@ -573,20 +593,20 @@ export default function ProviderRegisterPage() {
                 ) : (
                   <Sparkles className="h-4 w-4" />
                 )}
-                {t("improveBio")}
+                {isFr ? "Améliorer avec l'IA" : "Improve with AI"}
               </Button>
             </div>
 
             <div className="flex gap-3 pt-1">
               <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
-                {t("back")}
+                {isFr ? "Retour" : "Back"}
               </Button>
               <Button
                 onClick={() => setStep(3)}
                 disabled={!step2Valid}
                 className="flex-1 bg-[#0F3A7A] hover:bg-[#0d3068]"
               >
-                {t("continue")}
+                {isFr ? "Continuer" : "Continue"}
               </Button>
             </div>
           </div>
@@ -798,7 +818,7 @@ export default function ProviderRegisterPage() {
                 onClick={() => setStep(2)}
                 className="w-full text-sm text-gray-400 hover:text-gray-600 transition-colors py-1"
               >
-                ← {t("back")}
+                ← {isFr ? "Retour" : "Back"}
               </button>
             </div>
           </div>
@@ -807,12 +827,12 @@ export default function ProviderRegisterPage() {
         </div>{/* end active step card */}
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          {t("alreadyProvider")}{" "}
+          {isFr ? "Déjà inscrit ?" : "Already registered?"}{" "}
           <button
             onClick={() => router.push(`/${locale}/provider/login`)}
             className="text-[#0F3A7A] underline"
           >
-            {t("loginLink")}
+            {isFr ? "Accéder à votre tableau de bord" : "Access your dashboard"}
           </button>
         </p>
       </div>
