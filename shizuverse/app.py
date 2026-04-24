@@ -69,6 +69,7 @@ def create_app():
         "https://shizu.pro",
         "https://www.shizu.pro",
         "https://client-sigma-gilt.vercel.app",
+        "https://client-git-frontend-yao-ouattaras-projects.vercel.app",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ] + _extra
