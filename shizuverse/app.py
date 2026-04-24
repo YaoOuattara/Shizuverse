@@ -64,7 +64,15 @@ def create_app():
     except Exception as e:
         app.logger.error(f"Migration failed on startup: {e}")
         # App continues to start — existing schema still works
-    CORS(app, origins="*")
+    _extra = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
+    ALLOWED_ORIGINS = [
+        "https://shizu.pro",
+        "https://www.shizu.pro",
+        "https://client-sigma-gilt.vercel.app",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ] + _extra
+    CORS(app, origins=ALLOWED_ORIGINS)
     Babel(app)
 
     limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
@@ -78,7 +86,7 @@ def create_app():
     def load_user(user_id):
         return User.query.get(int(user_id)) if user_id else None
 
-    socketio = SocketIO(app, async_mode="gevent", cors_allowed_origins="*", logger=True, engineio_logger=True)
+    socketio = SocketIO(app, async_mode="gevent", cors_allowed_origins=ALLOWED_ORIGINS, logger=True, engineio_logger=True)
     create_socket_instance(socketio)
 
     SKIP_NAMES = {"auth", "socket_chat", "chat"}
