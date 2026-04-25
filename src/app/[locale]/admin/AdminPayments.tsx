@@ -593,20 +593,20 @@ export default function AdminPayments() {
               {/* Amount Summary */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Total Amount</span>
+                  <span className="text-sm text-muted-foreground">{isFr ? "Montant total" : "Total Amount"}</span>
                   <span className="text-xl font-bold">{formatMoney(selectedBooking.price, selectedBooking.currency)}</span>
                 </div>
                 
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-1">
-                    <span className="text-xs text-muted-foreground">Payment:</span>
+                    <span className="text-xs text-muted-foreground">{isFr ? "Paiement :" : "Payment:"}</span>
                     <Badge className={`${paymentStatusColors[selectedBooking.paymentStatus]}`}>
                       {paymentStatusLabels[selectedBooking.paymentStatus]}
                     </Badge>
                   </div>
                   {selectedBooking.payoutStatus && (
                     <div className="flex items-center gap-1">
-                      <span className="text-xs text-muted-foreground">Payout:</span>
+                      <span className="text-xs text-muted-foreground">{isFr ? "Versement :" : "Payout:"}</span>
                       <Badge className={`${payoutStatusColors[selectedBooking.payoutStatus]}`}>
                         {payoutStatusLabels[selectedBooking.payoutStatus]}
                       </Badge>
@@ -672,9 +672,9 @@ export default function AdminPayments() {
               <div className="space-y-3 pt-4 border-t">
                 <h4 className="font-medium text-sm text-muted-foreground">Actions</h4>
                 
-                {/* Record Payment - for unpaid confirmed/completed bookings only */}
-                {selectedBooking.paymentStatus === 'unpaid' && 
-                 (selectedBooking.status === 'confirmed' || selectedBooking.status === 'completed') && (
+                {/* Record Payment - for unpaid bookings that are past the pending stage */}
+                {selectedBooking.paymentStatus === 'unpaid' &&
+                 !['cancelled', 'pending', 'requested'].includes(selectedBooking.status) && (
                   <Button
                     className="w-full"
                     onClick={openPaymentModal}
@@ -687,9 +687,9 @@ export default function AdminPayments() {
                 )}
 
                 {/* Pending bookings need confirmation first */}
-                {selectedBooking.paymentStatus === 'unpaid' && selectedBooking.status === 'pending' && (
+                {selectedBooking.paymentStatus === 'unpaid' && ['pending', 'requested'].includes(selectedBooking.status) && (
                   <p className="text-sm text-muted-foreground text-center py-2">
-                    Confirm the booking before recording payment.
+                    {isFr ? "Confirmez la réservation avant d'enregistrer le paiement." : "Confirm the booking before recording payment."}
                   </p>
                 )}
 
@@ -703,7 +703,7 @@ export default function AdminPayments() {
                     data-testid="button-issue-refund"
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
-                    Issue Refund
+                    {isFr ? "Rembourser" : "Issue Refund"}
                   </Button>
                 )}
 
@@ -716,28 +716,28 @@ export default function AdminPayments() {
                     data-testid="button-mark-payout-sent"
                   >
                     {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ArrowUpRight className="h-4 w-4 mr-2" />}
-                    Mark Payout Sent
+                    {isFr ? "Marquer versement envoyé" : "Mark Payout Sent"}
                   </Button>
                 )}
 
                 {/* Already refunded */}
                 {selectedBooking.paymentStatus === 'refunded' && (
                   <p className="text-sm text-muted-foreground text-center py-2">
-                    This payment has been refunded.
+                    {isFr ? "Ce paiement a été remboursé." : "This payment has been refunded."}
                   </p>
                 )}
 
                 {/* Payout already sent */}
                 {selectedBooking.payoutStatus === 'sent' && (
                   <p className="text-sm text-muted-foreground text-center py-2">
-                    Payout has been sent to the provider.
+                    {isFr ? "Le versement a été envoyé au prestataire." : "Payout has been sent to the provider."}
                   </p>
                 )}
 
                 {/* Payout failed */}
                 {selectedBooking.payoutStatus === 'failed' && (
                   <p className="text-sm text-destructive text-center py-2">
-                    Payout failed. Please retry manually.
+                    {isFr ? "Versement échoué. Réessayez manuellement." : "Payout failed. Please retry manually."}
                   </p>
                 )}
               </div>

@@ -1151,7 +1151,9 @@ export default function AdminBookings() {
                       data-testid="button-mark-paid"
                     >
                       {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Banknote className="h-4 w-4 mr-2" />}
-                      Mark Paid ({formatMoney(selectedBooking.price, selectedBooking.currency)})
+                      {isFr
+                        ? `Marquer payé (${formatMoney(selectedBooking.price, selectedBooking.currency)})`
+                        : `Mark Paid (${formatMoney(selectedBooking.price, selectedBooking.currency)})`}
                     </Button>
                   </div>
                 )}
@@ -1600,42 +1602,44 @@ export default function AdminBookings() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-2">
-                <Label>Zone</Label>
-                <Select value={quoteZone} onValueChange={(v) => handleQuoteInputChange('zone', v)}>
-                  <SelectTrigger data-testid="select-quote-zone">
-                    <SelectValue placeholder={isFr ? "Sélectionner une zone..." : "Select zone..."} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ZONES_LIST.map((zone) => (
-                      <SelectItem key={zone.value} value={zone.value}>
-                        {zone.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Zone</Label>
+                  <Select value={quoteZone} onValueChange={(v) => handleQuoteInputChange('zone', v)}>
+                    <SelectTrigger data-testid="select-quote-zone">
+                      <SelectValue placeholder={isFr ? "Zone..." : "Zone..."} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ZONES_LIST.map((zone) => (
+                        <SelectItem key={zone.value} value={zone.value}>
+                          {zone.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{isFr ? "Urgence" : "Urgency"}</Label>
+                  <Select value={quoteUrgency} onValueChange={(v) => handleQuoteInputChange('urgency', v)}>
+                    <SelectTrigger data-testid="select-quote-urgency">
+                      <SelectValue placeholder="Normal" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {URGENCY_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {URGENCY_LABELS[opt.value]?.[isFr ? 'fr' : 'en'] ?? opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="space-y-2">
-                <Label>{isFr ? "Urgence" : "Urgency"}</Label>
-                <Select value={quoteUrgency} onValueChange={(v) => handleQuoteInputChange('urgency', v)}>
-                  <SelectTrigger data-testid="select-quote-urgency">
-                    <SelectValue placeholder="Normal" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {URGENCY_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {URGENCY_LABELS[opt.value]?.[isFr ? 'fr' : 'en'] ?? opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>{isFr ? "Préférence horaire" : "Time Pref."}</Label>
+                <Label>{isFr ? "Préférence horaire" : "Time Preference"}</Label>
                 <Select value={quoteTimePreference} onValueChange={(v) => handleQuoteInputChange('timePreference', v)}>
                   <SelectTrigger data-testid="select-quote-time-pref">
-                    <SelectValue placeholder="Anytime" />
+                    <SelectValue placeholder={isFr ? "Flexible" : "Anytime"} />
                   </SelectTrigger>
                   <SelectContent>
                     {TIME_PREFERENCE_OPTIONS.map((opt) => (

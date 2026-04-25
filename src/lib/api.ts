@@ -50,6 +50,10 @@ export const adminApi = {
   getServices: () => adminFetch("/api/admin/services"),
   patchService: (id: number, body: { is_active?: boolean; is_priority?: boolean; featured?: boolean; name?: string }) =>
     adminFetch(`/api/admin/services/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  createService: (body: { name: string; category?: string; is_active?: boolean }) =>
+    adminFetch("/api/admin/services", { method: "POST", body: JSON.stringify(body) }),
+  deleteService: (id: number) =>
+    adminFetch(`/api/admin/services/${id}`, { method: "DELETE" }),
 
   // New admin portal endpoints (/admin/* blueprint)
   portalGetProviders: (params?: { verification_status?: string; listed_status?: string; provider_status?: string }) => {

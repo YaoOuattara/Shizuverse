@@ -267,47 +267,67 @@ export default function AdminServices() {
       return;
     }
     setIsSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
 
     if (editingService) {
-      setServices(prev =>
-        prev.map(s =>
-          s.id === editingService.id
-            ? {
-                ...s,
-                name: formData.name.trim(),
-                category: formData.category,
-                durationMins: formData.durationMins,
-                basePrice: formData.basePrice,
-                description: formData.description.trim(),
-                pricingMode: formData.pricingMode,
-                minPrice: formData.minPrice,
-                maxPrice: formData.maxPrice,
-                pricingRules: formData.pricingRules,
-              }
-            : s,
-        ),
-      );
-      toast({ title: isFr ? "Service mis à jour" : "Service Updated", description: formData.name });
-      setEditingService(null);
+      try {
+        await adminApi.patchService(Number(editingService.id), { name: formData.name.trim() });
+        setServices(prev =>
+          prev.map(s =>
+            s.id === editingService.id
+              ? {
+                  ...s,
+                  name: formData.name.trim(),
+                  category: formData.category,
+                  durationMins: formData.durationMins,
+                  basePrice: formData.basePrice,
+                  description: formData.description.trim(),
+                  pricingMode: formData.pricingMode,
+                  minPrice: formData.minPrice,
+                  maxPrice: formData.maxPrice,
+                  pricingRules: formData.pricingRules,
+                }
+              : s,
+          ),
+        );
+        toast({ title: isFr ? "Service mis à jour" : "Service Updated", description: formData.name });
+        setEditingService(null);
+      } catch {
+        toast({
+          title: isFr ? "Erreur" : "Error",
+          description: isFr ? "Impossible de mettre à jour le service." : "Could not update service.",
+          variant: "destructive",
+        });
+      }
     } else {
-      const newService: AdminService = {
-        id: String(Date.now()),
-        name: formData.name.trim(),
-        category: formData.category,
-        durationMins: formData.durationMins,
-        basePrice: formData.basePrice,
-        description: formData.description.trim(),
-        active: true,
-        pricingMode: formData.pricingMode,
-        minPrice: formData.minPrice,
-        maxPrice: formData.maxPrice,
-        pricingRules: formData.pricingRules,
-      };
-      setServices(prev => [...prev, newService]);
-      setOpenCategories(prev => new Set([...prev, formData.category]));
-      toast({ title: isFr ? "Service créé" : "Service Created", description: formData.name });
-      setIsCreating(false);
+      try {
+        const created = await adminApi.createService({
+          name: formData.name.trim(),
+          category: formData.category,
+        }) as { id: number; name: string; category: string; active: boolean };
+        const newService: AdminService = {
+          id: String(created.id),
+          name: created.name,
+          category: created.category || formData.category,
+          durationMins: formData.durationMins,
+          basePrice: formData.basePrice,
+          description: formData.description.trim(),
+          active: created.active ?? true,
+          pricingMode: formData.pricingMode,
+          minPrice: formData.minPrice,
+          maxPrice: formData.maxPrice,
+          pricingRules: formData.pricingRules,
+        };
+        setServices(prev => [...prev, newService]);
+        setOpenCategories(prev => new Set([...prev, formData.category]));
+        toast({ title: isFr ? "Service créé" : "Service Created", description: formData.name });
+        setIsCreating(false);
+      } catch {
+        toast({
+          title: isFr ? "Erreur" : "Error",
+          description: isFr ? "Impossible de créer le service." : "Could not create service.",
+          variant: "destructive",
+        });
+      }
     }
     setIsSaving(false);
   };
@@ -331,11 +351,20 @@ export default function AdminServices() {
 
   const handleDelete = async (serviceId: string) => {
     setIsSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 200));
-    setServices(prev => prev.filter(s => s.id !== serviceId));
-    setDeleteConfirm(null);
-    toast({ title: isFr ? "Service supprimé" : "Service Deleted" });
-    setIsSaving(false);
+    try {
+      await adminApi.deleteService(Number(serviceId));
+      setServices(prev => prev.filter(s => s.id !== serviceId));
+      setDeleteConfirm(null);
+      toast({ title: isFr ? "Service supprimé" : "Service Deleted" });
+    } catch {
+      toast({
+        title: isFr ? "Erreur" : "Error",
+        description: isFr ? "Impossible de supprimer le service." : "Could not delete service.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleReset = () => {
