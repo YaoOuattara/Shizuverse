@@ -404,8 +404,15 @@ export default function AdminBookings() {
     );
   }, [liveProviders]);
 
+  // Map booking id → urgency from raw API data (ApiBooking has urgency field)
+  const urgencyMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    apiBookings.forEach(b => { if (b.urgency) m[String(b.id)] = b.urgency; });
+    return m;
+  }, [apiBookings]);
+
   const filteredBookings = useMemo(() => {
-    return bookings.filter((booking) => {
+    const filtered = bookings.filter((booking) => {
       const matchesSearch =
         searchQuery === "" ||
         booking.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -418,7 +425,13 @@ export default function AdminBookings() {
 
       return matchesSearch && matchesStatus;
     });
-  }, [bookings, searchQuery, statusFilter]);
+    // Urgent bookings always float to the top
+    return filtered.sort((a, b) => {
+      const aU = urgencyMap[a.id] === 'urgent_2h' ? 0 : 1;
+      const bU = urgencyMap[b.id] === 'urgent_2h' ? 0 : 1;
+      return aU - bU;
+    });
+  }, [bookings, searchQuery, statusFilter, urgencyMap]);
 
   const getReviewForBooking = (bookingId: string) => {
     return reviews.find(r => r.bookingId === bookingId);
@@ -812,6 +825,11 @@ export default function AdminBookings() {
                         <p className="text-xs text-muted-foreground">{formatDate(booking.createdAt, isFr ? 'fr' : 'en')}</p>
                       </div>
                       <div className="flex items-center gap-1 sm:justify-end flex-wrap">
+                        {urgencyMap[booking.id] === 'urgent_2h' && (
+                          <Badge className="text-xs bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                            ⚡ {isFr ? "Urgent" : "Urgent"}
+                          </Badge>
+                        )}
                         <Badge className={`text-xs ${statusColors[booking.status] || statusColors.pending}`}>
                           {statusLabels[booking.status] || booking.status}
                         </Badge>

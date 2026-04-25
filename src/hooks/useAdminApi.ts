@@ -30,6 +30,7 @@ export interface ApiBooking {
   cancellation_reason: string | null;
   time_slot?: string;
   time_preference?: string;
+  urgency?: string;
 }
 
 export interface ApiProvider {

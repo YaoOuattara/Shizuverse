@@ -390,7 +390,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
         ${active
           ? urgent
             ? "border-red-500 bg-red-500 text-white"
-            : "border-[#0F3A7A] bg-[#0F3A7A] text-white"
+            : "border-green-600 bg-green-600 text-white"
           : urgent
             ? "border-orange-400 bg-white text-orange-600 hover:border-orange-500"
             : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
@@ -425,7 +425,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
       </div>
 
       <button type="button" onClick={() => setStep(2)}
-        className="w-full bg-[#0F3A7A] text-white font-semibold py-3 rounded-xl hover:bg-[#0d3068] transition-colors">
+        className="w-full bg-green-600 text-white font-semibold py-3 rounded-xl hover:bg-green-700 transition-colors">
         {isFr ? "Continuer" : "Continue"}
       </button>
     </div>
@@ -508,7 +508,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           {isFr ? "Retour" : "Back"}
         </button>
         <button type="button" onClick={() => setStep(3)} disabled={!step2CanContinue}
-          className="flex-1 bg-[#0F3A7A] text-white font-semibold py-3 rounded-xl hover:bg-[#0d3068] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+          className="flex-1 bg-green-600 text-white font-semibold py-3 rounded-xl hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
           {isFr ? "Continuer" : "Continue"}
         </button>
       </div>
@@ -592,7 +592,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           {isFr ? "Retour" : "Back"}
         </button>
         <button type="button" onClick={() => setStep(4)} disabled={!date}
-          className="flex-1 bg-[#0F3A7A] text-white font-semibold py-3 rounded-xl hover:bg-[#0d3068] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+          className="flex-1 bg-green-600 text-white font-semibold py-3 rounded-xl hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
           {isFr ? "Continuer" : "Continue"}
         </button>
       </div>
@@ -661,7 +661,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           {isFr ? "Retour" : "Back"}
         </button>
         <button type="button" onClick={() => setStep(5)} disabled={!step4CanContinue}
-          className="flex-1 bg-[#0F3A7A] text-white font-semibold py-3 rounded-xl hover:bg-[#0d3068] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+          className="flex-1 bg-green-600 text-white font-semibold py-3 rounded-xl hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
           {isFr ? "Continuer" : "Continue"}
         </button>
       </div>
