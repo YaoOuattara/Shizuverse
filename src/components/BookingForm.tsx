@@ -169,8 +169,10 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   // ── Multi-step state ──────────────────────────────────────────────────────
   const [step, setStep] = useState(1);
 
-  // Step 2
-  const [urgencyChip, setUrgencyChip]   = useState<string | null>(null);
+  // Step 2 — pre-select urgency from URL param (?urgency=urgent_2h)
+  const [urgencyChip, setUrgencyChip]   = useState<string | null>(() =>
+    searchParams?.get("urgency") === "urgent_2h" ? "urgent_2h" : null
+  );
   const [timeSlot, setTimeSlot]         = useState<string | null>(null);
   const [notes, setNotes]               = useState("");
 
