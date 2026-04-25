@@ -200,6 +200,66 @@ def patch_service(service_id):
     db.session.commit()
     return jsonify({'success': True, 'id': service.id, 'is_active': service.is_active})
 
+
+@admin_bp.route('/services', methods=['POST'])
+@require_admin_token
+def create_service():
+    from shizuverse.models.service_models import ServiceSubcategory, ServiceCategory
+    data = request.get_json() or {}
+    name = str(data.get('name', '')).strip()
+    if not name:
+        return jsonify({'error': 'name is required'}), 400
+
+    category_name = str(data.get('category', '')).strip()
+
+    # Try to find best-matching subcategory by category name
+    subcategory = None
+    if category_name:
+        cats = ServiceCategory.query.all()
+        for cat in cats:
+            if category_name.lower() in cat.name.lower() or cat.name.lower() in category_name.lower():
+                sub = ServiceSubcategory.query.filter_by(category_id=cat.id).first()
+                if sub:
+                    subcategory = sub
+                    break
+
+    if not subcategory:
+        subcategory = ServiceSubcategory.query.first()
+
+    if not subcategory:
+        return jsonify({'error': 'No subcategory available to assign service'}), 400
+
+    service = Service(
+        name=name,
+        is_active=bool(data.get('is_active', True)),
+        is_priority=False,
+        featured=False,
+        professional_required=None,
+        subcategory_id=subcategory.id,
+    )
+    db.session.add(service)
+    db.session.commit()
+
+    cat = ServiceCategory.query.get(subcategory.category_id) if subcategory else None
+    return jsonify({
+        'id': service.id,
+        'name': service.name,
+        'category': cat.name if cat else category_name,
+        'active': service.is_active,
+        'is_priority': service.is_priority,
+        'featured': service.featured,
+    }), 201
+
+
+@admin_bp.route('/services/<int:service_id>', methods=['DELETE'])
+@require_admin_token
+def delete_service(service_id):
+    service = Service.query.get_or_404(service_id)
+    db.session.delete(service)
+    db.session.commit()
+    return jsonify({'success': True, 'id': service_id})
+
+
 provider_bp = Blueprint('provider', __name__)
 
 
