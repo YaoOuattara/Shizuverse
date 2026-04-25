@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-const client = new Anthropic()
-
 export async function POST(req: NextRequest) {
   try {
+    const client = new Anthropic()
     const { bio, services } = await req.json() as { bio: string; services?: string[] }
     console.log('[improve-bio] bio length:', bio?.length, 'services:', services)
 
@@ -29,7 +28,7 @@ Améliore cette bio : rends-la plus professionnelle, accrocheuse et convaincante
 Garde le même sens, 2-4 phrases max. Réponds UNIQUEMENT avec la bio améliorée, sans commentaire.`
 
     const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-haiku-4-5',
       max_tokens: 200,
       messages: [{ role: 'user', content: prompt }],
     })
@@ -41,6 +40,6 @@ Garde le même sens, 2-4 phrases max. Réponds UNIQUEMENT avec la bio amélioré
     return NextResponse.json({ improved_bio })
   } catch (err) {
     console.error('[improve-bio] error:', err)
-    return NextResponse.json({ improved_bio: null, error: String(err) }, { status: 500 })
+    return NextResponse.json({ improved_bio: null, error: 'ai_error' }, { status: 500 })
   }
 }
