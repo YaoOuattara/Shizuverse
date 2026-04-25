@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, usePathname, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,17 +26,19 @@ interface ApiCategory {
   name_en: string;
 }
 
-const CATEGORY_ICON_MAP: Record<number, LucideIcon> = {
-  13: Droplets,
-  14: Wrench,
-  15: Zap,
-  16: Hammer,
-  17: Baby,
-  18: Sparkles,
-  19: Heart,
-  20: Leaf,
-  21: Wind,
-};
+function getCategoryIcon(cat: ApiCategory): LucideIcon {
+  const name = (cat.name_en || cat.name || "").toLowerCase();
+  if (name.includes("clean") || name.includes("nettoy"))           return Sparkles;
+  if (name.includes("plumb") || name.includes("plomb") || name.includes("water") || name.includes("eau")) return Droplets;
+  if (name.includes("electr"))                                     return Zap;
+  if (name.includes("carpen") || name.includes("menuiser") || name.includes("construct") || name.includes("handyman")) return Hammer;
+  if (name.includes("baby") || name.includes("child") || name.includes("enfant") || name.includes("nanny")) return Baby;
+  if (name.includes("massage") || name.includes("wellness") || name.includes("beauty") || name.includes("beaut")) return Heart;
+  if (name.includes("garden") || name.includes("jardin") || name.includes("green") || name.includes("plant")) return Leaf;
+  if (name.includes("ac") || name.includes("air") || name.includes("clim") || name.includes("hvac") || name.includes("wind") || name.includes("cool")) return Wind;
+  if (name.includes("plumb") || name.includes("pipe") || name.includes("wrench") || name.includes("repair") || name.includes("réparat")) return Wrench;
+  return Sparkles;
+}
 
 function displayCatName(cat: ApiCategory, locale: string): string {
   return locale === "fr" ? (cat.name_fr || cat.name) : (cat.name_en || cat.name);
@@ -456,7 +458,7 @@ export default function ProviderRegisterPage() {
             <Button
               onClick={() => setStep(2)}
               disabled={!step1Valid}
-              className="w-full bg-[#0F3A7A] hover:bg-[#0d3068] mt-2"
+              className="w-full bg-green-600 hover:bg-green-700 mt-2"
             >
               {isFr ? "Continuer" : "Continue"}
             </Button>
@@ -486,7 +488,7 @@ export default function ProviderRegisterPage() {
                 <div className="grid grid-cols-2 gap-2">
                   {categories.map((cat) => {
                     const selected = selectedServices.includes(cat.id);
-                    const Icon = CATEGORY_ICON_MAP[cat.id] ?? Sparkles;
+                    const Icon = getCategoryIcon(cat);
                     return (
                       <button
                         key={cat.id}
@@ -637,7 +639,7 @@ export default function ProviderRegisterPage() {
               <Button
                 onClick={() => setStep(3)}
                 disabled={!step2Valid}
-                className="flex-1 bg-[#0F3A7A] hover:bg-[#0d3068]"
+                className="flex-1 bg-green-600 hover:bg-green-700"
               >
                 {isFr ? "Continuer" : "Continue"}
               </Button>
