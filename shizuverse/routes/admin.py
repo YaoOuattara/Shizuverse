@@ -210,6 +210,55 @@ def toggle_activation(provider_id):
     return jsonify({'message': f'Provider {action}d', 'provider_status': p.provider_status})
 
 
+# ── Provider Service List Edit ────────────────────────────────
+
+@admin_bp.route('/providers/<int:provider_id>/services', methods=['PATCH'])
+@admin_required
+def update_provider_services(provider_id):
+    """Replace a provider's service list. Accepts {services: [name, ...]}."""
+    data = request.get_json() or {}
+    new_names = [s.strip() for s in (data.get('services') or []) if s.strip()]
+
+    canonical = ServiceProvider.query.get_or_404(provider_id)
+    user_id = canonical.user_id
+
+    existing_rows = ServiceProvider.query.filter_by(user_id=user_id).all()
+    existing_by_svc_id = {row.service_id: row for row in existing_rows}
+
+    # Resolve names → service IDs (case-insensitive)
+    new_svc_ids = set()
+    for name in new_names:
+        svc = Service.query.filter(Service.name.ilike(name)).first()
+        if svc:
+            new_svc_ids.add(svc.id)
+
+    # Remove rows whose service is no longer in the list
+    for svc_id, row in list(existing_by_svc_id.items()):
+        if svc_id not in new_svc_ids:
+            db.session.delete(row)
+
+    # Add rows for newly added services
+    for svc_id in new_svc_ids:
+        if svc_id not in existing_by_svc_id:
+            db.session.add(ServiceProvider(
+                user_id=user_id,
+                service_id=svc_id,
+                company_name=canonical.company_name,
+                phone_number=canonical.phone_number,
+                bio=canonical.bio,
+                address=canonical.address,
+                verified=canonical.verified,
+                verification_status=canonical.verification_status,
+                account_type=getattr(canonical, 'account_type', None),
+            ))
+
+    db.session.commit()
+
+    updated = ServiceProvider.query.filter_by(user_id=user_id).all()
+    services = [row.service.name for row in updated if row.service]
+    return jsonify({'success': True, 'services': services})
+
+
 # ── Provider Directory ────────────────────────────────────────
 
 @admin_bp.route('/providers', methods=['GET'])
