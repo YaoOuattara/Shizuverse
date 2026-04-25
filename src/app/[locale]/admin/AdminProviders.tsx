@@ -64,6 +64,9 @@ import {
   XCircle,
   AlertTriangle,
   Sparkles,
+  Pencil,
+  X,
+  Plus,
 } from "lucide-react";
 import { type AdminProvider, type VerificationStatus } from "@/data/adminStore";
 import { COMMUNES } from "@/components/CommuneAutocomplete";
@@ -418,6 +421,47 @@ export default function AdminProviders() {
     setSuspendModalOpen(true);
   };
 
+  // ── Edit services state ───────────────────────────────────────────────────
+  const [editServicesMode, setEditServicesMode] = useState(false);
+  const [editingServices, setEditingServices] = useState<string[]>([]);
+  const [serviceAddValue, setServiceAddValue] = useState("");
+  const [isSavingServices, setIsSavingServices] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+
+  useEffect(() => {
+    const base = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
+    fetch(`${base}/api/services/categories`)
+      .then((r) => r.json())
+      .then((data: Array<{ name_fr?: string; name: string }>) =>
+        setAvailableCategories(data.map((c) => c.name_fr || c.name).sort())
+      )
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setEditServicesMode(false);
+    setEditingServices([]);
+    setServiceAddValue("");
+  }, [selectedProvider?.id]);
+
+  const handleSaveServices = async (providerId: string) => {
+    setIsSavingServices(true);
+    try {
+      await adminApi.patchProviderServices(Number(providerId), editingServices);
+      updateLocalProvider(providerId, { services: [...editingServices] });
+      setEditServicesMode(false);
+      toast({
+        title: isFr ? "Services mis à jour" : "Services Updated",
+        description: isFr ? "La liste des services a été mise à jour." : "Service list has been updated.",
+      });
+    } catch (err) {
+      console.error("Failed to update services:", err);
+      toast({ title: "Error", description: "Failed to update services.", variant: "destructive" });
+    } finally {
+      setIsSavingServices(false);
+    }
+  };
+
   return (
     <AdminLayout title={isFr ? "Prestataires" : "Providers"}>
       <div className="space-y-4">
@@ -703,14 +747,109 @@ export default function AdminProviders() {
 
               {/* Services */}
               <div className="space-y-3">
-                <h4 className="font-medium text-sm text-muted-foreground">Services</h4>
-                <div className="flex flex-wrap gap-1">
-                  {selectedProvider.services.map((service) => (
-                    <Badge key={service} variant="secondary" className="text-xs">
-                      {service}
-                    </Badge>
-                  ))}
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-sm text-muted-foreground">
+                    {isFr ? "Services" : "Services"}
+                  </h4>
+                  {!editServicesMode && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingServices([...selectedProvider.services]);
+                        setEditServicesMode(true);
+                      }}
+                      className="flex items-center gap-1 text-xs text-[#0F3A7A] hover:underline"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      {isFr ? "Éditer les services" : "Edit services"}
+                    </button>
+                  )}
                 </div>
+
+                {!editServicesMode ? (
+                  <div className="flex flex-wrap gap-1">
+                    {selectedProvider.services.length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">
+                        {isFr ? "Aucun service" : "No services"}
+                      </p>
+                    ) : selectedProvider.services.map((service) => (
+                      <Badge key={service} variant="secondary" className="text-xs">
+                        {service}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Current services as removable chips */}
+                    <div className="flex flex-wrap gap-1.5 min-h-[2rem]">
+                      {editingServices.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic">
+                          {isFr ? "Aucun service sélectionné" : "No services selected"}
+                        </p>
+                      ) : editingServices.map((svc) => (
+                        <Badge key={svc} variant="secondary" className="text-xs flex items-center gap-1 pr-1">
+                          {svc}
+                          <button
+                            type="button"
+                            onClick={() => setEditingServices((prev) => prev.filter((s) => s !== svc))}
+                            className="ml-0.5 hover:text-red-500 transition-colors"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+
+                    {/* Add service dropdown */}
+                    <Select
+                      value={serviceAddValue}
+                      onValueChange={(v) => {
+                        if (v && !editingServices.includes(v)) {
+                          setEditingServices((prev) => [...prev, v]);
+                        }
+                        setServiceAddValue("");
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder={isFr ? "Ajouter un service…" : "Add a service…"} />
+                      </SelectTrigger>
+                      <SelectContent className="z-50">
+                        {(availableCategories.length > 0 ? availableCategories : allCategories)
+                          .filter((cat) => !editingServices.includes(cat))
+                          .map((cat) => (
+                            <SelectItem key={cat} value={cat} className="text-sm">
+                              {cat}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+
+                    {/* Save / Cancel */}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => {
+                          setEditServicesMode(false);
+                          setEditingServices([]);
+                          setServiceAddValue("");
+                        }}
+                      >
+                        {isFr ? "Annuler" : "Cancel"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        disabled={isSavingServices}
+                        onClick={() => handleSaveServices(selectedProvider.id)}
+                      >
+                        {isSavingServices ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                        {isFr ? "Enregistrer" : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Stats */}

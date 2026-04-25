@@ -111,7 +111,7 @@ export default function ProviderRegisterPage() {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [selectedServices, setSelectedServices] = useState<number[]>([]);
   const [selectedCommunes, setSelectedCommunes] = useState<string[]>([]);
-  const [tarifIndicatif, setTarifIndicatif] = useState("");
+  const [serviceRates, setServiceRates] = useState<Record<number, { min: string; max: string }>>({});
   const [bio, setBio] = useState("");
 
   useEffect(() => {
@@ -232,7 +232,12 @@ export default function ProviderRegisterPage() {
           account_type: accountType,
           company_name: accountType === "company" ? businessName.trim() : undefined,
           rccm_number: accountType === "company" && rccmNumber.trim() ? rccmNumber.trim() : undefined,
-          hourly_rate: tarifIndicatif ? Number(tarifIndicatif) : undefined,
+          service_rates: Object.fromEntries(
+            Object.entries(serviceRates).map(([id, r]) => {
+              const cat = categories.find((c) => c.id === Number(id));
+              return [cat ? displayCatName(cat, locale) : id, { min: Number(r.min) || 0, max: Number(r.max) || 0 }];
+            })
+          ),
           profile_photo_url: profilePhotoUrl || undefined,
           id_doc_type: idDocType || undefined,
           id_doc_url: idDocUrl || undefined,
@@ -486,11 +491,14 @@ export default function ProviderRegisterPage() {
                       <button
                         key={cat.id}
                         type="button"
-                        onClick={() =>
-                          setSelectedServices((prev) =>
-                            selected ? prev.filter((id) => id !== cat.id) : [...prev, cat.id]
-                          )
-                        }
+                        onClick={() => {
+                          if (selected) {
+                            setSelectedServices((prev) => prev.filter((id) => id !== cat.id));
+                            setServiceRates((prev) => { const n = { ...prev }; delete n[cat.id]; return n; });
+                          } else {
+                            setSelectedServices((prev) => [...prev, cat.id]);
+                          }
+                        }}
                         className={`relative flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all
                           ${selected
                             ? "border-[#0F3A7A] bg-[#0F3A7A] text-white"
@@ -541,26 +549,51 @@ export default function ProviderRegisterPage() {
               </div>
             </div>
 
-            {/* Tarif indicatif */}
+            {/* Per-service price ranges */}
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                {isFr ? "Tarification" : "Pricing"}
+                {isFr ? "Tarification par service" : "Pricing per service"}
               </p>
-              <Label htmlFor="tarif" className="text-sm text-gray-700">
-                {isFr ? "Tarif indicatif (FCFA/heure)" : "Indicative rate (FCFA/hour)"}
-              </Label>
-              <div className="flex items-center gap-2">
-                <input
-                  id="tarif"
-                  type="number"
-                  min="0"
-                  value={tarifIndicatif}
-                  onChange={(e) => setTarifIndicatif(e.target.value)}
-                  placeholder={isFr ? "Ex: 5 000" : "e.g. 5000"}
-                  className={inputCls}
-                />
-                <span className="text-sm text-gray-500 shrink-0">FCFA</span>
-              </div>
+              {selectedServices.length === 0 ? (
+                <p className="text-sm text-gray-400 italic py-1">
+                  {isFr
+                    ? "Sélectionnez vos services pour définir vos tarifs"
+                    : "Select your services to set your rates"}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {selectedServices.map((id) => {
+                    const cat = categories.find((c) => c.id === id);
+                    if (!cat) return null;
+                    const name = displayCatName(cat, locale);
+                    const rates = serviceRates[id] ?? { min: "", max: "" };
+                    const setRate = (field: "min" | "max", val: string) =>
+                      setServiceRates((prev) => ({ ...prev, [id]: { ...(prev[id] ?? { min: "", max: "" }), [field]: val } }));
+                    return (
+                      <div key={id} className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm text-gray-700 w-28 truncate shrink-0">{name}</span>
+                        <span className="text-xs text-gray-400 shrink-0">{isFr ? "de" : "from"}</span>
+                        <input
+                          type="number" min="0"
+                          value={rates.min}
+                          onChange={(e) => setRate("min", e.target.value)}
+                          placeholder="0"
+                          className="w-24 h-8 text-sm rounded-md border border-input bg-background px-2 py-1 text-right focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        />
+                        <span className="text-xs text-gray-400 shrink-0">{isFr ? "à" : "to"}</span>
+                        <input
+                          type="number" min="0"
+                          value={rates.max}
+                          onChange={(e) => setRate("max", e.target.value)}
+                          placeholder="0"
+                          className="w-24 h-8 text-sm rounded-md border border-input bg-background px-2 py-1 text-right focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        />
+                        <span className="text-xs text-gray-400 shrink-0">FCFA</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Bio */}
