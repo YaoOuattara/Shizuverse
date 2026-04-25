@@ -554,7 +554,7 @@ export default function ProviderRegisterPage() {
             {/* Per-service price ranges */}
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                {isFr ? "Tarification par service" : "Pricing per service"}
+                {isFr ? "Tarif indicatif" : "Pricing per service"}
               </p>
               {selectedServices.length === 0 ? (
                 <p className="text-sm text-gray-400 italic py-1">
@@ -867,7 +867,7 @@ export default function ProviderRegisterPage() {
             onClick={() => router.push(`/${locale}/provider/login`)}
             className="text-[#0F3A7A] underline"
           >
-            {isFr ? "Accéder à votre tableau de bord" : "Access your dashboard"}
+            {isFr ? "Accéder à mon tableau de bord" : "Access your dashboard"}
           </button>
         </p>
       </div>
