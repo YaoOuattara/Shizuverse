@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
-import { useAdminStats, useAdminBookings, useAdminProviders, type ApiBooking } from "@/hooks/useAdminApi";
+import { useAdminStats, useAdminBookings, useAdminProviders, useAdminReviews, type ApiBooking } from "@/hooks/useAdminApi";
 import { useAdminStore, type AdminProvider, type DateRangeOption, type VerificationStatus } from "@/data/adminStore";
 import { useToast } from "@/hooks/use-toast";
 import { formatMoney } from "@/lib/currency";
@@ -91,15 +91,33 @@ export default function AdminOverview() {
   
   const { stats: liveStats } = useAdminStats();
   const { bookings: liveBookings } = useAdminBookings();
+  const { providers: liveProviders } = useAdminProviders();
+  const { reviews: liveReviews } = useAdminReviews();
+
+  // Provider counts — derived from the live providers list (single source of truth)
+  const liveActiveProviders = liveProviders.filter(p => p.provider_status === 'active').length;
+  const liveTotalProviders = liveProviders.length || (liveStats?.total_providers ?? 0);
+
+  // Average rating — only show when real reviews exist in DB
+  const liveAvgRating: number | null = liveReviews.length > 0
+    ? liveReviews.reduce((sum, r) => sum + r.rating, 0) / liveReviews.length
+    : null;
+
+  // Booking counts — derived from liveBookings (same source as recent bookings list)
+  const livePending   = liveBookings.filter(b => b.status === 'pending' || b.status === 'under_review').length;
+  const liveConfirmed = liveBookings.filter(b => b.status === 'confirmed' || b.status === 'assigned').length;
+  const liveCompleted = liveBookings.filter(b => b.status === 'completed').length;
+  const liveCancelled = liveBookings.filter(b => b.status === 'cancelled').length;
+
   const mockKpis = getKPIs();
   const kpis = {
     ...mockKpis,
-    totalBookings: liveStats?.total_bookings ?? mockKpis.totalBookings,
-    pendingBookings: liveStats?.pending ?? mockKpis.pendingBookings,
-    confirmedBookings: liveStats?.confirmed ?? mockKpis.confirmedBookings,
-    completedBookings: liveStats?.completed ?? mockKpis.completedBookings,
-    cancelledBookings: liveStats?.cancelled ?? mockKpis.cancelledBookings,
-    totalProviders: liveStats?.total_providers ?? mockKpis.totalProviders,
+    totalBookings:     liveBookings.length      || (liveStats?.total_bookings   ?? mockKpis.totalBookings),
+    pendingBookings:   livePending               || (liveStats?.pending          ?? mockKpis.pendingBookings),
+    confirmedBookings: liveConfirmed             || (liveStats?.confirmed        ?? mockKpis.confirmedBookings),
+    completedBookings: liveCompleted             || (liveStats?.completed        ?? mockKpis.completedBookings),
+    cancelledBookings: liveCancelled             || (liveStats?.cancelled        ?? mockKpis.cancelledBookings),
+    totalProviders:    liveTotalProviders,
   };
 
   // Recent bookings: real API data, sorted by created_at desc, top 5
@@ -204,10 +222,15 @@ export default function AdminOverview() {
 
   return (
     <AdminLayout title={isFr ? "Tableau de bord" : "Overview"}>
-      {liveStats && (
+      {(liveBookings.length > 0 || liveProviders.length > 0) && (
         <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-sm text-green-800">
           <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-          <strong>Live:</strong> {liveStats.total_bookings} {isFr ? "réservations" : "bookings"} · {liveStats.pending} {isFr ? "en attente" : "pending"} · {liveStats.confirmed} {isFr ? "confirmées" : "confirmed"} · {liveStats.completed} {isFr ? "terminées" : "completed"} · {liveStats.total_providers} {isFr ? "prestataires" : "providers"}
+          <strong>Live:</strong>{" "}
+          {liveBookings.length} {isFr ? "réservations" : "bookings"}{" "}
+          · {livePending} {isFr ? "en attente" : "pending"}{" "}
+          · {liveConfirmed} {isFr ? "confirmées" : "confirmed"}{" "}
+          · {liveCompleted} {isFr ? "terminées" : "completed"}{" "}
+          · {liveTotalProviders} {isFr ? "prestataires" : "providers"}
         </div>
       )}
       <div className="space-y-6">
@@ -308,7 +331,14 @@ export default function AdminOverview() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">{isFr ? "Note moyenne" : "Avg Rating"}</p>
-                  <p className="text-2xl font-bold" data-testid="kpi-avg-rating">{kpis.avgRating.toFixed(1)}</p>
+                  <p className="text-2xl font-bold" data-testid="kpi-avg-rating">
+                    {liveAvgRating !== null ? liveAvgRating.toFixed(1) : "—"}
+                  </p>
+                  {liveReviews.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {liveReviews.length} {isFr ? "avis" : "reviews"}
+                    </p>
+                  )}
                 </div>
                 <Star className="h-8 w-8 text-amber-500/50" />
               </div>
@@ -319,9 +349,15 @@ export default function AdminOverview() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">{isFr ? "Prestataires actifs" : "Active Providers"}</p>
+                  <p className="text-xs text-muted-foreground">{isFr ? "Prestataires" : "Providers"}</p>
                   <p className="text-2xl font-bold" data-testid="kpi-active-providers">
-                    {kpis.activeProviders}/{kpis.totalProviders}
+                    {liveActiveProviders}
+                    <span className="text-sm font-normal text-muted-foreground ml-1">
+                      {isFr ? "actifs" : "active"}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isFr ? `sur ${liveTotalProviders} au total` : `of ${liveTotalProviders} total`}
                   </p>
                 </div>
                 <Users className="h-8 w-8 text-muted-foreground/50" />
