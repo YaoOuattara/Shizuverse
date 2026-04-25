@@ -7,6 +7,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { trackEvent } from '@/lib/analytics'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface ApiCategory {
   id: number
@@ -38,6 +39,7 @@ const FEATURED: Featured[] = [
 
 export default function ServicesGrid({ locale }: { locale: string }) {
   const [categories, setCategories] = useState<ApiCategory[]>([])
+  const [loading, setLoading] = useState(true)
   const isFr = locale === 'fr'
 
   useEffect(() => {
@@ -45,6 +47,7 @@ export default function ServicesGrid({ locale }: { locale: string }) {
       .then((r) => r.json())
       .then((data) => setCategories(Array.isArray(data) ? data : []))
       .catch(console.error)
+      .finally(() => setLoading(false))
   }, [])
 
   // Match each Featured entry to an API category for the real ID (used in href)
@@ -87,20 +90,28 @@ export default function ServicesGrid({ locale }: { locale: string }) {
 
         {/* 6-card grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {cards.map((card) => (
-            <Link
-              key={card.nameFr}
-              href={`/${locale}/services`}
-              className="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-md hover:border-[#0F3A7A]/20 transition-all cursor-pointer group"
-              onClick={() => trackEvent('service_viewed', { service_name: card.name, locale })}
-            >
-              <card.Icon className="h-8 w-8 text-[#0F3A7A] group-hover:scale-110 transition-transform" />
-              <p className="font-semibold text-gray-800 mt-3 group-hover:text-[#0F3A7A] transition-colors">
-                {card.name}
-              </p>
-              <p className="text-xs text-gray-400 mt-1">{card.price}</p>
-            </Link>
-          ))}
+          {loading
+            ? Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-2xl border border-gray-100 p-6">
+                  <Skeleton className="h-8 w-8 rounded-lg" />
+                  <Skeleton className="h-4 w-3/4 mt-3 rounded" />
+                  <Skeleton className="h-3 w-1/2 mt-2 rounded" />
+                </div>
+              ))
+            : cards.map((card) => (
+                <Link
+                  key={card.nameFr}
+                  href={`/${locale}/services`}
+                  className="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-md hover:border-[#0F3A7A]/20 transition-all cursor-pointer group"
+                  onClick={() => trackEvent('service_viewed', { service_name: card.name, locale })}
+                >
+                  <card.Icon className="h-8 w-8 text-[#0F3A7A] group-hover:scale-110 transition-transform" />
+                  <p className="font-semibold text-gray-800 mt-3 group-hover:text-[#0F3A7A] transition-colors">
+                    {card.name}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">{card.price}</p>
+                </Link>
+              ))}
         </div>
       </div>
     </section>

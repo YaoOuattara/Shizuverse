@@ -51,12 +51,14 @@ export default function HomeHero() {
 
   const [searchValue, setSearchValue] = useState("");
   const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [chipsLoading, setChipsLoading] = useState(true);
 
   useEffect(() => {
     fetch(`${FLASK_API}/api/services/categories`)
       .then((r) => r.json())
       .then((data) => setCategories(Array.isArray(data) ? data : []))
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => setChipsLoading(false));
   }, []);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -67,6 +69,9 @@ export default function HomeHero() {
 
   // Show up to 8 chips so the row doesn't overflow on mobile
   const chips = categories.slice(0, 8);
+
+  // Skeleton widths mirror the natural spread of real category name lengths
+  const SKELETON_WIDTHS = ["w-16", "w-20", "w-24", "w-14", "w-20", "w-18", "w-16", "w-22"];
 
   return (
     <section
@@ -115,19 +120,24 @@ export default function HomeHero() {
         </form>
 
         {/* ── Category chips (from API) ──────────────────────────────── */}
-        {chips.length > 0 && (
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            {chips.map((cat) => (
-              <Link
-                key={cat.id}
-                href={`/${locale}/services?category=${cat.id}`}
-                className="inline-flex items-center px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors border border-white/20"
-              >
-                {locale === "fr" ? (cat.name_fr || cat.name) : (cat.name_en || cat.name)}
-              </Link>
-            ))}
-          </div>
-        )}
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          {chipsLoading
+            ? SKELETON_WIDTHS.map((w, i) => (
+                <span
+                  key={i}
+                  className={`${w} h-7 rounded-full bg-white/20 animate-pulse`}
+                />
+              ))
+            : chips.map((cat) => (
+                <Link
+                  key={cat.id}
+                  href={`/${locale}/services?category=${cat.id}`}
+                  className="inline-flex items-center px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors border border-white/20"
+                >
+                  {locale === "fr" ? (cat.name_fr || cat.name) : (cat.name_en || cat.name)}
+                </Link>
+              ))}
+        </div>
 
         {/* ── Two urgency paths ──────────────────────────────────────── */}
         <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center max-w-lg mx-auto">
