@@ -265,7 +265,8 @@ export default function AdminProviders() {
     const newStatus = action === "activate" ? "active" : "paused";
     updateLocalProvider(providerId, { status: newStatus });
     try {
-      await adminApi.portalToggleActivation(Number(providerId), action);
+      const res = await adminApi.portalToggleActivation(Number(providerId), action);
+      console.log("[AdminProviders] toggleStatus response:", res);
       toast({ title: isFr ? "Statut mis à jour" : "Status Updated", description: isFr ? `Prestataire maintenant ${newStatus === "active" ? "actif" : "en pause"}.` : `Provider is now ${newStatus}.` });
     } catch (err) {
       updateLocalProvider(providerId, { status: currentStatus });
@@ -279,7 +280,8 @@ export default function AdminProviders() {
   const handleApprove = async (providerId: string) => {
     setIsUpdating(true);
     try {
-      await adminApi.portalApproveProvider(Number(providerId));
+      const res = await adminApi.portalApproveProvider(Number(providerId));
+      console.log("[AdminProviders] approve response:", res);
       updateLocalProvider(providerId, {
         verificationStatus: 'approved',
         listed: true,
@@ -299,7 +301,8 @@ export default function AdminProviders() {
     setIsUpdating(true);
     const fullReason = rejectionReasons.find(r => r.value === rejectionReason)?.label || rejectionReason;
     try {
-      await adminApi.portalRejectProvider(Number(providerId), fullReason, customRejectionNote || undefined);
+      const res = await adminApi.portalRejectProvider(Number(providerId), fullReason, customRejectionNote || undefined);
+      console.log("[AdminProviders] reject response:", res);
       updateLocalProvider(providerId, {
         verificationStatus: 'rejected',
         listed: false,
@@ -324,7 +327,8 @@ export default function AdminProviders() {
       ? `${suspensionReasons.find(r => r.value === suspensionReason)?.label}: ${suspensionNote}`
       : suspensionReasons.find(r => r.value === suspensionReason)?.label || suspensionReason;
     try {
-      await adminApi.portalSuspendProvider(Number(idToSuspend), fullReason);
+      const res = await adminApi.portalSuspendProvider(Number(idToSuspend), fullReason);
+      console.log("[AdminProviders] suspend response:", res);
       updateLocalProvider(idToSuspend, {
         verificationStatus: 'suspended',
         listed: false,
@@ -354,7 +358,8 @@ export default function AdminProviders() {
     setIsUpdating(true);
     updateLocalProvider(providerId, { listed: true });
     try {
-      await adminApi.portalToggleListing(Number(providerId), "list");
+      const res = await adminApi.portalToggleListing(Number(providerId), "list");
+      console.log("[AdminProviders] toggleListed(list) response:", res);
       toast({ title: isFr ? "Prestataire listé" : "Provider Listed", description: isFr ? "Le prestataire est maintenant visible aux clients." : "Provider is now visible to clients." });
     } catch (err) {
       updateLocalProvider(providerId, { listed: false });
@@ -374,7 +379,8 @@ export default function AdminProviders() {
     setUnlistReason("");
     setPendingActionProviderId(null);
     try {
-      await adminApi.portalToggleListing(Number(idToUnlist), "unlist");
+      const unlistRes = await adminApi.portalToggleListing(Number(idToUnlist), "unlist");
+      console.log("[AdminProviders] toggleListed(unlist) response:", unlistRes);
       toast({
         title: isFr ? "Prestataire délisté" : "Provider Unlisted",
         description: unlistReason

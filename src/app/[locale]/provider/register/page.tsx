@@ -222,34 +222,39 @@ export default function ProviderRegisterPage() {
   // ── Final submit ──────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     setIsSubmitting(true);
+    const payload = {
+      ...account,
+      services: selectedServices,
+      zones: selectedCommunes,
+      bio,
+      account_type: accountType,
+      company_name: accountType === "company" ? businessName.trim() : undefined,
+      rccm_number: accountType === "company" && rccmNumber.trim() ? rccmNumber.trim() : undefined,
+      service_rates: Object.fromEntries(
+        Object.entries(serviceRates).map(([id, r]) => {
+          const cat = categories.find((c) => c.id === Number(id));
+          return [cat ? displayCatName(cat, locale) : id, { min: Number(r.min) || 0, max: Number(r.max) || 0 }];
+        })
+      ),
+      profile_photo_url: profilePhotoUrl || undefined,
+      id_doc_type: idDocType || undefined,
+      id_doc_url: idDocUrl || undefined,
+      momo_operator: momoOperator || undefined,
+      momo_number: momoNumber.trim() || undefined,
+      momo_account_name: momoName.trim() || undefined,
+      verification_status: "submitted",
+    };
+    console.log("[register] payload:", JSON.stringify(payload, null, 2));
     try {
-      await fetch(`${FLASK_API}/api/provider/register`, {
+      const res = await fetch(`${FLASK_API}/api/provider/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...account,
-          services: selectedServices,
-          zones: selectedCommunes,
-          bio,
-          account_type: accountType,
-          company_name: accountType === "company" ? businessName.trim() : undefined,
-          rccm_number: accountType === "company" && rccmNumber.trim() ? rccmNumber.trim() : undefined,
-          service_rates: Object.fromEntries(
-            Object.entries(serviceRates).map(([id, r]) => {
-              const cat = categories.find((c) => c.id === Number(id));
-              return [cat ? displayCatName(cat, locale) : id, { min: Number(r.min) || 0, max: Number(r.max) || 0 }];
-            })
-          ),
-          profile_photo_url: profilePhotoUrl || undefined,
-          id_doc_type: idDocType || undefined,
-          id_doc_url: idDocUrl || undefined,
-          momo_operator: momoOperator || undefined,
-          momo_number: momoNumber.trim() || undefined,
-          momo_account_name: momoName.trim() || undefined,
-          verification_status: "submitted",
-        }),
+        body: JSON.stringify(payload),
       });
-    } catch {
+      const data = await res.json().catch(() => null);
+      console.log("[register] response status:", res.status, "body:", data);
+    } catch (err) {
+      console.error("[register] fetch error:", err);
       // optimistic — show success anyway
     } finally {
       setIsSubmitting(false);

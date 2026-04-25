@@ -18,6 +18,10 @@ export default function Navbar() {
     setMounted(true);
   }, []);
 
+  const hideBookCta =
+    pathWithoutLocale.startsWith('/provider/register') ||
+    pathWithoutLocale.startsWith('/booking/');
+
   const providerHref = isProvider ? `/${locale}/provider` : `/${locale}/provider/register`;
   const providerLabel = isProvider
     ? (locale === 'fr' ? 'Mon tableau de bord' : 'My Dashboard')
@@ -79,12 +83,14 @@ export default function Navbar() {
             ))}
           </div>
 
-          <Link
-            href={`/${locale}/services`}
-            className="bg-[#0F3A7A] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0d3068] transition-colors"
-          >
-            {locale === 'fr' ? 'Réserver' : 'Book Now'}
-          </Link>
+          {!hideBookCta && (
+            <Link
+              href={`/${locale}/services`}
+              className="bg-[#0F3A7A] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0d3068] transition-colors"
+            >
+              {locale === 'fr' ? 'Réserver' : 'Book Now'}
+            </Link>
+          )}
         </div>
       </div>
     </nav>

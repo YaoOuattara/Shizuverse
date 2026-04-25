@@ -26,6 +26,7 @@ const CONTENT = {
     urgentBtn: "Besoin urgent — 2h",
     planBtn: "Planifier un service",
     browseAll: "Parcourir toutes les catégories →",
+    becomeProvider: "Devenir prestataire →",
     trust: ["Prestataires vérifiés", "Paiement sécurisé", "Support 7j/7"],
     availability: "Disponible aujourd'hui dans plusieurs quartiers d'Abidjan",
   },
@@ -39,6 +40,7 @@ const CONTENT = {
     urgentBtn: "Urgent — within 2h",
     planBtn: "Plan a service",
     browseAll: "Browse all categories →",
+    becomeProvider: "Become a provider →",
     trust: ["Verified providers", "Secure payment", "7-day support"],
     availability: "Available today across multiple Abidjan neighbourhoods",
   },
@@ -157,8 +159,18 @@ export default function HomeHero() {
           </Link>
         </div>
 
+        {/* ── Become a provider CTA ─────────────────────────────────── */}
+        <div className="mt-4">
+          <Link
+            href={`/${locale}/provider/register`}
+            className="inline-block border border-white/40 hover:border-white/70 text-white/80 hover:text-white px-5 py-2 rounded-xl text-sm font-medium transition-colors"
+          >
+            {c.becomeProvider}
+          </Link>
+        </div>
+
         {/* ── Secondary browse link ──────────────────────────────────── */}
-        <p className="mt-3">
+        <p className="mt-2">
           <Link
             href={`/${locale}/services`}
             className="text-white/50 hover:text-white/80 text-sm transition-colors"
