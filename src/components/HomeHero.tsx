@@ -3,101 +3,70 @@
 import Link from "next/link";
 import { useLocale } from "next-intl";
 import { useEffect, useState } from "react";
-import { Calendar, CheckCircle, User } from "lucide-react";
+import { CheckCircle, Search, Zap, CalendarCheck } from "lucide-react";
+import { useRouter } from "next/navigation";
 
-function BookingCardMockup({ locale }: { locale: "en" | "fr" }) {
-  const isFr = locale === "fr";
-  return (
-    <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-5">
-        <Calendar className="h-4 w-4 text-[#0F3A7A]" />
-        <span className="font-semibold text-gray-800 text-sm">
-          {isFr ? "Nouvelle réservation" : "New Booking"}
-        </span>
-      </div>
+const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
 
-      {/* Service selector */}
-      <div className="mb-4">
-        <p className="text-xs text-gray-400 mb-2">{isFr ? "Service" : "Service"}</p>
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-3 bg-[#0F3A7A]/5 border border-[#0F3A7A]/20 rounded-xl px-4 py-2.5">
-            <span className="text-lg">🧹</span>
-            <span className="text-sm font-medium text-[#0F3A7A]">
-              {isFr ? "Ménage à domicile" : "Home Cleaning"}
-            </span>
-            <CheckCircle className="h-4 w-4 text-[#0F3A7A] ml-auto" />
-          </div>
-          <div className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-gray-400">
-            <span className="text-lg">👶</span>
-            <span className="text-sm">{isFr ? "Nounou & Baby-sitting" : "Childcare"}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Date / time */}
-      <div className="mb-4 bg-gray-50 rounded-xl px-4 py-2.5 flex items-center gap-2">
-        <Calendar className="h-4 w-4 text-gray-400" />
-        <span className="text-sm text-gray-600">
-          {isFr ? "Mer. 12 Mars · 10h00" : "Wed. Mar 12 · 10:00 AM"}
-        </span>
-      </div>
-
-      {/* Provider row — generic, no fake name */}
-      <div className="mb-5 flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-2.5">
-        <div className="w-8 h-8 rounded-full bg-[#0F3A7A]/10 flex items-center justify-center">
-          <User className="h-4 w-4 text-[#0F3A7A]" />
-        </div>
-        <div>
-          <p className="text-sm font-medium text-gray-800">
-            {isFr ? "Prestataire vérifié" : "Verified Provider"}
-          </p>
-          <p className="text-xs text-yellow-500">⭐ 4.9</p>
-        </div>
-        <span className="ml-auto text-xs text-green-500 font-medium">
-          {isFr ? "Disponible" : "Available"}
-        </span>
-      </div>
-
-      {/* Confirm button */}
-      <button className="w-full bg-[#0F3A7A] text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-[#0d3068] transition-colors">
-        {isFr ? "Confirmer" : "Confirm"}
-      </button>
-    </div>
-  );
+interface ApiCategory {
+  id: number;
+  name: string;
+  name_fr: string;
+  name_en: string;
 }
 
 const CONTENT = {
   fr: {
+    badge: "Abidjan · Côte d'Ivoire",
     headline: "On s'occupe de tout. Vous gagnez du temps.",
     subtext:
       "Trouvez des prestataires vérifiés pour le ménage, la plomberie, l'électricité et plus encore.",
-    cta1: "Réserver un service",
-    cta2: "Devenir prestataire",
-    trust: ["4.8/5 Clients satisfaits", "Prestataires vérifiés", "Intervention rapide", "Support 7j/7"],
+    searchPlaceholder: "Ménage, plomberie, électricité…",
+    searchBtn: "Rechercher",
+    urgentBtn: "Besoin urgent — 2h",
+    planBtn: "Planifier un service",
+    browseAll: "Parcourir toutes les catégories →",
+    trust: ["Prestataires vérifiés", "Paiement sécurisé", "Support 7j/7"],
+    availability: "Disponible aujourd'hui dans plusieurs quartiers d'Abidjan",
   },
   en: {
+    badge: "Abidjan · Côte d'Ivoire",
     headline: "We handle it all. You save time.",
     subtext:
       "Find verified professionals for cleaning, plumbing, electrical work and more.",
-    cta1: "Book a service",
-    cta2: "Become a provider",
-    trust: ["4.8/5 Happy clients", "Verified providers", "Fast response", "7-day support"],
+    searchPlaceholder: "Cleaning, plumbing, electrical…",
+    searchBtn: "Search",
+    urgentBtn: "Urgent — within 2h",
+    planBtn: "Plan a service",
+    browseAll: "Browse all categories →",
+    trust: ["Verified providers", "Secure payment", "7-day support"],
+    availability: "Available today across multiple Abidjan neighbourhoods",
   },
 };
 
 export default function HomeHero() {
   const locale = useLocale() as "en" | "fr";
   const c = CONTENT[locale] ?? CONTENT.fr;
-  const [mounted, setMounted] = useState(false);
-  const [isClient, setIsClient] = useState(false);
-  const [isProvider, setIsProvider] = useState(false);
+  const router = useRouter();
+
+  const [searchValue, setSearchValue] = useState("");
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
 
   useEffect(() => {
-    setIsProvider(!!localStorage.getItem("provider_token"));
-    setIsClient(!!localStorage.getItem("client_token"));
-    setMounted(true);
+    fetch(`${FLASK_API}/api/services/categories`)
+      .then((r) => r.json())
+      .then((data) => setCategories(Array.isArray(data) ? data : []))
+      .catch(console.error);
   }, []);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchValue.trim();
+    router.push(`/${locale}/services${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+  };
+
+  // Show up to 8 chips so the row doesn't overflow on mobile
+  const chips = categories.slice(0, 8);
 
   return (
     <section
@@ -108,77 +77,105 @@ export default function HomeHero() {
         backgroundSize: "28px 28px",
       }}
     >
-      <div className="max-w-7xl mx-auto px-6 py-20 flex flex-col md:flex-row items-center gap-12">
-        {/* Left column */}
-        <div className="flex-[3] text-white">
-          {/* Badge */}
-          <span className="inline-block rounded-full bg-white/10 text-white/80 text-xs px-3 py-1 mb-6">
-            Abidjan · Côte d&apos;Ivoire
-          </span>
+      <div className="max-w-2xl mx-auto px-6 py-16 md:py-20 text-center">
 
-          {/* Headline — fix 1: pure white, no span with reduced opacity */}
-          <h1 className="text-4xl md:text-5xl font-bold leading-tight text-white">
-            {c.headline}
-          </h1>
+        {/* Location badge */}
+        <span className="inline-block rounded-full bg-white/10 text-white/80 text-xs px-3 py-1 mb-6">
+          {c.badge}
+        </span>
 
-          {/* Subtext */}
-          <p className="text-white/70 text-lg mt-4 max-w-lg">{c.subtext}</p>
+        {/* Headline */}
+        <h1 className="text-4xl md:text-5xl font-bold leading-tight text-white">
+          {c.headline}
+        </h1>
 
-          {/* CTA buttons */}
-          <div className="flex flex-wrap gap-4 mt-8">
-            <Link
-              href={`/${locale}/services`}
-              className="bg-green-600 text-white font-semibold px-6 py-3 rounded-xl hover:bg-green-700 transition-colors"
-            >
-              {c.cta1}
-            </Link>
-            {mounted && (
-              <Link
-                href={isProvider ? `/${locale}/provider` : `/${locale}/provider/register`}
-                className="border-2 border-white/60 text-white px-6 py-3 rounded-xl hover:bg-white/10 transition-colors"
-              >
-                {isProvider
-                  ? (locale === "fr" ? "Mon tableau de bord" : "My Dashboard")
-                  : (locale === "fr" ? "Rejoindre Shizu" : "Join Shizu")}
-              </Link>
-            )}
+        {/* Sub-headline */}
+        <p className="text-white/70 text-lg mt-4 max-w-xl mx-auto leading-relaxed">
+          {c.subtext}
+        </p>
+
+        {/* ── Search bar ─────────────────────────────────────────────── */}
+        <form onSubmit={handleSearch} className="mt-8 flex gap-2 max-w-xl mx-auto">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              placeholder={c.searchPlaceholder}
+              className="w-full pl-9 pr-4 py-3 rounded-xl text-sm text-gray-800 placeholder:text-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-white/50"
+            />
           </div>
+          <button
+            type="submit"
+            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-3 rounded-xl transition-colors whitespace-nowrap text-sm"
+          >
+            {c.searchBtn}
+          </button>
+        </form>
 
-          {/* Trust chips */}
-          <div className="flex flex-wrap gap-3 mt-6">
-            {c.trust.map((item) => (
-              <span key={item} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white/80">
-                <CheckCircle className="h-3 w-3 text-green-400 shrink-0" />
-                {item}
-              </span>
+        {/* ── Category chips (from API) ──────────────────────────────── */}
+        {chips.length > 0 && (
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            {chips.map((cat) => (
+              <Link
+                key={cat.id}
+                href={`/${locale}/services?category=${cat.id}`}
+                className="inline-flex items-center px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors border border-white/20"
+              >
+                {locale === "fr" ? (cat.name_fr || cat.name) : (cat.name_en || cat.name)}
+              </Link>
             ))}
           </div>
+        )}
 
-          {/* Availability line */}
-          <p className="mt-3 flex items-center gap-2 text-xs text-white/60">
-            <span className="inline-block h-2 w-2 rounded-full bg-green-400 shrink-0" />
-            {locale === "fr"
-              ? "Disponible aujourd'hui dans plusieurs quartiers d'Abidjan"
-              : "Available today across multiple Abidjan neighbourhoods"}
-          </p>
-
-          {/* Returning client link — only for logged-in clients */}
-          {mounted && isClient && (
-            <p className="mt-4 text-white/40 text-sm">
-              <Link
-                href={`/${locale}/bookings`}
-                className="underline underline-offset-2 hover:text-white/70 transition-colors"
-              >
-                {locale === 'fr' ? "Voir mes réservations →" : "View my bookings →"}
-              </Link>
-            </p>
-          )}
+        {/* ── Two urgency paths ──────────────────────────────────────── */}
+        <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center max-w-lg mx-auto">
+          <Link
+            href={`/${locale}/services?urgency=urgent`}
+            className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-3 rounded-xl transition-colors text-sm"
+          >
+            <Zap className="h-4 w-4 shrink-0" />
+            {c.urgentBtn}
+          </Link>
+          <Link
+            href={`/${locale}/services`}
+            className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-3 rounded-xl transition-colors text-sm"
+          >
+            <CalendarCheck className="h-4 w-4 shrink-0" />
+            {c.planBtn}
+          </Link>
         </div>
 
-        {/* Right column — hidden on mobile, centered */}
-        <div className="hidden md:flex flex-[2] w-full justify-center">
-          <BookingCardMockup locale={locale} />
+        {/* ── Secondary browse link ──────────────────────────────────── */}
+        <p className="mt-3">
+          <Link
+            href={`/${locale}/services`}
+            className="text-white/50 hover:text-white/80 text-sm transition-colors"
+          >
+            {c.browseAll}
+          </Link>
+        </p>
+
+        {/* ── Trust chips ────────────────────────────────────────────── */}
+        <div className="flex flex-wrap justify-center gap-3 mt-10">
+          {c.trust.map((item) => (
+            <span
+              key={item}
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white/80"
+            >
+              <CheckCircle className="h-3 w-3 text-green-400 shrink-0" />
+              {item}
+            </span>
+          ))}
         </div>
+
+        {/* ── Availability signal ────────────────────────────────────── */}
+        <p className="mt-3 flex items-center justify-center gap-2 text-xs text-white/50">
+          <span className="inline-block h-2 w-2 rounded-full bg-green-400 shrink-0 animate-pulse" />
+          {c.availability}
+        </p>
+
       </div>
     </section>
   );
