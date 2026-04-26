@@ -375,25 +375,40 @@ export default function ProviderProfilePage() {
     setIsSaving(true)
     try {
       const token = localStorage.getItem('provider_token')
-      const body = {
-        bio:                   profile.bio,
-        experience_text:       profile.experience_text,
-        mobile_money_number:   profile.mobile_money_number,
-        mobile_money_name:     profile.mobile_money_name,
-        mobile_money_operator: profile.mobile_money_operator,
-      }
+
+      // Build payload — only include non-empty values so backend doesn't clear existing data
+      const body: Record<string, string> = { bio: profile.bio }
+      if (profile.experience_text)       body.experience_text       = profile.experience_text
+      if (profile.profile_photo_url)     body.profile_photo_url     = profile.profile_photo_url
+      if (profile.id_document_url)       body.id_document_url       = profile.id_document_url
+      if (profile.experience_photo_url)  body.experience_photo_url  = profile.experience_photo_url
+      if (profile.mobile_money_number)   body.mobile_money_number   = profile.mobile_money_number
+      if (profile.mobile_money_name)     body.mobile_money_name     = profile.mobile_money_name
+      if (profile.mobile_money_operator) body.mobile_money_operator = profile.mobile_money_operator
+
+      console.log('[handleSave] payload:', JSON.stringify(body, null, 2))
+
       const res = await fetch(`${FLASK_API}/api/provider/profile`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       })
+      const data = await res.json().catch(() => null)
+      console.log('[handleSave] response status:', res.status, 'body:', data)
+
       if (res.ok) {
-        patchLocalStorage(body)
+        // Update both React state and localStorage from the server response
+        const newStatus: VerificationStatus = data?.provider?.verification_status ?? profile.verification_status
+        setProfile(prev => ({ ...prev, ...body, verification_status: newStatus }))
+        patchLocalStorage({ ...body, verification_status: newStatus })
         toast({ title: isFr ? 'Sauvegardé' : 'Saved', description: isFr ? 'Modifications enregistrées.' : 'Changes saved.' })
       } else {
+        const errMsg = data?.error ?? data?.message ?? res.status
+        console.error('[handleSave] server error:', errMsg)
         toast({ title: isFr ? 'Erreur' : 'Error', description: isFr ? 'Échec de la sauvegarde.' : 'Save failed.', variant: 'destructive' })
       }
-    } catch {
+    } catch (err) {
+      console.error('[handleSave] fetch error:', err)
       toast({ title: isFr ? 'Erreur réseau' : 'Network error', variant: 'destructive' })
     } finally {
       setIsSaving(false)
@@ -416,14 +431,16 @@ export default function ProviderProfilePage() {
         mobile_money_name:     profile.mobile_money_name,
         mobile_money_operator: profile.mobile_money_operator,
       }
+      console.log('[handleSubmit] payload:', JSON.stringify(body, null, 2))
       const res = await fetch(`${FLASK_API}/api/provider/profile`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       })
+      const data = await res.json().catch(() => null)
+      console.log('[handleSubmit] response status:', res.status, 'body:', data)
       if (res.ok) {
-        const data = await res.json()
-        const newStatus: VerificationStatus = data.provider?.verification_status ?? 'submitted'
+        const newStatus: VerificationStatus = data?.provider?.verification_status ?? 'submitted'
         setProfile(prev => ({ ...prev, ...body, verification_status: newStatus }))
         patchLocalStorage({ ...body, verification_status: newStatus })
         setForceForm(false)
