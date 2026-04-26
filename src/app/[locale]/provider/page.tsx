@@ -23,6 +23,7 @@ import {
   ChevronUp,
   Bell,
   Zap,
+  Share2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import ProviderBookingCard from "@/components/ProviderBookingCard";
@@ -118,9 +119,18 @@ export default function ProviderDashboard() {
   // todo: replace with useProviderBookings() hook when auth context provides providerId
   const [bookings, setBookings] = useState<ProviderBooking[]>([]);
 
+  const [providerInfo, setProviderInfo] = useState<{ id: string | null; verificationStatus: string }>({ id: null, verificationStatus: '' });
+
   // Hydrate state from localStorage after mount (SSR-safe)
   useEffect(() => {
     try {
+      const info = JSON.parse(localStorage.getItem('provider_info') || 'null');
+      if (info) {
+        setProviderInfo({
+          id: String(info.provider_id ?? info.id ?? ''),
+          verificationStatus: info.verification_status ?? '',
+        });
+      }
       const savedStats = localStorage.getItem(STORAGE_KEYS.STATS_VISIBLE);
       if (savedStats !== null) {
         setShowStats(JSON.parse(savedStats));
@@ -532,6 +542,17 @@ export default function ProviderDashboard() {
                   </>
                 )}
               </Button>
+              {providerInfo.verificationStatus === 'approved' && providerInfo.id && (
+                <Button
+                  variant="outline"
+                  className="border-green-200 text-green-700 hover:bg-green-50"
+                  onClick={() => window.open(`/${locale}/provider/${providerInfo.id}`, '_blank')}
+                  data-testid="button-share-profile"
+                >
+                  <Share2 className="mr-2 h-4 w-4" />
+                  {locale === 'fr' ? 'Partager mon profil' : 'Share my profile'}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => router.push(`/${locale}/provider/profile`)}
