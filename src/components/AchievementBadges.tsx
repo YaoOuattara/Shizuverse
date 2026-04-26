@@ -57,14 +57,14 @@ export function AchievementBadges({
   reviewCount = 0,
   className,
 }: AchievementBadgesProps) {
-  const isFr = true; // provider dashboard is always fr
+  const safeBookings = bookings ?? [];
 
   const computedBadges = useMemo(() => {
-    const completedBookings = bookings.filter((b) => b.status === "completed");
-    const confirmedOrCompleted = bookings.filter(
+    const completedBookings = safeBookings.filter((b) => b.status === "completed");
+    const confirmedOrCompleted = safeBookings.filter(
       (b) => b.status === "completed" || b.status === "confirmed"
     );
-    const cancelledBookings = bookings.filter((b) => b.status === "cancelled");
+    const cancelledBookings = safeBookings.filter((b) => b.status === "cancelled");
 
     const customerCounts = new Map<string, number>();
     completedBookings.forEach((b) => {
@@ -137,11 +137,11 @@ export function AchievementBadges({
     ];
 
     return badges;
-  }, [bookings, providerRating, reviewCount]);
+  }, [safeBookings, providerRating, reviewCount]);
 
   const unlockedCount = computedBadges.filter((b) => b.unlocked).length;
   const totalBadges = computedBadges.length;
-  const completedMissions = bookings.filter((b) => b.status === "completed").length;
+  const completedMissions = safeBookings.filter((b) => b.status === "completed").length;
 
   // First locked non-comingSoon badge = "next to unlock"
   const nextBadgeIdx = computedBadges.findIndex((b) => !b.unlocked && !b.comingSoon && !b.notEnoughHistory);

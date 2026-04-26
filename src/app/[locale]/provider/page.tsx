@@ -28,8 +28,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import ProviderBookingCard from "@/components/ProviderBookingCard";
 import NewRequestCard from "@/components/NewRequestCard";
-import dynamic from "next/dynamic";
-const RevenueBreakdown = dynamic(() => import("@/components/RevenueBreakdown"), { ssr: false });
 import AchievementBadges from "@/components/AchievementBadges";
 import DateRangeFilter, { type DateRange } from "@/components/DateRangeFilter";
 import StatusTabs from "@/components/StatusTabs";
@@ -636,75 +634,60 @@ export default function ProviderDashboard() {
 
       <main className="flex-1 overflow-auto p-4 sm:p-6">
         {/* ── Status banner ─────────────────────────────────────────────────── */}
-        {hasToken && providerInfo.verificationStatus && (() => {
+        {hasToken ? (() => {
           const vs = providerInfo.verificationStatus;
           const pid = providerInfo.id;
 
-          if (vs === 'approved') {
-            return (
-              <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-green-200 bg-[#f0fdf4] px-5 py-3">
-                <p className="text-sm font-semibold text-green-800">
-                  Profil approuvé ✓ · Visible aux clients
-                </p>
-                {pid && (
-                  <button
-                    onClick={() => window.open(`/${locale}/provider/${pid}`, '_blank')}
-                    className="shrink-0 flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                  >
-                    <Share2 className="h-3.5 w-3.5" />
-                    Partager mon profil
-                  </button>
-                )}
-              </div>
-            );
-          }
-
-          if (vs === 'submitted') {
-            return (
-              <div className="mb-4 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3">
-                <span className="text-base leading-none">⏳</span>
-                <p className="text-sm font-medium text-amber-800">
-                  En cours de vérification — Nous vous contacterons sous 48h
-                </p>
-              </div>
-            );
-          }
-
-          if (vs === 'rejected') {
-            return (
-              <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-3">
-                <p className="text-sm font-medium text-red-800">
-                  Profil refusé
-                  {providerInfo.rejectionReason ? ` · ${providerInfo.rejectionReason}` : ''}
-                </p>
+          if (vs === 'approved') return (
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-green-200 bg-[#f0fdf4] px-5 py-3">
+              <p className="text-sm font-semibold text-green-800">Profil approuvé ✓ · Visible aux clients</p>
+              {pid ? (
                 <button
-                  onClick={() => router.push(`/${locale}/provider/profile`)}
-                  className="shrink-0 text-xs font-semibold text-red-700 underline underline-offset-2 hover:text-red-900 whitespace-nowrap"
+                  onClick={() => window.open(`/${locale}/provider/${pid}`, '_blank')}
+                  className="shrink-0 flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
                 >
-                  Modifier mon profil
+                  <Share2 className="h-3.5 w-3.5" />
+                  Partager mon profil
                 </button>
-              </div>
-            );
-          }
+              ) : null}
+            </div>
+          );
 
-          if (vs === 'draft') {
-            return (
-              <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-3">
-                <p className="text-sm font-medium text-blue-800">
-                  Complétez votre profil pour recevoir des demandes
-                </p>
-                <button
-                  onClick={() => router.push(`/${locale}/provider/profile`)}
-                  className="shrink-0 text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 whitespace-nowrap"
-                >
-                  Compléter maintenant
-                </button>
-              </div>
-            );
-          }
+          if (vs === 'submitted') return (
+            <div className="mb-4 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3">
+              <span className="text-base leading-none">⏳</span>
+              <p className="text-sm font-medium text-amber-800">En cours de vérification — Nous vous contacterons sous 48h</p>
+            </div>
+          );
+
+          if (vs === 'rejected') return (
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-3">
+              <p className="text-sm font-medium text-red-800">
+                Profil refusé{providerInfo.rejectionReason ? ` · ${providerInfo.rejectionReason}` : ''}
+              </p>
+              <button
+                onClick={() => router.push(`/${locale}/provider/profile`)}
+                className="shrink-0 text-xs font-semibold text-red-700 underline underline-offset-2 hover:text-red-900 whitespace-nowrap"
+              >
+                Modifier mon profil
+              </button>
+            </div>
+          );
+
+          if (vs === 'draft') return (
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-3">
+              <p className="text-sm font-medium text-blue-800">Complétez votre profil pour recevoir des demandes</p>
+              <button
+                onClick={() => router.push(`/${locale}/provider/profile`)}
+                className="shrink-0 text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 whitespace-nowrap"
+              >
+                Compléter maintenant
+              </button>
+            </div>
+          );
 
           return null;
-        })()}
+        })() : null}
 
         {/* 2 — Profile completion tip */}
         {hasToken && statusCounts.completed < 3 && !isLoading && (
@@ -760,7 +743,7 @@ export default function ProviderDashboard() {
 
         {/* 4 — Earnings summary */}
         {(() => {
-          const { week, month, total } = computeEarnings(bookings);
+          const { week, month, total } = computeEarnings(bookings ?? []);
           const cards = [
             { label: locale === "fr" ? "Cette semaine" : "This week", value: week },
             { label: locale === "fr" ? "Ce mois" : "This month", value: month },
@@ -776,7 +759,7 @@ export default function ProviderDashboard() {
               ))}
             </div>
           );
-        })()}
+        })() ?? null}
 
         {/* 5 — WhatsApp support */}
         {(() => {
@@ -804,11 +787,11 @@ export default function ProviderDashboard() {
               </a>
             </div>
           );
-        })()}
+        })() ?? null}
 
         {/* 6 — Nouvelles demandes */}
         {(() => {
-          const pending = bookings.filter((b) => b.status === "pending" || b.status === "requested");
+          const pending = (bookings ?? []).filter((b) => b.status === "pending" || b.status === "requested");
           return (
             <div className="mb-6" data-testid="section-new-requests">
               <div className="flex items-center gap-2 mb-3">
@@ -840,7 +823,7 @@ export default function ProviderDashboard() {
               )}
             </div>
           );
-        })()}
+        })() ?? null}
 
         {/* 7 — Planning à venir */}
         <div className="mb-6">
@@ -872,7 +855,7 @@ export default function ProviderDashboard() {
               </div>
             </div>
           );
-        })()}
+        })() ?? null}
 
         {/* 9 — Récompenses */}
         <div className="mb-6">
