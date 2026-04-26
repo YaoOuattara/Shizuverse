@@ -24,6 +24,43 @@ interface ProviderData {
   verification_status: string;
 }
 
+interface ApiSubcategory { id: number; name: string; name_fr: string; name_en: string; service_id: number | null }
+interface ApiCategory    { id: number; name: string; name_fr: string; name_en: string; subcategories: ApiSubcategory[] }
+
+// Find the best service_id for a given service name by scanning the category tree.
+// Tries partial name matching against category and subcategory names; falls back to
+// the first available service_id in the entire catalog.
+function findServiceId(serviceName: string, categories: ApiCategory[]): number | null {
+  const lower = serviceName.toLowerCase().trim();
+  const firstWord = lower.split(/\s+/)[0];
+
+  for (const cat of categories) {
+    const catFr = (cat.name_fr || cat.name).toLowerCase();
+    const catEn = (cat.name_en || cat.name).toLowerCase();
+    const catMatch = lower.includes(catFr) || catFr.includes(firstWord) ||
+                     lower.includes(catEn) || catEn.includes(firstWord);
+    if (catMatch) {
+      const sub = cat.subcategories.find(s => s.service_id !== null);
+      if (sub?.service_id) return sub.service_id;
+    }
+    for (const sub of cat.subcategories) {
+      const subFr = (sub.name_fr || sub.name).toLowerCase();
+      const subEn = (sub.name_en || sub.name).toLowerCase();
+      if (lower.includes(subFr) || subFr.includes(firstWord) ||
+          lower.includes(subEn) || subEn.includes(firstWord)) {
+        if (sub.service_id !== null) return sub.service_id;
+      }
+    }
+  }
+  // Fallback: first service_id in catalog
+  for (const cat of categories) {
+    for (const sub of cat.subcategories) {
+      if (sub.service_id !== null) return sub.service_id;
+    }
+  }
+  return null;
+}
+
 export default function ProviderCardPage() {
   const params = useParams();
   const id = params?.id as string;
@@ -31,20 +68,37 @@ export default function ProviderCardPage() {
   const isFr = locale === "fr";
 
   const [provider, setProvider] = useState<ProviderData | null>(null);
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    fetch(`${FLASK_API}/api/providers/${id}`)
-      .then(async (res) => {
-        if (!res.ok) { setNotFound(true); return; }
-        const data = await res.json();
-        setProvider(data);
+    // Fetch provider and categories in parallel
+    Promise.all([
+      fetch(`${FLASK_API}/api/providers/${id}`).then(r => r.ok ? r.json() : Promise.reject(r.status)),
+      fetch(`${FLASK_API}/api/services/categories`).then(r => r.ok ? r.json() : []),
+    ])
+      .then(([providerData, cats]) => {
+        setProvider(providerData);
+        setCategories(Array.isArray(cats) ? cats : []);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Resolve booking URL: /[locale]/booking/[serviceId]?provider=[id]&providerName=[name]
+  const bookingHref = (() => {
+    if (!provider) return `/${locale}/services`;
+    const firstService = provider.services[0] ?? "";
+    const serviceId = firstService ? findServiceId(firstService, categories) : null;
+    if (!serviceId) return `/${locale}/services`;
+    const params = new URLSearchParams({
+      provider: String(provider.id),
+      providerName: provider.name,
+    });
+    return `/${locale}/booking/${serviceId}?${params.toString()}`;
+  })();
 
   const shareUrl = `https://www.shizu.pro/fr/provider/${id}`;
 
@@ -205,7 +259,7 @@ export default function ProviderCardPage() {
           {/* CTAs */}
           <div className="space-y-3">
             <Link
-              href={`/${locale}/services`}
+              href={bookingHref}
               className="flex items-center justify-center gap-2 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-5 rounded-xl transition-colors text-sm"
             >
               <Calendar className="h-4 w-4 shrink-0" />

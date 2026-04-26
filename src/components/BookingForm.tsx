@@ -169,6 +169,13 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   // ── Multi-step state ──────────────────────────────────────────────────────
   const [step, setStep] = useState(1);
 
+  // Provider preference from URL (?provider=6&providerName=Kouassi+Nettoyage)
+  const providerParam     = searchParams?.get("provider") ?? null;
+  const providerNameParam = searchParams?.get("providerName") ?? null;
+  const providerNote      = providerParam && providerNameParam
+    ? `Demande pour le prestataire : ${providerNameParam}`
+    : null;
+
   // Step 2 — pre-select urgency from URL param (?urgency=urgent_2h)
   const [urgencyChip, setUrgencyChip]   = useState<string | null>(() =>
     searchParams?.get("urgency") === "urgent_2h" ? "urgent_2h" : null
@@ -260,7 +267,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           client_phone:     phone.trim(),
           client_location:  location,
           appointment_date: appointmentIso,
-          notes:            notes.trim() || undefined,
+          notes:            [providerNote, notes.trim()].filter(Boolean).join('\n') || undefined,
           service_name:     serviceName ?? "",
           urgency,
           time_preference:  timePref,
