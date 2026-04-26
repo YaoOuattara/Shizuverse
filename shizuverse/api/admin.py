@@ -4,7 +4,7 @@ from shizuverse.models import db, User
 from shizuverse.models.appointment import Appointment
 from shizuverse.models.client_booking import ClientBooking
 from shizuverse.models.service_provider import ServiceProvider
-from shizuverse.models.service_models import Service
+from shizuverse.models.service_models import Service, ServiceCategory
 from datetime import datetime, timedelta
 import jwt
 import os
@@ -333,12 +333,18 @@ def provider_register():
     phone = (data.get('phone') or '').strip()
     password = data.get('password', '')
     bio = (data.get('bio') or '').strip()
-    service_names = data.get('services') or []
+    service_items = data.get('services') or []
     zones = data.get('zones') or []
     zones_str = ', '.join(str(z).strip() for z in zones if z) if zones else ''
     account_type = (data.get('account_type') or 'individual').strip()
-    business_name = (data.get('company_name') or '').strip()  # only used when account_type='company'
+    business_name = (data.get('company_name') or '').strip()
     rccm_number = (data.get('rccm_number') or '').strip() or None
+    # Mobile money fields — accept correct names only
+    mobile_money_operator = (data.get('mobile_money_operator') or '').strip() or None
+    mobile_money_number   = (data.get('mobile_money_number') or '').strip() or None
+    mobile_money_name     = (data.get('mobile_money_name') or '').strip() or None
+    profile_photo_url     = (data.get('profile_photo_url') or '').strip() or None
+    id_document_url       = (data.get('id_doc_url') or '').strip() or None
 
     if not full_name or not phone or not password:
         return jsonify({'error': 'full_name, phone, and password are required'}), 400
@@ -357,17 +363,31 @@ def provider_register():
     db.session.add(user)
     db.session.flush()  # get user.id before commit
 
-    # display_name: business name for companies, full name for individuals
     display_name = business_name if account_type == 'company' else full_name
 
-    # Match submitted service names against the services table (case-insensitive)
+    # Resolve service_items to actual Service rows.
+    # Frontend sends category IDs (integers); fall back to name-matching for strings (test compat).
     matched_services = []
-    for sname in service_names:
-        svc = Service.query.filter(Service.name.ilike(f'%{sname}%')).first()
-        if svc:
-            matched_services.append(svc)
+    seen_ids: set = set()
 
-    # Need at least one ServiceProvider row for login to return provider_id
+    for item in service_items:
+        if isinstance(item, (int, float)) or (isinstance(item, str) and str(item).strip().isdigit()):
+            # Category ID → find one active service per subcategory under that category
+            cat = ServiceCategory.query.get(int(item))
+            if cat:
+                for sub in cat.subcategories:
+                    svc = Service.query.filter_by(subcategory_id=sub.id, is_active=True).first()
+                    if svc and svc.id not in seen_ids:
+                        matched_services.append(svc)
+                        seen_ids.add(svc.id)
+        else:
+            # Name-based match (backward compat / test suite sends strings)
+            svc = Service.query.filter(Service.name.ilike(f'%{item}%')).first()
+            if svc and svc.id not in seen_ids:
+                matched_services.append(svc)
+                seen_ids.add(svc.id)
+
+    # Always need at least one ServiceProvider row for login to return provider_id
     if not matched_services:
         fallback = Service.query.filter_by(is_active=True).first()
         if fallback:
@@ -387,6 +407,11 @@ def provider_register():
             submitted_at=datetime.utcnow(),
             account_type=account_type,
             rccm_number=rccm_number,
+            mobile_money_operator=mobile_money_operator,
+            mobile_money_number=mobile_money_number,
+            mobile_money_name=mobile_money_name,
+            profile_photo_url=profile_photo_url,
+            id_document_url=id_document_url,
         )
         db.session.add(sp_row)
         if i == 0:

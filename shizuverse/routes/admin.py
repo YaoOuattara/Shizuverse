@@ -259,6 +259,24 @@ def update_provider_services(provider_id):
     return jsonify({'success': True, 'services': services})
 
 
+@admin_bp.route('/providers/<int:provider_id>/zones', methods=['PATCH'])
+@admin_required
+def update_provider_zones(provider_id):
+    """Replace a provider's service zones. Accepts {zones: ["Cocody", "Plateau", ...]}."""
+    data = request.get_json() or {}
+    zones = [str(z).strip() for z in (data.get('zones') or []) if str(z).strip()]
+    zones_str = ', '.join(zones) if zones else None
+
+    sp = ServiceProvider.query.get_or_404(provider_id)
+    # Apply to all ServiceProvider rows for this user so zones stay in sync
+    all_rows = ServiceProvider.query.filter_by(user_id=sp.user_id).all()
+    for row in all_rows:
+        row.address = zones_str
+    db.session.commit()
+
+    return jsonify({'success': True, 'zones': zones, 'provider_id': provider_id})
+
+
 # ── Provider Directory ────────────────────────────────────────
 
 @admin_bp.route('/providers', methods=['GET'])
