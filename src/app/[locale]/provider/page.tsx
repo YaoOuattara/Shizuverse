@@ -119,7 +119,7 @@ export default function ProviderDashboard() {
   // todo: replace with useProviderBookings() hook when auth context provides providerId
   const [bookings, setBookings] = useState<ProviderBooking[]>([]);
 
-  const [providerInfo, setProviderInfo] = useState<{ id: string | null; verificationStatus: string }>({ id: null, verificationStatus: '' });
+  const [providerInfo, setProviderInfo] = useState<{ id: string | null; verificationStatus: string; rejectionReason: string }>({ id: null, verificationStatus: '', rejectionReason: '' });
 
   // Hydrate state from localStorage after mount (SSR-safe)
   useEffect(() => {
@@ -129,6 +129,7 @@ export default function ProviderDashboard() {
         setProviderInfo({
           id: String(info.provider_id ?? info.id ?? ''),
           verificationStatus: info.verification_status ?? '',
+          rejectionReason: info.rejection_reason ?? '',
         });
       }
       const savedStats = localStorage.getItem(STORAGE_KEYS.STATS_VISIBLE);
@@ -634,25 +635,107 @@ export default function ProviderDashboard() {
       </header>
 
       <main className="flex-1 overflow-auto p-4 sm:p-6">
-        {/* Availability toggle card */}
+        {/* ── Status banner ─────────────────────────────────────────────────── */}
+        {hasToken && providerInfo.verificationStatus && (() => {
+          const vs = providerInfo.verificationStatus;
+          const pid = providerInfo.id;
+
+          if (vs === 'approved') {
+            return (
+              <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-green-200 bg-[#f0fdf4] px-5 py-3">
+                <p className="text-sm font-semibold text-green-800">
+                  Profil approuvé ✓ · Visible aux clients
+                </p>
+                {pid && (
+                  <button
+                    onClick={() => window.open(`/${locale}/provider/${pid}`, '_blank')}
+                    className="shrink-0 flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    Partager mon profil
+                  </button>
+                )}
+              </div>
+            );
+          }
+
+          if (vs === 'submitted') {
+            return (
+              <div className="mb-4 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3">
+                <span className="text-base leading-none">⏳</span>
+                <p className="text-sm font-medium text-amber-800">
+                  En cours de vérification — Nous vous contacterons sous 48h
+                </p>
+              </div>
+            );
+          }
+
+          if (vs === 'rejected') {
+            return (
+              <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-3">
+                <p className="text-sm font-medium text-red-800">
+                  Profil refusé
+                  {providerInfo.rejectionReason ? ` · ${providerInfo.rejectionReason}` : ''}
+                </p>
+                <button
+                  onClick={() => router.push(`/${locale}/provider/profile`)}
+                  className="shrink-0 text-xs font-semibold text-red-700 underline underline-offset-2 hover:text-red-900 whitespace-nowrap"
+                >
+                  Modifier mon profil
+                </button>
+              </div>
+            );
+          }
+
+          if (vs === 'draft') {
+            return (
+              <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-3">
+                <p className="text-sm font-medium text-blue-800">
+                  Complétez votre profil pour recevoir des demandes
+                </p>
+                <button
+                  onClick={() => router.push(`/${locale}/provider/profile`)}
+                  className="shrink-0 text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 whitespace-nowrap"
+                >
+                  Compléter maintenant
+                </button>
+              </div>
+            );
+          }
+
+          return null;
+        })()}
+
+        {/* 2 — Profile completion tip */}
+        {hasToken && statusCounts.completed < 3 && !isLoading && (
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <span className="text-lg leading-none mt-0.5">💡</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-800">
+                {locale === 'fr' ? 'Complétez votre profil pour attirer plus de clients' : 'Complete your profile to attract more clients'}
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                {locale === 'fr' ? "Ajoutez une présentation et améliorez-la avec l'IA pour vous démarquer." : 'Add a bio and improve it with AI to stand out.'}
+              </p>
+            </div>
+            <button
+              onClick={() => router.push(`/${locale}/provider/profile`)}
+              className="shrink-0 text-xs font-medium text-amber-700 underline underline-offset-2 hover:text-amber-900"
+            >
+              {locale === 'fr' ? 'Mon profil →' : 'My profile →'}
+            </button>
+          </div>
+        )}
+
+        {/* 3 — Availability toggle */}
         <div
           className={`mb-6 flex items-center justify-between gap-4 rounded-2xl border px-5 py-4 transition-colors ${
-            availableToday
-              ? "border-green-200 bg-green-50"
-              : "border-gray-200 bg-gray-50"
+            availableToday ? "border-green-200 bg-green-50" : "border-gray-200 bg-gray-50"
           }`}
         >
           <div className="flex items-center gap-3">
-            <div
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
-                availableToday ? "bg-green-100" : "bg-gray-200"
-              }`}
-            >
-              <Zap
-                className={`h-5 w-5 transition-colors ${
-                  availableToday ? "text-green-600" : "text-gray-400"
-                }`}
-              />
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${availableToday ? "bg-green-100" : "bg-gray-200"}`}>
+              <Zap className={`h-5 w-5 transition-colors ${availableToday ? "text-green-600" : "text-gray-400"}`} />
             </div>
             <div>
               <p className={`font-semibold text-sm ${availableToday ? "text-green-800" : "text-gray-700"}`}>
@@ -669,44 +752,61 @@ export default function ProviderDashboard() {
             onClick={toggleAvailability}
             disabled={availabilityLoading}
             aria-label={locale === "fr" ? "Basculer la disponibilité" : "Toggle availability"}
-            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-              availableToday ? "bg-green-500" : "bg-gray-300"
-            }`}
+            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${availableToday ? "bg-green-500" : "bg-gray-300"}`}
           >
-            <span
-              className={`pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform ${
-                availableToday ? "translate-x-5" : "translate-x-0.5"
-              }`}
-            />
+            <span className={`pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform ${availableToday ? "translate-x-5" : "translate-x-0.5"}`} />
           </button>
         </div>
 
-        {/* Earnings summary */}
+        {/* 4 — Earnings summary */}
         {(() => {
           const { week, month, total } = computeEarnings(bookings);
           const cards = [
             { label: locale === "fr" ? "Cette semaine" : "This week", value: week },
             { label: locale === "fr" ? "Ce mois" : "This month", value: month },
-            { label: locale === "fr" ? "Total" : "Total", value: total },
+            { label: "Total", value: total },
           ];
           return (
             <div className="grid grid-cols-3 gap-3 mb-6">
               {cards.map(({ label, value }) => (
-                <div
-                  key={label}
-                  className="rounded-2xl border border-gray-100 bg-white px-4 py-4 shadow-sm"
-                >
+                <div key={label} className="rounded-2xl border border-gray-100 bg-white px-4 py-4 shadow-sm">
                   <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
-                  <p className="text-lg font-bold text-foreground tabular-nums leading-tight">
-                    {formatFCFA(value)}
-                  </p>
+                  <p className="text-lg font-bold text-foreground tabular-nums leading-tight">{formatFCFA(value)}</p>
                 </div>
               ))}
             </div>
           );
         })()}
 
-        {/* Nouvelles demandes: pending bookings at the very top — always visible */}
+        {/* 5 — WhatsApp support */}
+        {(() => {
+          const waNumber = process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "";
+          const waMsg = encodeURIComponent("Bonjour Shizu, j'ai besoin d'aide avec mon compte prestataire.");
+          const waHref = waNumber
+            ? `https://wa.me/${waNumber.replace(/\D/g, "")}?text=${waMsg}`
+            : `whatsapp://send?text=${waMsg}`;
+          return (
+            <div className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-green-200 bg-green-50 px-5 py-4">
+              <div>
+                <p className="font-semibold text-sm text-green-800">{locale === "fr" ? "Besoin d'aide ?" : "Need help?"}</p>
+                <p className="text-xs text-green-600 mt-0.5">{locale === "fr" ? "Notre équipe répond en moins de 24h." : "Our team replies within 24h."}</p>
+              </div>
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 flex items-center gap-2 bg-[#25D366] hover:bg-[#1ebe5c] text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                </svg>
+                {locale === "fr" ? "Contacter le support" : "Contact support"}
+              </a>
+            </div>
+          );
+        })()}
+
+        {/* 6 — Nouvelles demandes */}
         {(() => {
           const pending = bookings.filter((b) => b.status === "pending" || b.status === "requested");
           return (
@@ -716,20 +816,13 @@ export default function ProviderDashboard() {
                 <h2 className="text-base font-semibold text-foreground">
                   {locale === "fr" ? "Nouvelles demandes" : "New Requests"}
                 </h2>
-                {pending.length > 0 && (
-                  <Badge variant="destructive" className="text-xs">
-                    {pending.length}
-                  </Badge>
-                )}
+                {pending.length > 0 && <Badge variant="destructive" className="text-xs">{pending.length}</Badge>}
               </div>
-
               {pending.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-muted-foreground/25 bg-muted/20 px-6 py-8 text-center">
                   <Bell className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
                   <p className="text-sm text-muted-foreground">
-                    {locale === "fr"
-                      ? "Aucune nouvelle demande pour le moment."
-                      : "No new requests at the moment."}
+                    {locale === "fr" ? "Aucune nouvelle demande pour le moment." : "No new requests at the moment."}
                   </p>
                 </div>
               ) : (
@@ -749,92 +842,50 @@ export default function ProviderDashboard() {
           );
         })()}
 
-        {showStats && (
-          <div className="space-y-4 mb-6" data-testid="stats-section">
-            <div className="grid gap-4 lg:grid-cols-2">
-              <RevenueBreakdown
-                bookings={bookings}
-                dateRange={filters.dateRange}
-                serviceFilter={filters.service}
-              />
-              <AchievementBadges bookings={bookings} />
-            </div>
-            <UpcomingSchedule bookings={bookings} />
-          </div>
-        )}
-
-        {/* Profile completion tip — shown when provider has fewer than 3 completed bookings */}
-        {hasToken && statusCounts.completed < 3 && !isLoading && (
-          <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <span className="text-lg leading-none mt-0.5">💡</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-amber-800">
-                {locale === 'fr'
-                  ? 'Complétez votre profil pour attirer plus de clients'
-                  : 'Complete your profile to attract more clients'}
-              </p>
-              <p className="text-xs text-amber-700 mt-0.5">
-                {locale === 'fr'
-                  ? 'Ajoutez une présentation et améliorez-la avec l\'IA pour vous démarquer.'
-                  : 'Add a bio and improve it with AI to stand out.'}
-              </p>
-            </div>
-            <button
-              onClick={() => router.push(`/${locale}/provider/profile`)}
-              className="shrink-0 text-xs font-medium text-amber-700 underline underline-offset-2 hover:text-amber-900"
-            >
-              {locale === 'fr' ? 'Mon profil →' : 'My profile →'}
-            </button>
-          </div>
-        )}
-
-        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 mb-4 border-b border-border/50 md:relative md:mx-0 md:px-0 md:py-0 md:mb-4 md:border-b-0 md:bg-transparent md:backdrop-blur-none">
-          <StatusTabs
-            value={filters.status}
-            onChange={handleStatusFilter}
-            counts={statusCounts}
-          />
+        {/* 7 — Planning à venir */}
+        <div className="mb-6">
+          <UpcomingSchedule bookings={bookings} />
         </div>
 
-        {/* WhatsApp support card */}
+        {/* 8 — Performances */}
         {(() => {
-          const waNumber = process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "";
-          const waMsg = encodeURIComponent("Bonjour Shizu, j'ai besoin d'aide avec mon compte prestataire.");
-          const waHref = waNumber
-            ? `https://wa.me/${waNumber.replace(/\D/g, "")}?text=${waMsg}`
-            : `whatsapp://send?text=${waMsg}`;
+          const totalWithOutcome = statusCounts.confirmed + statusCounts.completed + statusCounts.cancelled;
+          const accepted = statusCounts.confirmed + statusCounts.completed;
+          const acceptRate = totalWithOutcome > 0 ? Math.round((accepted / totalWithOutcome) * 100) : null;
+          const perfItems = [
+            { label: "Note moyenne", value: "—", sub: "Bientôt disponible" },
+            { label: "Missions terminées", value: String(statusCounts.completed), sub: "au total" },
+            { label: "Taux d'acceptation", value: acceptRate !== null ? `${acceptRate}%` : "—", sub: totalWithOutcome > 0 ? `${accepted}/${totalWithOutcome} demandes` : "Pas encore de données" },
+            { label: "Délai de réponse", value: "< 2h", sub: "estimation" },
+          ];
           return (
-            <div className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-green-200 bg-green-50 px-5 py-4">
-              <div>
-                <p className="font-semibold text-sm text-green-800">
-                  {locale === "fr" ? "Besoin d'aide ?" : "Need help?"}
-                </p>
-                <p className="text-xs text-green-600 mt-0.5">
-                  {locale === "fr"
-                    ? "Notre équipe répond en moins de 24h."
-                    : "Our team replies within 24h."}
-                </p>
+            <div className="mb-6">
+              <h2 className="text-base font-semibold text-foreground mb-3">Performances</h2>
+              <div className="grid grid-cols-2 gap-3">
+                {perfItems.map(({ label, value, sub }) => (
+                  <div key={label} className="rounded-2xl border border-gray-100 bg-white px-4 py-4 shadow-sm">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
+                    <p className="text-xl font-bold text-foreground tabular-nums">{value}</p>
+                    {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
+                  </div>
+                ))}
               </div>
-              <a
-                href={waHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 flex items-center gap-2 bg-[#25D366] hover:bg-[#1ebe5c] text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                </svg>
-                {locale === "fr" ? "Contacter le support" : "Contact support"}
-              </a>
             </div>
           );
         })()}
 
+        {/* 9 — Récompenses */}
+        <div className="mb-6">
+          <AchievementBadges bookings={bookings} />
+        </div>
+
+        {/* 10 — Booking list */}
+        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 mb-4 border-b border-border/50 md:relative md:mx-0 md:px-0 md:py-0 md:mb-4 md:border-b-0 md:bg-transparent md:backdrop-blur-none">
+          <StatusTabs value={filters.status} onChange={handleStatusFilter} counts={statusCounts} />
+        </div>
+
         {filteredBookings.length > 0 ? (
-          <div
-            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-            data-testid="bookings-grid"
-          >
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="bookings-grid">
             {filteredBookings.map((booking) => (
               <ProviderBookingCard
                 key={booking.id}
@@ -847,24 +898,14 @@ export default function ProviderDashboard() {
             ))}
           </div>
         ) : (
-          <div
-            className="flex flex-col items-center justify-center py-16 text-center"
-            data-testid="empty-state"
-          >
+          <div className="flex flex-col items-center justify-center py-16 text-center" data-testid="empty-state">
             <CalendarDays className="mb-4 h-12 w-12 text-muted-foreground" />
-            <h2 className="text-lg font-medium text-foreground">
-              {t("noBookingsTitle")}
-            </h2>
+            <h2 className="text-lg font-medium text-foreground">{t("noBookingsTitle")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {hasActiveFilters ? t("noBookingsWithFilters") : t("noBookingsEmpty")}
             </p>
             {hasActiveFilters && (
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={clearAllFilters}
-                data-testid="button-clear-filters-empty"
-              >
+              <Button variant="outline" className="mt-4" onClick={clearAllFilters} data-testid="button-clear-filters-empty">
                 {t("clearAllFilters")}
               </Button>
             )}
