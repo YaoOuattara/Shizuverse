@@ -1,12 +1,27 @@
-import { getAdminToken } from "./adminAuth";
+import { getAdminToken, clearAdminToken } from "./adminAuth";
 
 const BASE_URL = process.env.NEXT_PUBLIC_FLASK_API_URL || "https://shizu-verse.onrender.com";
 
 async function apiFetch(path: string, options: RequestInit = {}) {
+  // Spread options first, then override headers so Content-Type + any caller headers always win
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...options.headers },
     ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers as Record<string, string>),
+    },
   });
+
+  if (res.status === 401) {
+    // Expired or invalid admin token — clear it and redirect to login
+    clearAdminToken();
+    if (typeof window !== "undefined") {
+      const locale = window.location.pathname.split("/")[1] || "fr";
+      window.location.href = `/${locale}/admin/login`;
+    }
+    throw new Error(`API error 401: ${path} — session expired`);
+  }
+
   if (!res.ok) {
     let body = "";
     try { body = await res.text(); } catch { /* ignore */ }

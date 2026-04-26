@@ -25,5 +25,24 @@ export function clearAdminToken(): void {
 }
 
 export function isAdminAuthenticated(): boolean {
-  return !!getAdminToken();
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return false;
+
+    // Decode JWT payload (base64url, no signature verification needed client-side)
+    const parts = token.split(".");
+    if (parts.length !== 3) {
+      localStorage.removeItem(TOKEN_KEY);
+      return false;
+    }
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    const exp = payload?.exp;
+    if (typeof exp === "number" && Date.now() / 1000 >= exp) {
+      localStorage.removeItem(TOKEN_KEY);
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
