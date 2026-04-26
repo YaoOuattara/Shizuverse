@@ -166,18 +166,36 @@ def main():
         expect_status=200,
     )
 
-    # 7. POST cancel
-    # Lives at /admin/ (not /api/admin/)
-    # Note: booking was just moved to 'completed' in test 6, so this will 400.
-    # That is correct backend behaviour (cannot cancel a completed booking).
-    check(
-        "7. POST /admin/bookings/" + str(booking_id) + "/cancel  {reason: test}",
-        "POST", "/admin/bookings/" + str(booking_id) + "/cancel",
-        body={"reason": "test"},
-        expect_status=200,
-        note="spec had /api/admin; actual path is /admin. "
-             "Will 400 if booking is already completed (correct backend behaviour).",
-    )
+    # 7. POST cancel — needs a fresh booking in a cancellable state (not completed/cancelled)
+    # Create a new pending booking, confirm it, then cancel it.
+    cancel_booking_id = None
+    from datetime import datetime, timedelta
+    future = (datetime.utcnow() + timedelta(days=5)).strftime("%Y-%m-%dT10:00:00")
+    s7, r7 = _request("POST", "/api/bookings/", {
+        "client_name": "Cancel Test Client",
+        "client_phone": "0700000088",
+        "client_location": "Plateau, Abidjan",
+        "service_id": 1,
+        "appointment_date": future,
+        "notes": "Created by test suite for cancel test",
+    })
+    if s7 == 201 and isinstance(r7, dict):
+        cancel_booking_id = r7.get("id")
+        # Confirm it so it's in a cancellable state
+        _request("PATCH", "/api/admin/bookings/" + str(cancel_booking_id) + "/status",
+                 {"status": "confirmed"})
+    if cancel_booking_id:
+        check(
+            "7. POST /admin/bookings/" + str(cancel_booking_id) + "/cancel  {reason: test}",
+            "POST", "/admin/bookings/" + str(cancel_booking_id) + "/cancel",
+            body={"reason": "automated test cancel"},
+            expect_status=200,
+            note="fresh confirmed booking; spec had /api/admin, actual path is /admin",
+        )
+    else:
+        print("  SKIP  7. POST /admin/bookings/{id}/cancel  [could not create test booking status=" + str(s7) + "]")
+        global FAIL_COUNT
+        FAIL_COUNT += 1
 
     # Summary
     total = PASS_COUNT + FAIL_COUNT
