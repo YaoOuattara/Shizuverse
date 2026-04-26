@@ -434,6 +434,11 @@ export default function AdminProviders() {
   const [isSavingServices, setIsSavingServices] = useState(false);
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
 
+  // ── Edit zones state ──────────────────────────────────────────────────────
+  const [editZonesMode, setEditZonesMode] = useState(false);
+  const [editingZones, setEditingZones] = useState<string[]>([]);
+  const [isSavingZones, setIsSavingZones] = useState(false);
+
   useEffect(() => {
     const base = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
     fetch(`${base}/api/services/categories`)
@@ -448,6 +453,8 @@ export default function AdminProviders() {
     setEditServicesMode(false);
     setEditingServices([]);
     setServiceAddValue("");
+    setEditZonesMode(false);
+    setEditingZones([]);
   }, [selectedProvider?.id]);
 
   const handleSaveServices = async (providerId: string) => {
@@ -465,6 +472,24 @@ export default function AdminProviders() {
       toast({ title: "Error", description: "Failed to update services.", variant: "destructive" });
     } finally {
       setIsSavingServices(false);
+    }
+  };
+
+  const handleSaveZones = async (providerId: string) => {
+    setIsSavingZones(true);
+    try {
+      await adminApi.portalUpdateZones(Number(providerId), editingZones);
+      updateLocalProvider(providerId, { serviceArea: editingZones.join(', ') });
+      setEditZonesMode(false);
+      toast({
+        title: isFr ? "Zones mises à jour" : "Zones Updated",
+        description: isFr ? "Les zones d'intervention ont été mises à jour." : "Service zones have been updated.",
+      });
+    } catch (err) {
+      console.error("Failed to update zones:", err);
+      toast({ title: "Error", description: "Failed to update zones.", variant: "destructive" });
+    } finally {
+      setIsSavingZones(false);
     }
   };
 
@@ -858,43 +883,128 @@ export default function AdminProviders() {
                 )}
               </div>
 
+              {/* Zones */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-sm text-muted-foreground">
+                    {isFr ? "Zones d'intervention" : "Service Zones"}
+                  </h4>
+                  {!editZonesMode && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = selectedProvider.serviceArea
+                          ? selectedProvider.serviceArea.split(',').map((z: string) => z.trim()).filter(Boolean)
+                          : [];
+                        setEditingZones(current);
+                        setEditZonesMode(true);
+                      }}
+                      className="flex items-center gap-1 text-xs text-[#0F3A7A] hover:underline"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      {isFr ? "Éditer les zones" : "Edit zones"}
+                    </button>
+                  )}
+                </div>
+
+                {!editZonesMode ? (
+                  <div className="flex flex-wrap gap-1">
+                    {(!selectedProvider.serviceArea || selectedProvider.serviceArea.trim() === '') ? (
+                      <p className="text-xs text-muted-foreground italic">
+                        {isFr ? "Aucune zone" : "No zones"}
+                      </p>
+                    ) : selectedProvider.serviceArea.split(',').map((z: string) => z.trim()).filter(Boolean).map((zone: string) => (
+                      <Badge key={zone} variant="outline" className="text-xs">
+                        {zone}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto rounded-lg border p-2">
+                      {COMMUNES.filter((c: string) => c.trim().length > 2).map((commune: string) => {
+                        const active = editingZones.includes(commune);
+                        return (
+                          <button
+                            key={commune}
+                            type="button"
+                            onClick={() => setEditingZones(prev =>
+                              active ? prev.filter(z => z !== commune) : [...prev, commune]
+                            )}
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium border transition-colors ${
+                              active
+                                ? 'bg-[#0F3A7A] text-white border-[#0F3A7A]'
+                                : 'bg-background text-muted-foreground border-border hover:border-[#0F3A7A]'
+                            }`}
+                          >
+                            {commune}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {editingZones.length} {isFr ? "zone(s) sélectionnée(s)" : "zone(s) selected"}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => { setEditZonesMode(false); setEditingZones([]); }}
+                      >
+                        {isFr ? "Annuler" : "Cancel"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        disabled={isSavingZones}
+                        onClick={() => handleSaveZones(selectedProvider.id)}
+                      >
+                        {isSavingZones ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                        {isFr ? "Enregistrer" : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Stats */}
               <div className="space-y-3">
-                <h4 className="font-medium text-sm text-muted-foreground">Performance</h4>
+                <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Performance" : "Performance"}</h4>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="text-center p-3 rounded-md bg-muted/50">
                     <Star className="h-4 w-4 mx-auto mb-1 text-amber-500" />
                     <p className="text-lg font-bold">{selectedProvider.rating || "-"}</p>
-                    <p className="text-xs text-muted-foreground">Rating</p>
+                    <p className="text-xs text-muted-foreground">{isFr ? "Note" : "Rating"}</p>
                   </div>
                   <div className="text-center p-3 rounded-md bg-muted/50">
                     <CheckCircle2 className="h-4 w-4 mx-auto mb-1 text-emerald-500" />
                     <p className="text-lg font-bold">{selectedProvider.completedBookings}</p>
-                    <p className="text-xs text-muted-foreground">Completed</p>
+                    <p className="text-xs text-muted-foreground">{isFr ? "Terminées" : "Completed"}</p>
                   </div>
                   <div className="text-center p-3 rounded-md bg-muted/50">
                     <Banknote className="h-4 w-4 mx-auto mb-1 text-emerald-500" />
                     <p className="text-lg font-bold">{formatMoney(selectedProvider.revenue)}</p>
-                    <p className="text-xs text-muted-foreground">Revenue</p>
+                    <p className="text-xs text-muted-foreground">{isFr ? "Revenus" : "Revenue"}</p>
                   </div>
                 </div>
               </div>
 
               {/* Timestamps */}
               <div className="space-y-1 text-xs text-muted-foreground">
-                <p>Joined: {selectedProvider.joinedAt}</p>
+                <p>{isFr ? "Inscrit :" : "Joined:"} {selectedProvider.joinedAt}</p>
                 {selectedProvider.submittedAt && (
-                  <p>Application submitted: {selectedProvider.submittedAt}</p>
+                  <p>{isFr ? "Candidature soumise :" : "Application submitted:"} {selectedProvider.submittedAt}</p>
                 )}
                 {selectedProvider.reviewedAt && (
-                  <p>Last reviewed: {selectedProvider.reviewedAt}</p>
+                  <p>{isFr ? "Dernière révision :" : "Last reviewed:"} {selectedProvider.reviewedAt}</p>
                 )}
               </div>
 
               {/* Verification Actions */}
               {selectedProvider.verificationStatus === 'submitted' && (
                 <div className="space-y-3 pt-4 border-t">
-                  <h4 className="font-medium text-sm text-muted-foreground">Review Application</h4>
+                  <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Examiner la candidature" : "Review Application"}</h4>
                   
                   <Button
                     className="w-full"
@@ -978,7 +1088,7 @@ export default function AdminProviders() {
               {/* Approved Provider Actions */}
               {selectedProvider.verificationStatus === 'approved' && (
                 <div className="space-y-3 pt-4 border-t">
-                  <h4 className="font-medium text-sm text-muted-foreground">Manage Provider</h4>
+                  <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Gérer le prestataire" : "Manage Provider"}</h4>
                   
                   <Button
                     variant="outline"

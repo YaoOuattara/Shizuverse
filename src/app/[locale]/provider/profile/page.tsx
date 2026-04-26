@@ -4,10 +4,16 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Loader2, Sparkles, Save, CheckCircle2, XCircle,
-  ShieldCheck, ShieldAlert, ShieldX, Clock, Upload,
+  ShieldCheck, ShieldAlert, ShieldX, Clock, Upload, Eye, Star,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? 'https://shizu-verse.onrender.com'
 
@@ -287,6 +293,7 @@ export default function ProviderProfilePage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isImproving, setIsImproving] = useState(false)
   const [forceForm, setForceForm] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   useEffect(() => {
     // 1. Show localStorage immediately (no flicker)
@@ -463,14 +470,24 @@ export default function ProviderProfilePage() {
     <div className="max-w-2xl mx-auto px-4 py-8">
 
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => router.back()}
+            className="text-muted-foreground hover:text-foreground text-sm"
+          >
+            ← {isFr ? 'Retour' : 'Back'}
+          </button>
+          <h1 className="text-2xl font-bold">{isFr ? 'Mon profil' : 'My Profile'}</h1>
+        </div>
         <button
-          onClick={() => router.back()}
-          className="text-muted-foreground hover:text-foreground text-sm"
+          type="button"
+          onClick={() => setPreviewOpen(true)}
+          className="flex items-center gap-1.5 text-sm text-[#0F3A7A] hover:underline"
         >
-          ← {isFr ? 'Retour' : 'Back'}
+          <Eye className="h-4 w-4" />
+          {isFr ? 'Aperçu client' : 'Client preview'}
         </button>
-        <h1 className="text-2xl font-bold">{isFr ? 'Mon profil' : 'My Profile'}</h1>
       </div>
 
       {providerName && (
@@ -694,6 +711,85 @@ export default function ProviderProfilePage() {
           {isFr ? 'Sauvegarder les modifications' : 'Save changes'}
         </Button>
       )}
+
+      {/* ── Profile preview modal ─────────────────────────────────────────── */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{isFr ? 'Aperçu de mon profil' : 'My Profile Preview'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Photo + name */}
+            <div className="flex items-center gap-3">
+              {profile.profile_photo_url ? (
+                <img
+                  src={profile.profile_photo_url}
+                  alt=""
+                  className="h-16 w-16 rounded-full object-cover border border-border shrink-0"
+                  onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                />
+              ) : (
+                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  <span className="text-2xl font-bold text-muted-foreground">
+                    {providerName ? providerName[0].toUpperCase() : '?'}
+                  </span>
+                </div>
+              )}
+              <div>
+                <p className="font-semibold text-foreground">{providerName || '—'}</p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  {[1,2,3,4,5].map(n => (
+                    <Star key={n} className="h-3 w-3 text-amber-400 fill-amber-400" />
+                  ))}
+                  <span className="text-xs text-muted-foreground ml-1">
+                    {isFr ? 'Nouveau prestataire' : 'New provider'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Bio */}
+            {profile.bio && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">
+                  {isFr ? 'Présentation' : 'About'}
+                </p>
+                <p className="text-sm text-foreground leading-relaxed">{profile.bio}</p>
+              </div>
+            )}
+
+            {/* Services */}
+            {services.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">
+                  {isFr ? 'Services' : 'Services'}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {services.map(s => (
+                    <span key={s} className="px-2 py-0.5 rounded-full bg-[#0F3A7A]/10 text-[#0F3A7A] text-xs font-medium">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Verification badge */}
+            <div className="pt-2 border-t">
+              {profile.verification_status === 'approved' ? (
+                <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {isFr ? 'Prestataire vérifié' : 'Verified provider'}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground italic">
+                  {isFr ? 'Vérification en attente' : 'Verification pending'}
+                </span>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </div>
   )

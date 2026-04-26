@@ -662,9 +662,9 @@ export default function AdminPayments() {
               {/* Payment Timestamps */}
               {(selectedBooking.paidAt || selectedBooking.payoutDueAt || selectedBooking.payoutSentAt) && (
                 <div className="space-y-2 text-xs text-muted-foreground">
-                  {selectedBooking.paidAt && <p>Paid: {selectedBooking.paidAt}</p>}
-                  {selectedBooking.payoutDueAt && <p>Payout Due: {selectedBooking.payoutDueAt}</p>}
-                  {selectedBooking.payoutSentAt && <p>Payout Sent: {selectedBooking.payoutSentAt}</p>}
+                  {selectedBooking.paidAt && <p>{isFr ? "Payé :" : "Paid:"} {selectedBooking.paidAt}</p>}
+                  {selectedBooking.payoutDueAt && <p>{isFr ? "Versement dû :" : "Payout Due:"} {selectedBooking.payoutDueAt}</p>}
+                  {selectedBooking.payoutSentAt && <p>{isFr ? "Versement envoyé :" : "Payout Sent:"} {selectedBooking.payoutSentAt}</p>}
                 </div>
               )}
 
@@ -758,30 +758,30 @@ export default function AdminPayments() {
           {selectedBooking && (
             <div className="space-y-4">
               <div className="bg-muted/50 rounded-md p-3 text-sm">
-                <p><strong>Booking ID:</strong> {selectedBooking.id}</p>
-                <p><strong>Client:</strong> {selectedBooking.clientName}</p>
-                <p><strong>Amount:</strong> {formatMoney(selectedBooking.price, selectedBooking.currency)}</p>
+                <p><strong>{isFr ? "N° réservation" : "Booking ID"}:</strong> {selectedBooking.id}</p>
+                <p><strong>{isFr ? "Client" : "Client"}:</strong> {selectedBooking.clientName}</p>
+                <p><strong>{isFr ? "Montant" : "Amount"}:</strong> {formatMoney(selectedBooking.price, selectedBooking.currency)}</p>
               </div>
-              
+
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Payment Method</label>
+                  <label className="text-sm font-medium">{isFr ? "Mode de paiement" : "Payment Method"}</label>
                   <Select value={paymentMethod} onValueChange={(v: 'cash' | 'mobile_money' | 'bank_transfer') => setPaymentMethod(v)}>
                     <SelectTrigger data-testid="select-payment-method">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="cash">{isFr ? "Espèces" : "Cash"}</SelectItem>
                       <SelectItem value="mobile_money">Mobile Money</SelectItem>
-                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="bank_transfer">{isFr ? "Virement" : "Bank Transfer"}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Reference (optional)</label>
-                  <Input 
-                    placeholder="Transaction reference or receipt number"
+                  <label className="text-sm font-medium">{isFr ? "Référence (optionnel)" : "Reference (optional)"}</label>
+                  <Input
+                    placeholder={isFr ? "Référence ou numéro de reçu" : "Transaction reference or receipt number"}
                     value={paymentReference}
                     onChange={(e) => setPaymentReference(e.target.value)}
                     data-testid="input-payment-reference"
@@ -829,28 +829,28 @@ export default function AdminPayments() {
           {selectedBooking && (
             <div className="space-y-3">
               <div className="bg-muted/50 rounded-md p-3 text-sm">
-                <p><strong>Booking ID:</strong> {selectedBooking.id}</p>
-                <p><strong>Client:</strong> {selectedBooking.clientName}</p>
-                <p><strong>Amount:</strong> {formatMoney(selectedBooking.price, selectedBooking.currency)}</p>
+                <p><strong>{isFr ? "N° réservation" : "Booking ID"}:</strong> {selectedBooking.id}</p>
+                <p><strong>{isFr ? "Client" : "Client"}:</strong> {selectedBooking.clientName}</p>
+                <p><strong>{isFr ? "Montant" : "Amount"}:</strong> {formatMoney(selectedBooking.price, selectedBooking.currency)}</p>
               </div>
               <p className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
-                This action cannot be undone.
+                {isFr ? "Cette action est irréversible." : "This action cannot be undone."}
               </p>
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setRefundModalOpen(false)} disabled={isUpdating}>
-              Cancel
+              {isFr ? "Annuler" : "Cancel"}
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={() => selectedBooking && handleIssueRefund(selectedBooking.id)}
               disabled={isUpdating}
               data-testid="button-confirm-refund"
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Issue Refund
+              {isFr ? "Rembourser" : "Issue Refund"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -868,27 +868,27 @@ export default function AdminPayments() {
           {selectedBooking && (
             <div className="space-y-4">
               <div className="bg-muted/50 rounded-md p-3 text-sm">
-                <p><strong>Provider:</strong> {selectedBooking.providerName}</p>
-                <p><strong>Service:</strong> {selectedBooking.serviceName}</p>
-                <p><strong>Payout Amount:</strong> {formatMoney(selectedBooking.providerPayoutAmount, selectedBooking.currency)}</p>
+                <p><strong>{isFr ? "Prestataire" : "Provider"}:</strong> {selectedBooking.providerName}</p>
+                <p><strong>{isFr ? "Service" : "Service"}:</strong> {selectedBooking.serviceName}</p>
+                <p><strong>{isFr ? "Montant versement" : "Payout Amount"}:</strong> {formatMoney(selectedBooking.providerPayoutAmount, selectedBooking.currency)}</p>
               </div>
-              
+
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Payout Method</label>
+                  <label className="text-sm font-medium">{isFr ? "Mode de versement" : "Payout Method"}</label>
                   <Select value={payoutMethod} onValueChange={(v: 'mobile_money' | 'bank_transfer') => setPayoutMethod(v)}>
                     <SelectTrigger data-testid="select-payout-method">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="mobile_money">Mobile Money</SelectItem>
-                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="bank_transfer">{isFr ? "Virement" : "Bank Transfer"}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Reference (optional)</label>
+                  <label className="text-sm font-medium">{isFr ? "Référence (optionnel)" : "Reference (optional)"}</label>
                   <Input 
                     placeholder="Transaction reference"
                     value={payoutReference}
@@ -898,9 +898,9 @@ export default function AdminPayments() {
                 </div>
                 
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Note (optional)</label>
-                  <Textarea 
-                    placeholder="Additional notes about this payout"
+                  <label className="text-sm font-medium">{isFr ? "Note (optionnel)" : "Note (optional)"}</label>
+                  <Textarea
+                    placeholder={isFr ? "Notes sur ce versement" : "Additional notes about this payout"}
                     value={payoutNote}
                     onChange={(e) => setPayoutNote(e.target.value)}
                     rows={2}
@@ -912,16 +912,16 @@ export default function AdminPayments() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setPayoutModalOpen(false)} disabled={isUpdating}>
-              Cancel
+              {isFr ? "Annuler" : "Cancel"}
             </Button>
-            <Button 
+            <Button
               className="bg-emerald-600 hover:bg-emerald-700"
               onClick={() => selectedBooking && handleRecordPayout(selectedBooking.id)}
               disabled={isUpdating}
               data-testid="button-confirm-payout"
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Record Payout
+              {isFr ? "Enregistrer le versement" : "Record Payout"}
             </Button>
           </DialogFooter>
         </DialogContent>

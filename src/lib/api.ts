@@ -90,6 +90,8 @@ export const adminApi = {
     adminFetch(`/admin/providers/${id}/activation`, { method: "POST", body: JSON.stringify({ action }) }),
   patchProviderServices: (id: number, services: string[]) =>
     adminFetch(`/admin/providers/${id}/services`, { method: "PATCH", body: JSON.stringify({ services }) }),
+  portalUpdateZones: (id: number, zones: string[]) =>
+    adminFetch(`/admin/providers/${id}/zones`, { method: "PATCH", body: JSON.stringify({ zones }) }),
   portalGetBookings: (params?: { status?: string; payment_status?: string; payout_status?: string }) => {
     const qs = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => !!v).map(([k, v]) => [k, v as string])).toString() : "";
     return adminFetch(`/admin/bookings${qs ? `?${qs}` : ""}`);

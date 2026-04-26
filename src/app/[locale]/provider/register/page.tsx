@@ -239,9 +239,9 @@ export default function ProviderRegisterPage() {
       profile_photo_url: profilePhotoUrl || undefined,
       id_doc_type: idDocType || undefined,
       id_doc_url: idDocUrl || undefined,
-      momo_operator: momoOperator || undefined,
-      momo_number: momoNumber.trim() || undefined,
-      momo_account_name: momoName.trim() || undefined,
+      mobile_money_operator: momoOperator || undefined,
+      mobile_money_number: momoNumber.trim() || undefined,
+      mobile_money_name: momoName.trim() || undefined,
       verification_status: "submitted",
     };
     console.log("[register] payload:", JSON.stringify(payload, null, 2));
