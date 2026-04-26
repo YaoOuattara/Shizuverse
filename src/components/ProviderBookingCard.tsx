@@ -129,7 +129,7 @@ export default function ProviderBookingCard({
     completed: Check,
   };
 
-  const StatusIcon = statusIcons[booking.status];
+  const StatusIcon = statusIcons[booking.status as ProviderBookingStatus] ?? CircleDashed;
   const isPending = booking.status === "pending" || booking.status === "requested";
   const isActionable = isPending || booking.status === "confirmed";
   const isAnyLoading = isAccepting || isRejecting || isRescheduling;
@@ -156,11 +156,11 @@ export default function ProviderBookingCard({
               </div>
               <Badge
                 variant="secondary"
-                className={`${statusStyles[booking.status]} text-xs font-medium shrink-0`}
+                className={`${statusStyles[booking.status as ProviderBookingStatus] ?? ""} text-xs font-medium shrink-0`}
                 data-testid={`badge-status-${booking.id}`}
               >
                 <StatusIcon className="mr-1 h-3 w-3" />
-                {statusLabels[booking.status]}
+                {statusLabels[booking.status as ProviderBookingStatus] ?? booking.status}
               </Badge>
             </div>
 

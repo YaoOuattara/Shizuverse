@@ -434,9 +434,9 @@ export default function ProviderDashboard() {
   const filteredBookings = bookings.filter((booking) => {
     const matchesSearch =
       searchQuery.trim() === "" ||
-      booking.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      booking.serviceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      booking.customerEmail.toLowerCase().includes(searchQuery.toLowerCase());
+      (booking.customerName ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (booking.serviceName ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (booking.customerEmail ?? "").toLowerCase().includes(searchQuery.toLowerCase());
 
     // "pending" filter tab shows both pending and requested bookings
     const matchesStatus =
