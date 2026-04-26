@@ -2,14 +2,7 @@
 
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   Shield,
   Star,
@@ -23,7 +16,6 @@ import {
 } from "lucide-react";
 import type { ProviderBooking } from "@/data/mockProviderBookings";
 import { ACHIEVEMENT_THRESHOLDS } from "@/lib/achievementThresholds";
-import { useTranslations } from "next-intl";
 
 interface AchievementBadgesProps {
   bookings: ProviderBooking[];
@@ -42,7 +34,6 @@ export interface AchievementBadge {
   comingSoon?: boolean;
   notEnoughHistory?: boolean;
   helperText?: string;
-  unlockedDate?: string;
   progress?: {
     current: number;
     target: number;
@@ -66,7 +57,7 @@ export function AchievementBadges({
   reviewCount = 0,
   className,
 }: AchievementBadgesProps) {
-  const t = useTranslations("achievementBadges");
+  const isFr = true; // provider dashboard is always fr
 
   const computedBadges = useMemo(() => {
     const completedBookings = bookings.filter((b) => b.status === "completed");
@@ -80,13 +71,12 @@ export function AchievementBadges({
       const count = customerCounts.get(b.customerId) || 0;
       customerCounts.set(b.customerId, count + 1);
     });
-    const repeatCustomers = Array.from(customerCounts.values()).filter((count) => count >= 2).length;
+    const repeatCustomers = Array.from(customerCounts.values()).filter((c) => c >= 2).length;
 
     const totalWithOutcome = confirmedOrCompleted.length + cancelledBookings.length;
     const completionRate = totalWithOutcome > 0
       ? Math.round((confirmedOrCompleted.length / totalWithOutcome) * 100)
       : 0;
-
     const cancellationRate = totalWithOutcome > 0
       ? Math.round((cancelledBookings.length / totalWithOutcome) * 100)
       : 0;
@@ -97,245 +87,93 @@ export function AchievementBadges({
     const badges: AchievementBadge[] = [
       {
         id: "first_booking",
-        name: t("badges.firstSteps.name"),
-        description: t("badges.firstSteps.description"),
-        requirement: t("badges.firstSteps.requirement", { count: FIRST_BOOKING.completedCount }),
+        name: "Premiers pas",
+        description: "Complétez votre première mission",
+        requirement: `${FIRST_BOOKING.completedCount} mission(s)`,
         icon: "Sparkles",
         unlocked: completedCount >= FIRST_BOOKING.completedCount,
-        progress: {
-          current: Math.min(completedCount, FIRST_BOOKING.completedCount),
-          target: FIRST_BOOKING.completedCount,
-        },
+        progress: { current: Math.min(completedCount, FIRST_BOOKING.completedCount), target: FIRST_BOOKING.completedCount },
       },
       {
         id: "reliable",
-        name: t("badges.reliable.name"),
-        description: t("badges.reliable.description"),
-        requirement: t("badges.reliable.requirement", { count: RELIABLE.completedCount, maxRate: RELIABLE.maxCancellationRate }),
+        name: "Fiable",
+        description: "Prouvez votre fiabilité",
+        requirement: `${RELIABLE.completedCount} missions`,
         icon: "Shield",
         unlocked: completedCount >= RELIABLE.completedCount && cancellationRate < RELIABLE.maxCancellationRate,
-        progress: {
-          current: completedCount,
-          target: RELIABLE.completedCount,
-        },
+        progress: { current: completedCount, target: RELIABLE.completedCount },
       },
       {
         id: "top_rated",
-        name: t("badges.topRated.name"),
-        description: t("badges.topRated.description"),
-        requirement: t("badges.topRated.requirement", { minRating: TOP_RATED.minRating, minReviews: TOP_RATED.minReviewCount }),
+        name: "Top noté",
+        description: "Obtenez d'excellentes évaluations",
+        requirement: `Note ≥ ${TOP_RATED.minRating} · ${TOP_RATED.minReviewCount} avis`,
         icon: "Star",
         unlocked: providerRating !== undefined && providerRating >= TOP_RATED.minRating && reviewCount >= TOP_RATED.minReviewCount,
         comingSoon: providerRating === undefined,
-        progress: providerRating !== undefined ? {
-          current: reviewCount,
-          target: TOP_RATED.minReviewCount,
-        } : undefined,
+        progress: providerRating !== undefined ? { current: reviewCount, target: TOP_RATED.minReviewCount } : undefined,
       },
       {
         id: "completion_streak",
-        name: t("badges.completionStreak.name"),
-        description: t("badges.completionStreak.description"),
-        requirement: t("badges.completionStreak.requirement", { minRate: COMPLETION_STREAK.minCompletionRate, minBookings: COMPLETION_STREAK.minBookingsWithOutcome }),
+        name: "Assidu",
+        description: "Maintenez un taux de complétion élevé",
+        requirement: `${COMPLETION_STREAK.minCompletionRate}% complétion`,
         icon: "Flame",
         unlocked: completionRate >= COMPLETION_STREAK.minCompletionRate && totalWithOutcome >= COMPLETION_STREAK.minBookingsWithOutcome,
         notEnoughHistory: totalWithOutcome < COMPLETION_STREAK.minBookingsWithOutcome,
-        helperText: t("badges.completionStreak.helperText", { total: totalWithOutcome }),
-        progress: totalWithOutcome >= COMPLETION_STREAK.minBookingsWithOutcome ? {
-          current: completionRate,
-          target: COMPLETION_STREAK.minCompletionRate,
-          suffix: "%",
-          displayFormat: "goal",
-        } : {
-          current: totalWithOutcome,
-          target: COMPLETION_STREAK.minBookingsWithOutcome,
-          displayFormat: "fraction",
-        },
+        progress: totalWithOutcome >= COMPLETION_STREAK.minBookingsWithOutcome
+          ? { current: completionRate, target: COMPLETION_STREAK.minCompletionRate, suffix: "%", displayFormat: "goal" }
+          : { current: totalWithOutcome, target: COMPLETION_STREAK.minBookingsWithOutcome, displayFormat: "fraction" },
       },
       {
         id: "loyalty",
-        name: t("badges.loyalty.name"),
-        description: t("badges.loyalty.description"),
-        requirement: t("badges.loyalty.requirement", { count: LOYALTY_CHAMPION.repeatCustomerCount }),
+        name: "Fidélisateur",
+        description: "Gardez des clients réguliers",
+        requirement: `${LOYALTY_CHAMPION.repeatCustomerCount} clients récurrents`,
         icon: "Heart",
         unlocked: repeatCustomers >= LOYALTY_CHAMPION.repeatCustomerCount,
-        progress: {
-          current: repeatCustomers,
-          target: LOYALTY_CHAMPION.repeatCustomerCount,
-        },
+        progress: { current: repeatCustomers, target: LOYALTY_CHAMPION.repeatCustomerCount },
       },
     ];
 
     return badges;
-  }, [bookings, providerRating, reviewCount, t]);
+  }, [bookings, providerRating, reviewCount]);
 
   const unlockedCount = computedBadges.filter((b) => b.unlocked).length;
   const totalBadges = computedBadges.length;
+  const completedMissions = bookings.filter((b) => b.status === "completed").length;
 
-  const renderBadge = (badge: AchievementBadge) => {
-    const IconComponent = iconMap[badge.icon] || Shield;
-    const isUnlocked = badge.unlocked;
-    const isComingSoon = badge.comingSoon;
+  // First locked non-comingSoon badge = "next to unlock"
+  const nextBadgeIdx = computedBadges.findIndex((b) => !b.unlocked && !b.comingSoon && !b.notEnoughHistory);
 
-    return (
-      <Tooltip key={badge.id}>
-        <TooltipTrigger asChild>
-          <div
-            className={`
-              relative flex flex-col items-center gap-2 p-4 rounded-lg
-              transition-all cursor-pointer
-              ${isUnlocked
-                ? "bg-primary/10 dark:bg-primary/20 hover-elevate"
-                : "bg-muted/50 opacity-70"
-              }
-            `}
-            data-testid={`badge-achievement-${badge.id}`}
-          >
-            <div
-              className={`
-                relative flex items-center justify-center w-12 h-12 rounded-full
-                ${isUnlocked
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
-                }
-              `}
-            >
-              <IconComponent className="h-6 w-6" />
-
-              {!isUnlocked && (
-                <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5">
-                  <Lock className="h-3 w-3 text-muted-foreground" />
-                </div>
-              )}
-
-              {isUnlocked && (
-                <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-0.5">
-                  <CheckCircle className="h-3 w-3 text-white" />
-                </div>
-              )}
-            </div>
-
-            <span
-              className={`
-                text-sm font-medium text-center
-                ${isUnlocked ? "text-foreground" : "text-muted-foreground"}
-              `}
-            >
-              {badge.name}
-            </span>
-
-            {isComingSoon && (
-              <Badge variant="secondary" className="text-xs">
-                {t("comingSoon")}
-              </Badge>
-            )}
-
-            {badge.notEnoughHistory && !isComingSoon && (
-              <Badge variant="outline" className="text-xs">
-                {t("notEnoughHistory")}
-              </Badge>
-            )}
-
-            {/* Progress bar — shown for all badges (locked and unlocked) */}
-            {!isComingSoon && !badge.notEnoughHistory && (
-              <div className="w-full space-y-1">
-                {badge.progress ? (
-                  <>
-                    <Progress
-                      value={isUnlocked ? 100 : (badge.progress.current / badge.progress.target) * 100}
-                      className={`h-1.5 ${isUnlocked ? "[&>div]:bg-green-500" : ""}`}
-                    />
-                    <p className={`text-xs text-center font-medium ${isUnlocked ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                      {isUnlocked
-                        ? `${badge.progress.target}${badge.progress.suffix || ""} ✓`
-                        : badge.progress.displayFormat === "goal"
-                          ? `${badge.progress.current}${badge.progress.suffix || ""} / ${badge.progress.target}${badge.progress.suffix || ""}`
-                          : `${badge.progress.current} / ${badge.progress.target}${badge.progress.suffix || ""}`
-                      }
-                    </p>
-                  </>
-                ) : null}
-                {!isUnlocked && (
-                  <p className="text-xs text-center text-muted-foreground/70 italic leading-snug">
-                    {badge.requirement}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Not-enough-history: show requirement text only */}
-            {badge.notEnoughHistory && !isComingSoon && (
-              <p className="text-xs text-center text-muted-foreground italic">
-                {badge.requirement}
-              </p>
-            )}
-          </div>
-        </TooltipTrigger>
-
-        <TooltipContent side="bottom" className="max-w-[250px] p-3">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <IconComponent className={`h-4 w-4 ${isUnlocked ? "text-primary" : "text-muted-foreground"}`} />
-              <span className="font-semibold">{badge.name}</span>
-              {isUnlocked && (
-                <Badge variant="secondary" className="text-xs ml-auto">
-                  {t("unlocked")}
-                </Badge>
-              )}
-              {isComingSoon && (
-                <Badge variant="outline" className="text-xs ml-auto">
-                  {t("comingSoon")}
-                </Badge>
-              )}
-            </div>
-
-            <p className="text-sm text-muted-foreground">
-              {badge.description}
-            </p>
-
-            <div className="pt-1 border-t border-border">
-              <p className="text-xs text-muted-foreground">
-                <span className="font-medium">{t("requirementLabel")}</span> {badge.requirement}
-              </p>
-
-              {isUnlocked && (
-                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                  {t("achievementUnlocked")}
-                </p>
-              )}
-
-              {isComingSoon && (
-                <p className="text-xs text-muted-foreground/70 mt-1">
-                  {t("ratingDataRequired")}
-                </p>
-              )}
-
-              {badge.notEnoughHistory && (
-                <p className="text-xs text-muted-foreground/70 mt-1">
-                  {t("notEnoughBookingHistory")}
-                </p>
-              )}
-
-              {!isUnlocked && !isComingSoon && !badge.notEnoughHistory && badge.progress && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t("progressLabel")} {badge.progress.displayFormat === "goal"
-                    ? `${badge.progress.current}${badge.progress.suffix || ""} \u2022 ${t("goal")} ${badge.progress.target}${badge.progress.suffix || ""}`
-                    : `${badge.progress.current} / ${badge.progress.target}${badge.progress.suffix || ""}`
-                  }
-                </p>
-              )}
-
-              {badge.helperText && !badge.notEnoughHistory && (
-                <p className="text-xs text-muted-foreground/60 mt-1 italic">
-                  {badge.helperText}
-                </p>
-              )}
-            </div>
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    );
-  };
+  const bottomText = (() => {
+    if (unlockedCount === totalBadges) {
+      return { text: "Félicitations ! Tous vos badges sont débloqués. 🎉", color: "text-green-600" };
+    }
+    if (completedMissions === 0) {
+      return {
+        text: "Acceptez votre première demande pour débloquer vos premiers badges !",
+        color: "text-muted-foreground",
+      };
+    }
+    if (nextBadgeIdx >= 0) {
+      const nb = computedBadges[nextBadgeIdx];
+      if (nb.progress) {
+        const remaining = nb.progress.target - nb.progress.current;
+        if (remaining > 0) {
+          return {
+            text: `Plus que ${remaining}${nb.progress.suffix ?? ""} pour débloquer « ${nb.name} »`,
+            color: "text-[#0F3A7A]",
+          };
+        }
+      }
+      return {
+        text: `Prochain objectif : ${nb.name}`,
+        color: "text-[#0F3A7A]",
+      };
+    }
+    return null;
+  })();
 
   return (
     <Card className={className}>
@@ -343,34 +181,109 @@ export function AchievementBadges({
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-muted-foreground" />
-            <CardTitle className="text-lg">{t("title")}</CardTitle>
+            <CardTitle className="text-lg">Récompenses</CardTitle>
           </div>
-
-          <Badge variant="secondary" data-testid="badge-achievement-count">
-            {t("unlockedCount", { count: unlockedCount, total: totalBadges })}
-          </Badge>
+          <span className="text-xs font-medium text-muted-foreground bg-muted rounded-full px-2.5 py-0.5">
+            {unlockedCount} / {totalBadges}
+          </span>
         </div>
       </CardHeader>
 
       <CardContent>
-        <TooltipProvider>
-        <div
-          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3"
-          data-testid="grid-achievements"
-        >
-          {computedBadges.map(renderBadge)}
+        {/* Horizontal scroll on mobile, wrap on desktop */}
+        <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory sm:flex-wrap sm:overflow-visible">
+          {computedBadges.map((badge, idx) => {
+            const IconComponent = iconMap[badge.icon] || Shield;
+            const isUnlocked = badge.unlocked;
+            const isNext = idx === nextBadgeIdx;
+            const progressPct = badge.progress
+              ? isUnlocked ? 100 : Math.round((badge.progress.current / badge.progress.target) * 100)
+              : 0;
+            const progressLabel = badge.progress
+              ? isUnlocked
+                ? `${badge.progress.target}${badge.progress.suffix ?? ""} ✓`
+                : `${badge.progress.current} / ${badge.progress.target}${badge.progress.suffix ?? ""}`
+              : null;
+
+            return (
+              <div
+                key={badge.id}
+                className={`
+                  shrink-0 snap-center w-28 sm:w-32 flex flex-col items-center gap-2 p-3 rounded-xl border transition-all
+                  ${isUnlocked
+                    ? "border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20"
+                    : isNext
+                      ? "border-blue-400 bg-blue-50 dark:bg-blue-950/20"
+                      : "border-border bg-muted/30 opacity-70"
+                  }
+                `}
+                data-testid={`badge-achievement-${badge.id}`}
+              >
+                {/* Next badge label */}
+                {isNext && (
+                  <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide leading-none">
+                    Prochain objectif
+                  </span>
+                )}
+
+                {/* Icon circle */}
+                <div
+                  className={`
+                    relative flex items-center justify-center w-11 h-11 rounded-full
+                    ${isUnlocked
+                      ? "bg-emerald-500 text-white"
+                      : isNext
+                        ? "bg-blue-100 text-blue-600 dark:bg-blue-900/40"
+                        : "bg-muted text-muted-foreground"
+                    }
+                  `}
+                >
+                  <IconComponent className="h-5 w-5" />
+                  {isUnlocked && (
+                    <div className="absolute -bottom-1 -right-1 bg-white dark:bg-background rounded-full p-0.5">
+                      <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                    </div>
+                  )}
+                  {!isUnlocked && (
+                    <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5">
+                      <Lock className="h-3 w-3 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Badge name */}
+                <span className={`text-xs font-semibold text-center leading-tight ${isUnlocked ? "text-emerald-700 dark:text-emerald-400" : isNext ? "text-blue-700 dark:text-blue-300" : "text-muted-foreground"}`}>
+                  {badge.name}
+                </span>
+
+                {/* Progress bar */}
+                {badge.progress && !badge.comingSoon && (
+                  <div className="w-full space-y-1">
+                    <Progress
+                      value={progressPct}
+                      className={`h-1.5 ${isUnlocked ? "[&>div]:bg-emerald-500" : isNext ? "[&>div]:bg-blue-500" : ""}`}
+                    />
+                    <p className={`text-[10px] text-center ${isUnlocked ? "text-emerald-600" : "text-muted-foreground"}`}>
+                      {progressLabel}
+                    </p>
+                  </div>
+                )}
+
+                {/* Coming soon / not enough history */}
+                {(badge.comingSoon || badge.notEnoughHistory) && (
+                  <p className="text-[10px] text-muted-foreground italic text-center leading-tight">
+                    {badge.comingSoon ? "Bientôt disponible" : badge.requirement}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
-        </TooltipProvider>
 
-        {unlockedCount < totalBadges && (
-          <p className="text-sm text-muted-foreground text-center mt-4">
-            {t("keepUpMsg", { count: totalBadges - unlockedCount })}
-          </p>
-        )}
-
-        {unlockedCount === totalBadges && (
-          <p className="text-sm text-green-600 dark:text-green-400 text-center mt-4">
-            {t("congratulations")}
+        {/* Bottom motivational text */}
+        {bottomText && (
+          <p className={`text-xs text-center mt-3 font-medium ${bottomText.color}`}>
+            {bottomText.text}
           </p>
         )}
       </CardContent>
