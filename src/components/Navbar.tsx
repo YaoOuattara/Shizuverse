@@ -12,16 +12,30 @@ export default function Navbar() {
   const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}(?=\/|$)/, '') || '';
   const [mounted, setMounted] = useState(false);
   const [isProvider, setIsProvider] = useState(false);
+  const [isHeroVisible, setIsHeroVisible] = useState(true);
 
   useEffect(() => {
     setIsProvider(!!localStorage.getItem('provider_token'));
     setMounted(true);
   }, []);
 
+  const isHomePage = pathWithoutLocale === '';
+
+  useEffect(() => {
+    if (!isHomePage) return;
+    const hero = document.getElementById('hero-section');
+    if (!hero) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsHeroVisible(entry.isIntersecting),
+      { threshold: 0 },
+    );
+    observer.observe(hero);
+    return () => observer.disconnect();
+  }, [isHomePage]);
+
   const hideBookCta =
     pathWithoutLocale.startsWith('/provider/register') ||
     pathWithoutLocale.startsWith('/booking/');
-  const isHomePage = pathWithoutLocale === '';
 
   const providerHref = isProvider ? `/${locale}/provider` : `/${locale}/provider/register`;
   const providerLabel = isProvider
@@ -85,24 +99,32 @@ export default function Navbar() {
           </div>
 
           {!hideBookCta && (
-            isHomePage ? (
-              <button
-                onClick={() => {
-                  document.getElementById('search-bar')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  setTimeout(() => document.getElementById('search-bar')?.focus(), 400);
-                }}
-                className="bg-[#0F3A7A] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0d3068] transition-colors"
-              >
-                {locale === 'fr' ? 'Réserver' : 'Book Now'}
-              </button>
-            ) : (
-              <Link
-                href={`/${locale}/services`}
-                className="bg-[#0F3A7A] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0d3068] transition-colors"
-              >
-                {locale === 'fr' ? 'Réserver' : 'Book Now'}
-              </Link>
-            )
+            <div
+              className={`transition-all duration-300 ${
+                isHomePage && isHeroVisible
+                  ? 'opacity-0 -translate-y-1 pointer-events-none'
+                  : 'opacity-100 translate-y-0'
+              }`}
+            >
+              {isHomePage ? (
+                <button
+                  onClick={() => {
+                    document.getElementById('search-bar')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    setTimeout(() => document.getElementById('search-bar')?.focus(), 400);
+                  }}
+                  className="bg-[#0F3A7A] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0d3068] transition-colors"
+                >
+                  {locale === 'fr' ? 'Réserver' : 'Book Now'}
+                </button>
+              ) : (
+                <Link
+                  href={`/${locale}/services`}
+                  className="bg-[#0F3A7A] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0d3068] transition-colors"
+                >
+                  {locale === 'fr' ? 'Réserver' : 'Book Now'}
+                </Link>
+              )}
+            </div>
           )}
         </div>
       </div>

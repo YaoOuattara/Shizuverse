@@ -77,6 +77,7 @@ export default function HomeHero() {
 
   return (
     <section
+      id="hero-section"
       className="bg-[#0F3A7A] relative overflow-hidden"
       style={{
         backgroundImage:
