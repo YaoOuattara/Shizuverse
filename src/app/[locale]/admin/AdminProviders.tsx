@@ -104,16 +104,16 @@ const REJECTION_REASON_KEYS = [
   'other',
 ] as const;
 
-const suspensionReasons = [
-  { value: 'customer_complaints', label: 'Multiple Customer Complaints' },
-  { value: 'policy_violation', label: 'Policy Violation' },
-  { value: 'quality_issues', label: 'Service Quality Issues' },
-  { value: 'fraud_suspected', label: 'Suspected Fraudulent Activity' },
-  { value: 'inactive', label: 'Extended Inactivity' },
-  { value: 'other', label: 'Other Reason' },
+const getSuspensionReasons = (isFr: boolean) => [
+  { value: 'customer_complaints', label: isFr ? 'Plaintes clients multiples' : 'Multiple Customer Complaints' },
+  { value: 'policy_violation',    label: isFr ? 'Violation des règles'        : 'Policy Violation' },
+  { value: 'quality_issues',      label: isFr ? 'Problèmes de qualité'        : 'Service Quality Issues' },
+  { value: 'fraud_suspected',     label: isFr ? 'Activité frauduleuse suspectée' : 'Suspected Fraudulent Activity' },
+  { value: 'inactive',            label: isFr ? 'Inactivité prolongée'        : 'Extended Inactivity' },
+  { value: 'other',               label: isFr ? 'Autre raison'                : 'Other Reason' },
 ];
 
-const getVerificationBadge = (status: VerificationStatus) => {
+const getVerificationBadge = (status: VerificationStatus, isFr: boolean) => {
   const styles: Record<VerificationStatus, string> = {
     draft: "bg-muted text-muted-foreground",
     submitted: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
@@ -121,16 +121,16 @@ const getVerificationBadge = (status: VerificationStatus) => {
     rejected: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
     suspended: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
   };
-  const labels: Record<VerificationStatus, string> = {
-    draft: "Draft",
-    submitted: "Submitted",
-    approved: "Approved",
-    rejected: "Rejected",
-    suspended: "Suspended",
+  const labels: Record<VerificationStatus, { fr: string; en: string }> = {
+    draft:     { fr: "Brouillon",  en: "Draft"     },
+    submitted: { fr: "Soumis",     en: "Submitted" },
+    approved:  { fr: "Approuvé",   en: "Approved"  },
+    rejected:  { fr: "Refusé",     en: "Rejected"  },
+    suspended: { fr: "Suspendu",   en: "Suspended" },
   };
   return (
     <Badge className={styles[status]}>
-      {labels[status]}
+      {labels[status][isFr ? 'fr' : 'en']}
     </Badge>
   );
 };
@@ -144,6 +144,7 @@ export default function AdminProviders() {
     value: key,
     label: t(`rejectionReasons.${key}`),
   }));
+  const suspensionReasons = getSuspensionReasons(isFr);
   const { providers: apiProviders, loading: providersLoading } = useAdminProviders();
   const [localProviders, setLocalProviders] = useState<AdminProvider[]>([]);
 
@@ -271,7 +272,7 @@ export default function AdminProviders() {
     } catch (err) {
       updateLocalProvider(providerId, { status: currentStatus });
       console.error("Failed to update status:", err);
-      toast({ title: "Error", description: "Failed to update provider status.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de mettre à jour le statut du prestataire." : "Failed to update provider status.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -288,7 +289,7 @@ export default function AdminProviders() {
         status: 'active',
         reviewedAt: new Date().toISOString().split('T')[0],
       });
-      toast({ title: "Provider Approved", description: "Provider has been approved and listed." });
+      toast({ title: isFr ? "Prestataire approuvé" : "Provider Approved", description: isFr ? "Le prestataire a été approuvé et listé." : "Provider has been approved and listed." });
     } catch (err) {
       console.error("Failed to approve provider:", err);
       toast({ title: "Error", description: "Failed to approve provider.", variant: "destructive" });
@@ -309,7 +310,7 @@ export default function AdminProviders() {
         reviewedAt: new Date().toISOString().split('T')[0],
         rejectionReason: customRejectionNote ? `${fullReason}: ${customRejectionNote}` : fullReason,
       });
-      toast({ title: "Application Rejected", description: "Provider application has been rejected.", variant: "destructive" });
+      toast({ title: isFr ? "Candidature refusée" : "Application Rejected", description: isFr ? "La candidature du prestataire a été refusée." : "Provider application has been rejected.", variant: "destructive" });
       setCustomRejectionNote("");
     } catch (err) {
       console.error("Failed to reject provider:", err);
@@ -336,7 +337,7 @@ export default function AdminProviders() {
         reviewedAt: new Date().toISOString().split('T')[0],
         rejectionReason: fullReason,
       });
-      toast({ title: "Provider Suspended", description: `Provider has been suspended.`, variant: "destructive" });
+      toast({ title: isFr ? "Prestataire suspendu" : "Provider Suspended", description: isFr ? "Le prestataire a été suspendu." : "Provider has been suspended.", variant: "destructive" });
       setSuspendModalOpen(false);
       setSuspensionNote("");
       setPendingActionProviderId(null);
@@ -364,7 +365,7 @@ export default function AdminProviders() {
     } catch (err) {
       updateLocalProvider(providerId, { listed: false });
       console.error("Failed to list provider:", err);
-      toast({ title: "Error", description: "Failed to list provider.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de lister le prestataire." : "Failed to list provider.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -390,7 +391,7 @@ export default function AdminProviders() {
     } catch (err) {
       updateLocalProvider(idToUnlist, { listed: true });
       console.error("Failed to unlist provider:", err);
-      toast({ title: "Error", description: "Failed to unlist provider.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de délister le prestataire." : "Failed to unlist provider.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -469,7 +470,7 @@ export default function AdminProviders() {
       });
     } catch (err) {
       console.error("Failed to update services:", err);
-      toast({ title: "Error", description: "Failed to update services.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de mettre à jour les services." : "Failed to update services.", variant: "destructive" });
     } finally {
       setIsSavingServices(false);
     }
@@ -487,7 +488,7 @@ export default function AdminProviders() {
       });
     } catch (err) {
       console.error("Failed to update zones:", err);
-      toast({ title: "Error", description: "Failed to update zones.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de mettre à jour les zones." : "Failed to update zones.", variant: "destructive" });
     } finally {
       setIsSavingZones(false);
     }
@@ -596,7 +597,7 @@ export default function AdminProviders() {
             ) : filteredProviders.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No providers found</p>
+                <p>{isFr ? "Aucun prestataire trouvé" : "No providers found"}</p>
               </div>
             ) : (
               <div className="divide-y" data-testid="providers-list">
@@ -625,7 +626,7 @@ export default function AdminProviders() {
                       {/* Status Chips Row */}
                       <div className="flex items-center gap-2 flex-wrap">
                         {/* Verification Status */}
-                        {getVerificationBadge(provider.verificationStatus)}
+                        {getVerificationBadge(provider.verificationStatus, isFr)}
                         
                         {/* Listed Status (only for approved) */}
                         {provider.verificationStatus === 'approved' && (
@@ -637,9 +638,9 @@ export default function AdminProviders() {
                             }`}
                           >
                             {provider.listed ? (
-                              <><Eye className="h-3 w-3 mr-1" /> Listed</>
+                              <><Eye className="h-3 w-3 mr-1" />{isFr ? "Listé" : "Listed"}</>
                             ) : (
-                              <><EyeOff className="h-3 w-3 mr-1" /> Unlisted</>
+                              <><EyeOff className="h-3 w-3 mr-1" />{isFr ? "Délisté" : "Unlisted"}</>
                             )}
                           </Badge>
                         )}
@@ -651,7 +652,7 @@ export default function AdminProviders() {
                             : "bg-amber-100/50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400"
                           }`}
                         >
-                          {provider.status === "active" ? "Active" : "Paused"}
+                          {provider.status === "active" ? (isFr ? "Actif" : "Active") : (isFr ? "En pause" : "Paused")}
                         </Badge>
                       </div>
                     </div>
@@ -667,7 +668,7 @@ export default function AdminProviders() {
       <Sheet open={!!selectedProvider} onOpenChange={(open) => !open && setSelectedProvider(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Provider Details</SheetTitle>
+            <SheetTitle>{isFr ? "Détails du prestataire" : "Provider Details"}</SheetTitle>
             <SheetDescription>
               ID: {selectedProvider?.id}
             </SheetDescription>
@@ -677,7 +678,7 @@ export default function AdminProviders() {
             <div className="space-y-6 mt-6">
               {/* Status Chips */}
               <div className="flex items-center gap-2 flex-wrap">
-                {getVerificationBadge(selectedProvider.verificationStatus)}
+                {getVerificationBadge(selectedProvider.verificationStatus, isFr)}
                 {selectedProvider.verificationStatus === 'approved' && (
                   <Badge 
                     variant="outline"
@@ -687,9 +688,9 @@ export default function AdminProviders() {
                     }
                   >
                     {selectedProvider.listed ? (
-                      <><Eye className="h-3 w-3 mr-1" /> Listed</>
+                      <><Eye className="h-3 w-3 mr-1" />{isFr ? "Listé" : "Listed"}</>
                     ) : (
-                      <><EyeOff className="h-3 w-3 mr-1" /> Unlisted</>
+                      <><EyeOff className="h-3 w-3 mr-1" />{isFr ? "Délisté" : "Unlisted"}</>
                     )}
                   </Badge>
                 )}
@@ -699,7 +700,7 @@ export default function AdminProviders() {
                     : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
                   }
                 >
-                  {selectedProvider.status === "active" ? "Active" : "Paused"}
+                  {selectedProvider.status === "active" ? (isFr ? "Actif" : "Active") : (isFr ? "En pause" : "Paused")}
                 </Badge>
               </div>
 
@@ -708,7 +709,7 @@ export default function AdminProviders() {
                 <div className="space-y-2">
                   <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                     <AlertTriangle className="h-4 w-4 text-red-500" />
-                    Rejection Reason
+                    {isFr ? "Raison du refus" : "Rejection Reason"}
                   </h4>
                   <p className="text-sm bg-red-50 dark:bg-red-950/30 p-3 rounded-md">
                     {selectedProvider.rejectionReason}
@@ -718,7 +719,7 @@ export default function AdminProviders() {
 
               {/* Verification Checklist */}
               <div className="space-y-3">
-                <h4 className="font-medium text-sm text-muted-foreground">Verification Documents</h4>
+                <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Documents de vérification" : "Verification Documents"}</h4>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm">
                     {selectedProvider.hasIdProof ? (
@@ -728,7 +729,7 @@ export default function AdminProviders() {
                     )}
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     <span className={selectedProvider.hasIdProof ? "" : "text-muted-foreground"}>
-                      ID Proof
+                      {isFr ? "Pièce d'identité" : "ID Proof"}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
@@ -739,7 +740,7 @@ export default function AdminProviders() {
                     )}
                     <Camera className="h-4 w-4 text-muted-foreground" />
                     <span className={selectedProvider.hasWorkPhoto ? "" : "text-muted-foreground"}>
-                      Work Photos
+                      {isFr ? "Photos de travail" : "Work Photos"}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
@@ -750,7 +751,7 @@ export default function AdminProviders() {
                     )}
                     <Users className="h-4 w-4 text-muted-foreground" />
                     <span className={selectedProvider.hasReference ? "" : "text-muted-foreground"}>
-                      References
+                      {isFr ? "Références" : "References"}
                     </span>
                   </div>
                 </div>
@@ -1036,7 +1037,7 @@ export default function AdminProviders() {
                   <div className="space-y-2">
                     <Select value={rejectionReason} onValueChange={setRejectionReason}>
                       <SelectTrigger data-testid="select-rejection-reason" className="w-full">
-                        <SelectValue placeholder="Select rejection reason" />
+                        <SelectValue placeholder={isFr ? "Choisir un motif de refus" : "Select rejection reason"} />
                       </SelectTrigger>
                       <SelectContent
                         position="popper"
@@ -1117,7 +1118,7 @@ export default function AdminProviders() {
                     ) : (
                       <Eye className="h-4 w-4 mr-2" />
                     )}
-                    {selectedProvider.listed ? t("unlistButton") : "List Provider"}
+                    {selectedProvider.listed ? t("unlistButton") : (isFr ? "Lister le prestataire" : "List Provider")}
                   </Button>
 
                   <Button
@@ -1186,10 +1187,10 @@ export default function AdminProviders() {
                           status: 'active',
                           reviewedAt: new Date().toISOString().split('T')[0],
                         });
-                        toast({ title: "Provider Reinstated", description: "Provider is now active and listed." });
+                        toast({ title: isFr ? "Prestataire réactivé" : "Provider Reinstated", description: isFr ? "Le prestataire est maintenant actif et listé." : "Provider is now active and listed." });
                       } catch (err) {
                         console.error("Failed to reinstate provider:", err);
-                        toast({ title: "Error", description: "Failed to reinstate provider.", variant: "destructive" });
+                        toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de réactiver le prestataire." : "Failed to reinstate provider.", variant: "destructive" });
                       } finally {
                         setIsUpdating(false);
                       }
@@ -1215,14 +1216,16 @@ export default function AdminProviders() {
       <Dialog open={suspendModalOpen} onOpenChange={setSuspendModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Suspend Provider</DialogTitle>
+            <DialogTitle>{isFr ? "Suspendre le prestataire" : "Suspend Provider"}</DialogTitle>
             <DialogDescription>
-              This will suspend the provider and remove them from the marketplace. Please provide a reason.
+              {isFr
+                ? "Le prestataire sera suspendu et retiré du marketplace. Veuillez indiquer un motif."
+                : "This will suspend the provider and remove them from the marketplace. Please provide a reason."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Suspension Reason</Label>
+              <Label>{isFr ? "Motif de suspension" : "Suspension Reason"}</Label>
               <Select value={suspensionReason} onValueChange={setSuspensionReason}>
                 <SelectTrigger data-testid="select-suspension-reason">
                   <SelectValue placeholder="Select reason" />
@@ -1245,12 +1248,12 @@ export default function AdminProviders() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="suspension-note">Additional Notes (optional)</Label>
+              <Label htmlFor="suspension-note">{isFr ? "Notes supplémentaires (optionnel)" : "Additional Notes (optional)"}</Label>
               <Textarea
                 id="suspension-note"
                 value={suspensionNote}
                 onChange={(e) => setSuspensionNote(e.target.value)}
-                placeholder="Add details about the suspension..."
+                placeholder={isFr ? "Ajouter des détails sur la suspension..." : "Add details about the suspension..."}
                 rows={3}
                 data-testid="textarea-suspension-note"
               />
@@ -1258,7 +1261,7 @@ export default function AdminProviders() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSuspendModalOpen(false)}>
-              Cancel
+              {isFr ? "Annuler" : "Cancel"}
             </Button>
             <Button 
               variant="destructive"
@@ -1284,7 +1287,7 @@ export default function AdminProviders() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="unlist-reason">Reason (optional)</Label>
+              <Label htmlFor="unlist-reason">{isFr ? "Raison (optionnel)" : "Reason (optional)"}</Label>
               <Textarea
                 id="unlist-reason"
                 value={unlistReason}
@@ -1297,7 +1300,7 @@ export default function AdminProviders() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setUnlistModalOpen(false)}>
-              Cancel
+              {isFr ? "Annuler" : "Cancel"}
             </Button>
             <Button
               onClick={handleUnlist}

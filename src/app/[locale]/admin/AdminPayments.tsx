@@ -238,7 +238,7 @@ export default function AdminPayments() {
       setPaymentModalOpen(false);
     } catch (err) {
       console.error("Failed to record payment:", err);
-      toast({ title: "Error", description: "Failed to record payment.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'enregistrer le paiement." : "Failed to record payment.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -259,7 +259,7 @@ export default function AdminPayments() {
       setRefundModalOpen(false);
     } catch (err) {
       console.error("Failed to issue refund:", err);
-      toast({ title: "Error", description: "Failed to issue refund.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'effectuer le remboursement." : "Failed to issue refund.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -291,7 +291,7 @@ export default function AdminPayments() {
       setPayoutModalOpen(false);
     } catch (err) {
       console.error("Failed to record payout:", err);
-      toast({ title: "Error", description: "Failed to record payout.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'enregistrer le versement." : "Failed to record payout.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -524,7 +524,7 @@ export default function AdminPayments() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">
-                  Payouts ({payoutsBookings.length})
+                  {isFr ? "Versements" : "Payouts"} ({payoutsBookings.length})
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
@@ -546,7 +546,7 @@ export default function AdminPayments() {
                         <div className="min-w-0 flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2 sm:gap-4">
                           <div>
                             <p className="font-medium text-sm truncate">{booking.providerName}</p>
-                            <p className="text-xs text-muted-foreground">{booking.providerCompany || 'Individual'}</p>
+                            <p className="text-xs text-muted-foreground">{booking.providerCompany || (isFr ? 'Indépendant' : 'Individual')}</p>
                           </div>
                           <div className="hidden sm:block">
                             <p className="text-sm truncate">{booking.serviceName}</p>
@@ -654,7 +654,7 @@ export default function AdminPayments() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>{selectedBooking.date} at {selectedBooking.time}</span>
+                    <span>{selectedBooking.date} {isFr ? "à" : "at"} {selectedBooking.time}</span>
                   </div>
                 </div>
               </div>
@@ -789,9 +789,9 @@ export default function AdminPayments() {
                 </div>
                 
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Note (optional)</label>
-                  <Textarea 
-                    placeholder="Additional notes about this payment"
+                  <label className="text-sm font-medium">{isFr ? "Note (optionnel)" : "Note (optional)"}</label>
+                  <Textarea
+                    placeholder={isFr ? "Notes sur ce paiement" : "Additional notes about this payment"}
                     value={paymentNote}
                     onChange={(e) => setPaymentNote(e.target.value)}
                     rows={2}
@@ -803,7 +803,7 @@ export default function AdminPayments() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setPaymentModalOpen(false)} disabled={isUpdating}>
-              Cancel
+              {isFr ? "Annuler" : "Cancel"}
             </Button>
             <Button 
               onClick={() => selectedBooking && handleRecordPayment(selectedBooking.id)}
@@ -890,7 +890,7 @@ export default function AdminPayments() {
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">{isFr ? "Référence (optionnel)" : "Reference (optional)"}</label>
                   <Input 
-                    placeholder="Transaction reference"
+                    placeholder={isFr ? "Référence de transaction" : "Transaction reference"}
                     value={payoutReference}
                     onChange={(e) => setPayoutReference(e.target.value)}
                     data-testid="input-payout-reference"

@@ -733,7 +733,7 @@ export default function AdminBookings() {
       setQuoteModalOpen(false);
     } catch (err) {
       console.error("Failed to save quote:", err);
-      toast({ title: "Error", description: isFr ? "Impossible d'enregistrer le devis." : "Failed to save quote.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'enregistrer le devis." : "Failed to save quote.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -846,7 +846,7 @@ export default function AdminBookings() {
                           className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
                           onClick={() => handleStatusChange(booking.id, 'under_review')}
                         >
-                          Examiner
+                          {isFr ? "Examiner" : "Review"}
                         </button>
                       )}
                       {booking.status === 'under_review' && (
@@ -892,7 +892,7 @@ export default function AdminBookings() {
                               className="text-xs bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600"
                               onClick={() => { setAssigningBookingId(booking.id); setInlineProviderName(""); setInlineProviderPhone(""); }}
                             >
-                              Assigner prestataire
+                              {isFr ? "Assigner prestataire" : "Assign provider"}
                             </button>
                           )}
                         </>
@@ -902,7 +902,7 @@ export default function AdminBookings() {
                           className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
                           onClick={() => handleStatusChange(booking.id, 'confirmed')}
                         >
-                          Confirmer
+                          {isFr ? "Confirmer" : "Confirm"}
                         </button>
                       )}
                       {booking.status === 'confirmed' && (
@@ -910,7 +910,7 @@ export default function AdminBookings() {
                           className="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
                           onClick={() => handleStatusChange(booking.id, 'completed')}
                         >
-                          Terminé
+                          {isFr ? "Terminé" : "Complete"}
                         </button>
                       )}
                     </div>

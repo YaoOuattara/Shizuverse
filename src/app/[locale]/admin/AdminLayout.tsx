@@ -170,7 +170,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
           </SheetTrigger>
           <SheetContent side="right" className="w-64 p-4">
             <SheetHeader className="sr-only">
-              <SheetTitle>Admin Navigation</SheetTitle>
+              <SheetTitle>{isFr ? "Navigation Admin" : "Admin Navigation"}</SheetTitle>
             </SheetHeader>
             <NavContent />
           </SheetContent>
