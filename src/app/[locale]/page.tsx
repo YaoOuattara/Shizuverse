@@ -50,18 +50,18 @@ function HowItWorks({ locale }: { locale: string }) {
         <h2 className="text-2xl font-bold text-gray-900 text-center mb-12">
           {locale === 'fr' ? 'Comment ça marche' : 'How It Works'}
         </h2>
-        <div className="flex flex-col md:flex-row items-start gap-8">
+        <div className="flex flex-col md:flex-row md:items-start gap-6 md:gap-8">
           {STEPS.map((step, i) => (
-            <div key={step.n} className="flex-1 flex flex-col items-center text-center relative">
-              {/* Dashed connector — desktop only */}
+            <div key={step.n} className="w-full md:flex-1 flex flex-col items-center md:items-start text-center md:text-left relative">
+              {/* Dashed connector — desktop only, from right edge of circle */}
               {i < STEPS.length - 1 && (
-                <div className="hidden md:block absolute top-5 left-[calc(50%+20px)] right-0 border-t-2 border-dashed border-gray-200" />
+                <div className="hidden md:block absolute top-5 left-10 right-0 border-t-2 border-dashed border-gray-200" />
               )}
-              <div className="w-10 h-10 rounded-full bg-[#0F3A7A] text-white flex items-center justify-center font-bold text-sm z-10">
+              <div className="w-10 h-10 rounded-full bg-[#0F3A7A] text-white flex items-center justify-center font-bold text-sm z-10 shrink-0">
                 {step.n}
               </div>
               <p className="font-semibold text-gray-800 mt-4 text-sm">{step.title}</p>
-              <p className="text-xs text-gray-400 mt-1 max-w-[160px]">{step.desc}</p>
+              <p className="text-xs text-gray-400 mt-1 max-w-xs md:max-w-none">{step.desc}</p>
             </div>
           ))}
         </div>
