@@ -21,6 +21,7 @@ export default function Navbar() {
   const hideBookCta =
     pathWithoutLocale.startsWith('/provider/register') ||
     pathWithoutLocale.startsWith('/booking/');
+  const isHomePage = pathWithoutLocale === '';
 
   const providerHref = isProvider ? `/${locale}/provider` : `/${locale}/provider/register`;
   const providerLabel = isProvider
@@ -84,12 +85,24 @@ export default function Navbar() {
           </div>
 
           {!hideBookCta && (
-            <Link
-              href={`/${locale}/services`}
-              className="bg-[#0F3A7A] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0d3068] transition-colors"
-            >
-              {locale === 'fr' ? 'Réserver' : 'Book Now'}
-            </Link>
+            isHomePage ? (
+              <button
+                onClick={() => {
+                  document.getElementById('search-bar')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  setTimeout(() => document.getElementById('search-bar')?.focus(), 400);
+                }}
+                className="bg-[#0F3A7A] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0d3068] transition-colors"
+              >
+                {locale === 'fr' ? 'Réserver' : 'Book Now'}
+              </button>
+            ) : (
+              <Link
+                href={`/${locale}/services`}
+                className="bg-[#0F3A7A] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0d3068] transition-colors"
+              >
+                {locale === 'fr' ? 'Réserver' : 'Book Now'}
+              </Link>
+            )
           )}
         </div>
       </div>

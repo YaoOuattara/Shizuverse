@@ -199,8 +199,8 @@ export default async function HomePage({
       <Navbar />
       <HomeHero />
       <ServicesGrid locale={locale} />
-      <ProviderCTA locale={locale} />
       <HowItWorks locale={locale} />
+      <ProviderCTA locale={locale} />
       <Footer locale={locale} />
     </>
   );

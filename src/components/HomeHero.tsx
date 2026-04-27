@@ -20,8 +20,8 @@ const CONTENT = {
     badge: "Abidjan · Côte d'Ivoire",
     headline: "On s'occupe de tout. Vous gagnez du temps.",
     subtext:
-      "Trouvez des prestataires vérifiés pour le ménage, la plomberie, l'électricité et plus encore.",
-    searchPlaceholder: "Ménage, plomberie, électricité…",
+      "Réservez un prestataire vérifié à Abidjan en quelques minutes.",
+    searchPlaceholder: "Décrivez votre besoin : fuite d'eau, ménage, clim...",
     searchBtn: "Rechercher",
     urgentBtn: "Besoin urgent — 2h",
     planBtn: "Planifier un service",
@@ -34,8 +34,8 @@ const CONTENT = {
     badge: "Abidjan · Côte d'Ivoire",
     headline: "We handle it all. You save time.",
     subtext:
-      "Find verified professionals for cleaning, plumbing, electrical work and more.",
-    searchPlaceholder: "Cleaning, plumbing, electrical…",
+      "Book a verified provider in Abidjan in minutes.",
+    searchPlaceholder: "Describe your need: water leak, cleaning, AC...",
     searchBtn: "Search",
     urgentBtn: "Urgent — within 2h",
     planBtn: "Plan a service",
@@ -106,6 +106,7 @@ export default function HomeHero() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
             <input
+              id="search-bar"
               type="text"
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}

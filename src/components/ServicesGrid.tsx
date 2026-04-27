@@ -19,22 +19,23 @@ interface ApiCategory {
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL || 'https://shizu-verse.onrender.com'
 
-// Featured 6 — price ranges are indicative and static
+// Featured 6 — starting prices only (lower bound), set correct expectations
 interface Featured {
   matchFr: string      // substring to match against category name_fr
   nameFr: string
   nameEn: string
-  price: string        // FCFA range
+  priceFr: string      // "À partir de X FCFA"
+  priceEn: string      // "From X FCFA"
   Icon: LucideIcon
 }
 
 const FEATURED: Featured[] = [
-  { matchFr: 'ménage',      nameFr: 'Ménage',       nameEn: 'Cleaning',   price: '5 000–15 000 FCFA', Icon: Sparkles },
-  { matchFr: 'plomberie',   nameFr: 'Plomberie',    nameEn: 'Plumbing',   price: '10 000–35 000 FCFA', Icon: Wrench },
-  { matchFr: 'électricité', nameFr: 'Électricité',  nameEn: 'Electrical', price: '15 000–50 000 FCFA', Icon: Zap },
-  { matchFr: 'bricolage',   nameFr: 'Bricolage',    nameEn: 'Handyman',   price: '8 000–25 000 FCFA',  Icon: Hammer },
-  { matchFr: 'nounou',      nameFr: 'Nounou',       nameEn: 'Childcare',  price: '5 000–12 000 FCFA',  Icon: Baby },
-  { matchFr: 'beauté',      nameFr: 'Beauté',       nameEn: 'Beauty',     price: '5 000–20 000 FCFA',  Icon: Scissors },
+  { matchFr: 'ménage',      nameFr: 'Ménage',       nameEn: 'Cleaning',   priceFr: 'À partir de 5 000 FCFA',  priceEn: 'From 5 000 FCFA',  Icon: Sparkles },
+  { matchFr: 'plomberie',   nameFr: 'Plomberie',    nameEn: 'Plumbing',   priceFr: 'À partir de 10 000 FCFA', priceEn: 'From 10 000 FCFA', Icon: Wrench   },
+  { matchFr: 'électricité', nameFr: 'Électricité',  nameEn: 'Electrical', priceFr: 'À partir de 15 000 FCFA', priceEn: 'From 15 000 FCFA', Icon: Zap      },
+  { matchFr: 'bricolage',   nameFr: 'Bricolage',    nameEn: 'Handyman',   priceFr: 'À partir de 8 000 FCFA',  priceEn: 'From 8 000 FCFA',  Icon: Hammer   },
+  { matchFr: 'nounou',      nameFr: 'Nounou',       nameEn: 'Childcare',  priceFr: 'À partir de 5 000 FCFA',  priceEn: 'From 5 000 FCFA',  Icon: Baby     },
+  { matchFr: 'beauté',      nameFr: 'Beauté',       nameEn: 'Beauty',     priceFr: 'À partir de 5 000 FCFA',  priceEn: 'From 5 000 FCFA',  Icon: Scissors },
 ]
 
 export default function ServicesGrid({ locale }: { locale: string }) {
@@ -60,7 +61,7 @@ export default function ServicesGrid({ locale }: { locale: string }) {
       nameFr: f.nameFr,
       nameEn: f.nameEn,
       name: isFr ? f.nameFr : f.nameEn,
-      price: f.price,
+      price: isFr ? f.priceFr : f.priceEn,
       Icon: f.Icon,
     }
   })
