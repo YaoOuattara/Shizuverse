@@ -325,7 +325,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
               {isFr ? "Suivre ma demande" : "Track my request"}
             </a>
             <a href={waUrl} target="_blank" rel="noopener noreferrer"
-              className="w-full inline-flex items-center justify-center gap-2 bg-green-500 text-white text-sm font-semibold py-3 rounded-xl hover:bg-green-600 transition-colors">
+              className="w-full inline-flex items-center justify-center gap-2 bg-green-600 text-white text-sm font-semibold py-3 rounded-xl hover:bg-green-700 transition-colors">
               <MessageCircle className="h-4 w-4" />
               {isFr ? "Contacter sur WhatsApp" : "Contact on WhatsApp"}
             </a>

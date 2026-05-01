@@ -199,6 +199,14 @@ export default async function HomePage({
       <Navbar />
       <HomeHero />
       <ServicesGrid locale={locale} />
+      <div className="bg-gray-50 pb-6 text-center">
+        <a
+          href={`/${locale}/provider/register`}
+          className="text-sm text-gray-500 hover:text-gray-800 underline underline-offset-4 transition-colors"
+        >
+          {locale === "fr" ? "Devenir prestataire →" : "Become a provider →"}
+        </a>
+      </div>
       <HowItWorks locale={locale} />
       <ProviderCTA locale={locale} />
       <Footer locale={locale} />

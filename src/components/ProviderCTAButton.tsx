@@ -44,7 +44,7 @@ export default function ProviderCTAButton({ locale }: Props) {
     return (
       <Link
         href={defaultHref}
-        className="inline-block mt-6 bg-[#0F3A7A] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#0d3068] transition-colors"
+        className="inline-block mt-6 border border-[#0F3A7A] text-[#0F3A7A] bg-white px-6 py-3 rounded-xl font-semibold hover:bg-[#0F3A7A] hover:text-white transition-colors"
       >
         {defaultLabel}
       </Link>
@@ -56,11 +56,12 @@ export default function ProviderCTAButton({ locale }: Props) {
     ? (locale === "fr" ? "Mon tableau de bord" : "My Dashboard")
     : defaultLabel;
 
+  const className = isProvider
+    ? "inline-block mt-6 bg-[#0F3A7A] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#0d3068] transition-colors"
+    : "inline-block mt-6 border border-[#0F3A7A] text-[#0F3A7A] bg-white px-6 py-3 rounded-xl font-semibold hover:bg-[#0F3A7A] hover:text-white transition-colors";
+
   return (
-    <Link
-      href={href}
-      className="inline-block mt-6 bg-[#0F3A7A] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#0d3068] transition-colors"
-    >
+    <Link href={href} className={className}>
       {label}
     </Link>
   );

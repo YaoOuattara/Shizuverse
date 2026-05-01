@@ -67,10 +67,10 @@ export default function ServicesGrid({ locale }: { locale: string }) {
   })
 
   return (
-    <section className="bg-gray-50 py-16 px-6">
+    <section className="bg-gray-50 py-10 md:py-16 px-6">
       <div className="max-w-5xl mx-auto">
         {/* Header row */}
-        <div className="flex items-center justify-between mb-10">
+        <div className="flex items-center justify-between mb-6 md:mb-10">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
               {isFr ? 'Services populaires' : 'Popular services'}
@@ -90,10 +90,10 @@ export default function ServicesGrid({ locale }: { locale: string }) {
         </div>
 
         {/* 6-card grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
           {loading
             ? Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="bg-white rounded-2xl border border-gray-100 p-6">
+                <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 md:p-6">
                   <Skeleton className="h-8 w-8 rounded-lg" />
                   <Skeleton className="h-4 w-3/4 mt-3 rounded" />
                   <Skeleton className="h-3 w-1/2 mt-2 rounded" />
@@ -103,7 +103,7 @@ export default function ServicesGrid({ locale }: { locale: string }) {
                 <Link
                   key={card.nameFr}
                   href={`/${locale}/services`}
-                  className="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-md hover:border-[#0F3A7A]/20 transition-all cursor-pointer group"
+                  className="bg-white rounded-2xl border border-gray-100 p-4 md:p-6 hover:shadow-md hover:border-[#0F3A7A]/20 transition-all cursor-pointer group"
                   onClick={() => trackEvent('service_viewed', { service_name: card.name, locale })}
                 >
                   <card.Icon className="h-8 w-8 text-[#0F3A7A] group-hover:scale-110 transition-transform" />

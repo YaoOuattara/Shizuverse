@@ -21,7 +21,7 @@ const CONTENT = {
     headline: "On s'occupe de tout. Vous gagnez du temps.",
     subtext:
       "Réservez un prestataire vérifié à Abidjan en quelques minutes.",
-    searchPlaceholder: "Décrivez votre besoin : fuite d'eau, ménage, clim...",
+    searchPlaceholder: "Quel est votre besoin ?",
     searchBtn: "Rechercher",
     urgentBtn: "Besoin urgent — 2h",
     planBtn: "Planifier un service",
@@ -35,7 +35,7 @@ const CONTENT = {
     headline: "We handle it all. You save time.",
     subtext:
       "Book a verified provider in Abidjan in minutes.",
-    searchPlaceholder: "Describe your need: water leak, cleaning, AC...",
+    searchPlaceholder: "What do you need?",
     searchBtn: "Search",
     urgentBtn: "Urgent — within 2h",
     planBtn: "Plan a service",
@@ -158,16 +158,6 @@ export default function HomeHero() {
           >
             <CalendarCheck className="h-4 w-4 shrink-0" />
             {c.planBtn}
-          </Link>
-        </div>
-
-        {/* ── Become a provider CTA ─────────────────────────────────── */}
-        <div className="mt-4">
-          <Link
-            href={`/${locale}/provider/register`}
-            className="inline-block border border-white/40 hover:border-white/70 text-white/80 hover:text-white px-5 py-2 rounded-xl text-sm font-medium transition-colors"
-          >
-            {c.becomeProvider}
           </Link>
         </div>
 
