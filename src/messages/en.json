@@ -402,7 +402,37 @@
     "errorInvalid": "Invalid phone number or password.",
     "errorGeneral": "Something went wrong. Please try again.",
     "noAccount": "Not yet a provider?",
-    "registerLink": "Join Shizu"
+    "registerLink": "Join Shizu",
+    "forgotPasswordLink": "Forgot password?"
+  },
+  "forgotPassword": {
+    "title": "Forgot your password?",
+    "subtitle": "Enter your WhatsApp number and contact us to reset your password.",
+    "phoneLabel": "WhatsApp / Phone",
+    "phonePlaceholder": "+225 07 00 00 00",
+    "instruction": "Contact us on WhatsApp to reset your password",
+    "whatsAppButton": "Open WhatsApp",
+    "back": "Back to login"
+  },
+  "reviewPage": {
+    "title": "Leave a Review",
+    "bookingSummary": "Booking Summary",
+    "service": "Service",
+    "provider": "Provider",
+    "date": "Date",
+    "yourRating": "Your Rating *",
+    "comment": "Comment (optional)",
+    "commentPlaceholder": "Share your experience with others...",
+    "softSkills": "Provider Assessment",
+    "punctuality": "Punctuality",
+    "respect": "Respect",
+    "submit": "Submit Review",
+    "submitting": "Submitting...",
+    "successTitle": "Thank you for your review!",
+    "successDesc": "Your review has been saved.",
+    "backToBookings": "Back to bookings",
+    "errorRequired": "Please select a rating.",
+    "errorGeneral": "An error occurred. Please try again."
   },
   "adminProviders": {
     "rejectionReasons": {

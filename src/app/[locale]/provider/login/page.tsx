@@ -99,7 +99,16 @@ export default function ProviderLoginPage() {
             </Button>
           </form>
 
-          <p className="mt-4 text-center text-sm text-muted-foreground">
+          <div className="mt-3 text-center">
+            <a
+              href={`/${locale}/provider/forgot-password`}
+              className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4"
+            >
+              {t('forgotPasswordLink')}
+            </a>
+          </div>
+
+          <p className="mt-3 text-center text-sm text-muted-foreground">
             {t('noAccount')}{' '}
             <a
               href={`/${locale}/provider/register`}

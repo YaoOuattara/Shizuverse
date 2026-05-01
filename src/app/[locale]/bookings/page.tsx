@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import BookingCard, { type BookingCardProps, type BookingStatus } from "@/components/BookingCard";
 import BookingModal, { type BookingWithNotes, type PreSelectedProvider } from "@/components/BookingModal";
 import ProviderProfileModal from "@/components/ProviderProfileModal";
-import ReviewModal from "@/components/ReviewModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -76,9 +75,6 @@ export default function BookingsPage() {
   const [providerReviews, setProviderReviews] = useState<Review[]>([]);
   const [preSelectedProvider, setPreSelectedProvider] = useState<PreSelectedProvider | null>(null);
 
-  // Review modal state
-  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
-  const [bookingToReview, setBookingToReview] = useState<BookingCardProps | null>(null);
 
   // todo: remove mock functionality - replace with API data
   const [reviews, setReviews] = useState<Review[]>(() =>
@@ -294,58 +290,14 @@ export default function BookingsPage() {
   };
 
   const handleOpenReviewModal = (booking: BookingCardProps) => {
-    setBookingToReview(booking);
-    setIsReviewModalOpen(true);
+    const qs = new URLSearchParams({
+      service: booking.serviceName,
+      provider: booking.providerName,
+      date: booking.date,
+    }).toString();
+    router.push(`/${locale}/review/${booking.id}?${qs}`);
   };
 
-  // todo: remove mock functionality - replace with API call for submitting review
-  const handleSubmitReview = (
-    bookingId: string,
-    providerId: string,
-    rating: number,
-    comment: string
-  ) => {
-    const provider = providers.find((p) => p.id === providerId);
-    if (!provider) return;
-
-    const newReview: Review = {
-      id: `review-${Date.now()}`,
-      providerId: provider.id,
-      bookingId,
-      reviewerName: "You",
-      rating,
-      comment: comment || "No comment provided.",
-      date: new Date().toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }),
-    };
-
-    setReviews((prev) => [newReview, ...prev]);
-    setReviewedBookings((prev) => new Set(Array.from(prev).concat(bookingId)));
-
-    setProviders((prev) =>
-      prev.map((p) => {
-        if (p.id === provider.id) {
-          const totalRating = p.averageRating * p.totalReviews + rating;
-          const newTotalReviews = p.totalReviews + 1;
-          return {
-            ...p,
-            averageRating: Math.round((totalRating / newTotalReviews) * 10) / 10,
-            totalReviews: newTotalReviews,
-          };
-        }
-        return p;
-      })
-    );
-
-    toast({
-      title: t("reviewSubmitted"),
-      description: t("reviewSubmittedDesc", { name: provider.name }),
-      variant: "success",
-    });
-  };
 
   const hasBookingBeenReviewed = (bookingId: string): boolean => {
     return reviewedBookings.has(bookingId) || reviews.some((r) => r.bookingId === bookingId);
@@ -629,12 +581,6 @@ export default function BookingsPage() {
         onBookNow={handleBookFromProfile}
       />
 
-      <ReviewModal
-        open={isReviewModalOpen}
-        onOpenChange={setIsReviewModalOpen}
-        booking={bookingToReview}
-        onSubmit={handleSubmitReview}
-      />
     </div>
   );
 }

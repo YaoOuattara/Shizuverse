@@ -402,7 +402,37 @@
     "errorInvalid": "Numéro de téléphone ou mot de passe invalide.",
     "errorGeneral": "Une erreur est survenue. Veuillez réessayer.",
     "noAccount": "Pas encore prestataire ?",
-    "registerLink": "Rejoindre Shizu"
+    "registerLink": "Rejoindre Shizu",
+    "forgotPasswordLink": "Mot de passe oublié ?"
+  },
+  "forgotPassword": {
+    "title": "Mot de passe oublié ?",
+    "subtitle": "Entrez votre numéro WhatsApp et contactez-nous pour réinitialiser votre mot de passe.",
+    "phoneLabel": "WhatsApp / Téléphone",
+    "phonePlaceholder": "+225 07 00 00 00",
+    "instruction": "Contactez-nous sur WhatsApp pour réinitialiser votre mot de passe",
+    "whatsAppButton": "Ouvrir WhatsApp",
+    "back": "Retour à la connexion"
+  },
+  "reviewPage": {
+    "title": "Laisser un avis",
+    "bookingSummary": "Résumé de la réservation",
+    "service": "Service",
+    "provider": "Prestataire",
+    "date": "Date",
+    "yourRating": "Votre note *",
+    "comment": "Commentaire (optionnel)",
+    "commentPlaceholder": "Partagez votre expérience avec les autres...",
+    "softSkills": "Évaluation du prestataire",
+    "punctuality": "Ponctualité",
+    "respect": "Respect",
+    "submit": "Soumettre l'avis",
+    "submitting": "Envoi en cours...",
+    "successTitle": "Merci pour votre avis !",
+    "successDesc": "Votre avis a bien été enregistré.",
+    "backToBookings": "Retour aux réservations",
+    "errorRequired": "Veuillez sélectionner une note.",
+    "errorGeneral": "Une erreur est survenue. Veuillez réessayer."
   },
   "adminProviders": {
     "rejectionReasons": {
