@@ -109,7 +109,7 @@ function ProviderCTA({ locale }: { locale: string }) {
     {
       emoji: "📱",
       title: isFr ? "Recevez des demandes directement" : "Get requests directly",
-      desc:  isFr ? "Clients vous contactent via Shizu"  : "Clients reach you through Shizu",
+      desc:  isFr ? "Tableau de bord simple et intuitif"  : "Simple, intuitive dashboard",
     },
     {
       emoji: "💰",
@@ -120,13 +120,11 @@ function ProviderCTA({ locale }: { locale: string }) {
       emoji: "⭐",
       title: isFr ? "Construisez votre réputation"     : "Build your reputation",
       desc:  isFr ? "Avis clients et badges de confiance"  : "Client reviews & trust badges",
-      mobileHidden: true,
     },
     {
       emoji: "📈",
       title: isFr ? "Développez votre activité"        : "Grow your business",
       desc:  isFr ? "Accédez à plus de clients chaque jour" : "Reach more clients every day",
-      mobileHidden: true,
     },
   ];
 
@@ -151,7 +149,7 @@ function ProviderCTA({ locale }: { locale: string }) {
           {PROVIDER_BENEFITS.map((b) => (
             <div
               key={b.title}
-              className={`bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-sm transition-shadow${b.mobileHidden ? " hidden md:block" : ""}`}
+              className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-sm transition-shadow"
             >
               <span className="text-2xl">{b.emoji}</span>
               <p className="font-semibold text-gray-800 text-sm mt-2">{b.title}</p>

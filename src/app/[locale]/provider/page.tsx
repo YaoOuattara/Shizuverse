@@ -24,6 +24,7 @@ import {
   Bell,
   Zap,
   Share2,
+  Lightbulb,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import ProviderBookingCard from "@/components/ProviderBookingCard";
@@ -41,33 +42,27 @@ import {
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
 import { useTranslations } from "next-intl";
 
-// Compute earnings totals from provider bookings
+// Compute 4-state earnings from provider bookings
 function computeEarnings(bookings: ProviderBooking[]) {
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1)); // Monday
-  startOfWeek.setHours(0, 0, 0, 0);
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  type R = ProviderBooking & { payment_status?: string; payout_status?: string; amount_xof?: number };
+  const rich = bookings as R[];
 
-  let week = 0, month = 0, total = 0;
+  let gagne = 0;     // all completed
+  let verse = 0;     // completed + paid out
+  let enAttente = 0; // confirmed, awaiting payment
 
-  for (const b of bookings) {
-    if (b.status !== "completed") continue;
-    // payment_status comes from the API but ProviderBooking type may not include it
-    const raw = b as ProviderBooking & { payment_status?: string; amount_xof?: number };
-    if (raw.payment_status && raw.payment_status !== "paid") continue;
-    const amount = raw.amount_xof ?? (typeof b.price === "number" ? b.price : 0);
+  for (const b of rich) {
+    const amount = b.amount_xof ?? (typeof b.price === "number" ? b.price : 0);
     if (!amount) continue;
-
-    total += amount;
-    const d = b.date ? new Date(b.date) : null;
-    if (d) {
-      if (d >= startOfMonth) month += amount;
-      if (d >= startOfWeek) week += amount;
+    if (b.status === "completed") {
+      gagne += amount;
+      if (b.payout_status === "sent" || b.payment_status === "paid") verse += amount;
+    } else if (b.status === "confirmed" && b.payment_status !== "paid") {
+      enAttente += amount;
     }
   }
 
-  return { week, month, total };
+  return { gagne, verse, enAttente, prochainVersement: enAttente };
 }
 
 function formatFCFA(amount: number) {
@@ -80,6 +75,7 @@ const STORAGE_KEYS = {
   STATS_VISIBLE: "provider_dashboard_stats_visible",
   BOOKINGS: "provider_cached_bookings",
   AVAILABILITY: "provider_available_today",
+  COACHING_DISMISSED: "provider_coaching_dismissed",
 };
 
 // Check if viewport is mobile width
@@ -110,6 +106,7 @@ export default function ProviderDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [availableToday, setAvailableToday] = useState(false);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [coachingDismissed, setCoachingDismissed] = useState(false);
 
   // Stats visibility: default true (expanded); hydrated from localStorage on mount
   const [showStats, setShowStats] = useState(true);
@@ -140,6 +137,7 @@ export default function ProviderDashboard() {
       if (savedFilters) setFilters(JSON.parse(savedFilters));
       const savedAvailability = localStorage.getItem(STORAGE_KEYS.AVAILABILITY);
       if (savedAvailability !== null) setAvailableToday(JSON.parse(savedAvailability));
+      if (localStorage.getItem(STORAGE_KEYS.COACHING_DISMISSED) === "1") setCoachingDismissed(true);
     } catch {
       // keep defaults
     }
@@ -741,22 +739,98 @@ export default function ProviderDashboard() {
           </button>
         </div>
 
-        {/* 4 — Earnings summary */}
+        {/* 3.5 — Coaching card */}
+        {!coachingDismissed && (
+          <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Lightbulb className="h-4 w-4 text-blue-500 shrink-0" />
+                <p className="font-semibold text-sm text-blue-900">
+                  {locale === "fr" ? "Comment obtenir plus de demandes ?" : "How to get more requests?"}
+                </p>
+              </div>
+              <button
+                onClick={() => { setCoachingDismissed(true); localStorage.setItem(STORAGE_KEYS.COACHING_DISMISSED, "1"); }}
+                aria-label="Fermer"
+                className="text-blue-300 hover:text-blue-600 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-2.5">
+              {/* Tip 1 */}
+              <div className="flex items-center gap-3">
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${availableToday ? "bg-green-100" : "bg-blue-100"}`}>
+                  <Zap className={`h-4 w-4 ${availableToday ? "text-green-600" : "text-blue-600"}`} />
+                </div>
+                <p className="flex-1 text-sm text-foreground">
+                  {locale === "fr" ? "Activez votre disponibilité" : "Enable your availability"}
+                </p>
+                {availableToday ? (
+                  <span className="text-xs text-green-600 font-semibold shrink-0">✓ {locale === "fr" ? "Actif" : "Active"}</span>
+                ) : (
+                  <button
+                    onClick={toggleAvailability}
+                    disabled={availabilityLoading}
+                    className="shrink-0 text-xs font-semibold text-blue-600 hover:underline disabled:opacity-50"
+                  >
+                    {locale === "fr" ? "Activer →" : "Enable →"}
+                  </button>
+                )}
+              </div>
+              {/* Tip 2 */}
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-100">
+                  <User className="h-4 w-4 text-blue-600" />
+                </div>
+                <p className="flex-1 text-sm text-foreground">
+                  {locale === "fr" ? "Complétez votre profil" : "Complete your profile"}
+                </p>
+                <button
+                  onClick={() => router.push(`/${locale}/provider/profile`)}
+                  className="shrink-0 text-xs font-semibold text-blue-600 hover:underline"
+                >
+                  {locale === "fr" ? "Voir →" : "View →"}
+                </button>
+              </div>
+              {/* Tip 3 */}
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-100">
+                  <Bell className="h-4 w-4 text-blue-600" />
+                </div>
+                <p className="flex-1 text-sm text-foreground">
+                  {locale === "fr" ? "Répondez rapidement aux demandes" : "Respond quickly to requests"}
+                </p>
+                <span className="shrink-0 text-xs text-muted-foreground">&lt; 2h</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 4 — Earnings module */}
         {(() => {
-          const { week, month, total } = computeEarnings(bookings ?? []);
+          const { gagne, enAttente, verse, prochainVersement } = computeEarnings(bookings ?? []);
+          const isFr = locale === "fr";
           const cards = [
-            { label: locale === "fr" ? "Cette semaine" : "This week", value: week },
-            { label: locale === "fr" ? "Ce mois" : "This month", value: month },
-            { label: "Total", value: total },
+            { label: isFr ? "Gagné"              : "Earned",        value: gagne,             sub: isFr ? "réservations terminées"       : "completed bookings",       textColor: "text-green-700", bg: "bg-green-50",  border: "border-green-100" },
+            { label: isFr ? "En attente"         : "Pending",       value: enAttente,         sub: isFr ? "confirmé, paiement en cours"  : "confirmed, awaiting payout", textColor: "text-amber-700", bg: "bg-amber-50",  border: "border-amber-100" },
+            { label: isFr ? "Versé"              : "Paid out",      value: verse,             sub: isFr ? "déjà reversé"                 : "already disbursed",          textColor: "text-blue-700",  bg: "bg-blue-50",   border: "border-blue-100"  },
+            { label: isFr ? "Prochain versement" : "Next payout",   value: prochainVersement, sub: isFr ? "estimation prochaine"         : "upcoming estimate",          textColor: "text-gray-700",  bg: "bg-white",     border: "border-gray-100"  },
           ];
           return (
-            <div className="grid grid-cols-3 gap-3 mb-6">
-              {cards.map(({ label, value }) => (
-                <div key={label} className="rounded-2xl border border-gray-100 bg-white px-4 py-4 shadow-sm">
-                  <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
-                  <p className="text-lg font-bold text-foreground tabular-nums leading-tight">{formatFCFA(value)}</p>
-                </div>
-              ))}
+            <div className="mb-6">
+              <h2 className="text-base font-semibold text-foreground mb-3">
+                {isFr ? "Mes gains" : "My earnings"}
+              </h2>
+              <div className="grid grid-cols-2 gap-3">
+                {cards.map(({ label, value, sub, textColor, bg, border }) => (
+                  <div key={label} className={`rounded-2xl border ${border} ${bg} px-4 py-4 shadow-sm`}>
+                    <p className={`text-xs font-medium ${textColor} mb-1`}>{label}</p>
+                    <p className={`text-lg font-bold tabular-nums leading-tight ${textColor}`}>{formatFCFA(value)}</p>
+                    {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
+                  </div>
+                ))}
+              </div>
             </div>
           );
         })() ?? null}
@@ -803,10 +877,29 @@ export default function ProviderDashboard() {
               </div>
               {pending.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-muted-foreground/25 bg-muted/20 px-6 py-8 text-center">
-                  <Bell className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
-                  <p className="text-sm text-muted-foreground">
-                    {locale === "fr" ? "Aucune nouvelle demande pour le moment." : "No new requests at the moment."}
+                  <Bell className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+                  <p className="text-sm font-medium text-foreground">
+                    {locale === "fr" ? "Pas encore de demandes" : "No requests yet"}
                   </p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+                    {locale === "fr"
+                      ? "Activez votre disponibilité pour commencer à recevoir des clients"
+                      : "Enable your availability to start receiving clients"}
+                  </p>
+                  {!availableToday ? (
+                    <button
+                      onClick={toggleAvailability}
+                      disabled={availabilityLoading}
+                      className="mt-4 inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+                    >
+                      <Zap className="h-4 w-4" />
+                      {locale === "fr" ? "Activer maintenant" : "Enable now"}
+                    </button>
+                  ) : (
+                    <p className="mt-3 text-xs text-green-600 font-medium">
+                      ✓ {locale === "fr" ? "Vous êtes disponible — en attente de demandes" : "You're available — waiting for requests"}
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
