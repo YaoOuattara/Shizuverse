@@ -4,6 +4,7 @@ from .appointments.appointments import appointments_bp
 from .admin import admin_bp, provider_bp, client_bp
 from .bookings import bookings_bp
 from .providers.providers import providers_bp
+from .reviews import reviews_bp
 
 api_bp = Blueprint("api", __name__)
 api_bp.register_blueprint(services_bp, url_prefix="/services")
@@ -13,5 +14,6 @@ api_bp.register_blueprint(provider_bp, url_prefix="/provider")
 api_bp.register_blueprint(client_bp, url_prefix="/client")
 api_bp.register_blueprint(bookings_bp, url_prefix="/bookings")
 api_bp.register_blueprint(providers_bp, url_prefix="/providers")
+api_bp.register_blueprint(reviews_bp, url_prefix="/reviews")
 
 __all__ = ["api_bp"]

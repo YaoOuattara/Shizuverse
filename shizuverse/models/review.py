@@ -14,4 +14,6 @@ class Review(db.Model):
     service_slug = db.Column(db.String(50), nullable=False)
     provider_id = db.Column(db.Integer, db.ForeignKey('service_providers.id'), nullable=True)
     moderation_status = db.Column(db.String(20), default='pending')
+    punctuality = db.Column(db.Boolean, nullable=True)
+    respect = db.Column(db.Boolean, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
