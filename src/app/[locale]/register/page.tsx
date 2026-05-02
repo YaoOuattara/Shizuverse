@@ -3,15 +3,10 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, MessageCircle, Eye, EyeOff } from "lucide-react";
+import PhoneInput from "@/components/PhoneInput";
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
 const SHIZU_WA  = (process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "").replace(/\D/g, "");
-
-function normalizePhone(local: string): string {
-  let p = local.trim().replace(/\s+/g, "");
-  if (!p.startsWith("+")) p = "+225" + p;
-  return p;
-}
 
 function ProgressBar({ step }: { step: number }) {
   return (
@@ -45,7 +40,7 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const step1Valid = name.trim().length >= 2;
-  const step2Valid = phone.trim().length >= 7;
+  const step2Valid = phone.trim().length >= 8;
   const step3Valid =
     password.length >= 6 && password === confirm;
 
@@ -53,7 +48,7 @@ export default function RegisterPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const normalizedPhone = normalizePhone(phone);
+      const normalizedPhone = phone.replace(/\s+/g, "");
       const res = await fetch(`${FLASK_API}/api/client/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -141,21 +136,14 @@ export default function RegisterPage() {
             </p>
             <div className="space-y-4">
               <div>
-                <div className="flex">
-                  <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-gray-200 bg-gray-50 text-sm text-gray-500 font-medium select-none">
-                    +225
-                  </span>
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="07 00 00 00 00"
-                    autoFocus
-                    onKeyDown={(e) => e.key === "Enter" && step2Valid && setStep(3)}
-                    className="flex-1 rounded-r-xl border border-gray-200 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 placeholder:text-gray-300"
-                  />
-                </div>
+                <PhoneInput
+                  defaultValue={phone}
+                  onChange={setPhone}
+                  autoFocus
+                  required
+                  selectClassName="rounded-l-xl border-gray-200 bg-gray-50 text-gray-500"
+                  inputClassName="rounded-r-xl border-gray-200 focus:ring-green-500 py-3"
+                />
                 <p className="text-xs text-gray-400 mt-2">
                   {isFr
                     ? "Utilisé uniquement pour vos réservations Shizu"

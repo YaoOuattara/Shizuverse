@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import PhoneInput from "@/components/PhoneInput";
 import {
   Loader2, CheckCircle, Sparkles, Droplets, Wrench, Zap, Hammer,
   Baby, Heart, Leaf, Wind, ArrowLeft, Camera, CreditCard,
@@ -137,7 +138,7 @@ export default function ProviderRegisterPage() {
   // ── Validators ────────────────────────────────────────────────────────────
   const step1Valid =
     account.full_name.trim().length >= 2 &&
-    account.phone.trim().length >= 8 &&
+    account.phone.replace(/\D/g, "").length >= 6 &&
     account.password.length >= 6 &&
     confirmPassword === account.password &&
     (accountType === "individual" || businessName.trim().length >= 2);
@@ -401,24 +402,19 @@ export default function ProviderRegisterPage() {
               />
             </div>
 
-            {/* WhatsApp +225 */}
+            {/* WhatsApp */}
             <div className="space-y-1.5">
               <Label htmlFor="phone">
                 WhatsApp <span className="text-red-500">*</span>
               </Label>
-              <div className="flex">
-                <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm font-medium">
-                  +225
-                </span>
-                <input
-                  id="phone"
-                  type="tel"
-                  value={account.phone}
-                  onChange={(e) => setAccount((a) => ({ ...a, phone: e.target.value }))}
-                  placeholder="07 XX XX XX XX"
-                  className="flex-1 h-10 rounded-none rounded-r-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0F3A7A]/30 focus:border-[#0F3A7A]"
-                />
-              </div>
+              <PhoneInput
+                id="phone"
+                defaultValue={account.phone}
+                onChange={(v) => setAccount((a) => ({ ...a, phone: v }))}
+                placeholder="07 XX XX XX XX"
+                selectClassName="rounded-l-md border-gray-300 bg-gray-50 text-gray-500 focus:ring-[#0F3A7A]/30"
+                inputClassName="rounded-none rounded-r-md border-gray-300 bg-white py-2 focus:ring-[#0F3A7A]/30 focus:border-[#0F3A7A]"
+              />
             </div>
 
             {/* Password */}

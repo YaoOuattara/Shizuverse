@@ -7,6 +7,7 @@ import {
   ShieldCheck, UserPlus, X, ChevronLeft, ChevronRight, MapPin,
 } from "lucide-react";
 import CommuneAutocomplete, { COMMUNES } from "@/components/CommuneAutocomplete";
+import PhoneInput from "@/components/PhoneInput";
 
 interface Props {
   serviceId: string;
@@ -627,18 +628,17 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           placeholder="Kouassi Marie" className={inputCls} required />
       </div>
 
-      {/* Phone — +225 prefix */}
+      {/* Phone */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">{isFr ? "Numéro de téléphone *" : "Phone number *"}</label>
-        <div className="flex">
-          <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm font-medium">
-            +225
-          </span>
-          <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-            placeholder="07 XX XX XX XX"
-            className="flex-1 h-10 rounded-none rounded-r-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0F3A7A]/30 focus:border-[#0F3A7A]"
-            required />
-        </div>
+        <PhoneInput
+          defaultValue={phone}
+          onChange={setPhone}
+          placeholder="07 XX XX XX XX"
+          required
+          selectClassName="rounded-l-md border-gray-300 bg-gray-50 text-gray-500 focus:ring-[#0F3A7A]/30"
+          inputClassName="rounded-none rounded-r-md border-gray-300 bg-white py-2 focus:ring-[#0F3A7A]/30 focus:border-[#0F3A7A]"
+        />
       </div>
 
       {/* Commune */}
@@ -712,7 +712,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
         <RecapRow label={isFr ? "Horaire"    : "Time slot"}  value={timeLabel} />
         <RecapRow label={isFr ? "Date"       : "Date"}       value={date ? (isFr ? formatDateFr(date) : date) : ""} />
         <RecapRow label={isFr ? "Nom"        : "Name"}       value={name} />
-        <RecapRow label={isFr ? "Téléphone"  : "Phone"}      value={`+225 ${phone}`} />
+        <RecapRow label={isFr ? "Téléphone"  : "Phone"}      value={phone} />
         <RecapRow label={isFr ? "Commune"    : "District"}   value={commune} />
         {address && <RecapRow label={isFr ? "Adresse" : "Address"} value={address} />}
         {notes   && <RecapRow label={isFr ? "Précisions" : "Notes"} value={notes} />}

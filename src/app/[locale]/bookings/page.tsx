@@ -7,11 +7,11 @@ import {
   Loader2,
   ArrowLeft,
   MessageCircle,
-  Phone,
   Star,
   RefreshCw,
   Hash,
 } from "lucide-react";
+import PhoneInput from "@/components/PhoneInput";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -36,13 +36,6 @@ const REF_KEY     = "shizu_client_ref";
 const REVIEWED_KEY = "dashboard_reviewed_bookings";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function normalizePhone(input: string): string {
-  let p = input.trim().replace(/\s+/g, "");
-  if (p.startsWith("00225")) p = "+" + p.slice(2);
-  if (!p.startsWith("+")) p = "+225" + p;
-  return p;
-}
 
 function normalizeRef(input: string): string {
   return input.trim().replace(/^#/, "").toUpperCase();
@@ -150,7 +143,7 @@ export default function BookingsPage() {
   function handleLookup(e: React.FormEvent) {
     e.preventDefault();
     if (!phoneInput.trim() || !refInput.trim()) return;
-    const phone = normalizePhone(phoneInput);
+    const phone = phoneInput.replace(/\s+/g, "");
     const ref   = normalizeRef(refInput);
     setActivePhone(phone);
     doFetch(phone, ref);
@@ -167,7 +160,7 @@ export default function BookingsPage() {
     setFetchError(null);
   }
 
-  const canSubmit = phoneInput.trim().length > 0 && refInput.trim().length > 0;
+  const canSubmit = phoneInput.replace(/\D/g, "").length >= 6 && refInput.trim().length > 0;
 
   // ── Phone + ref lookup form ────────────────────────────────────────────────
 
@@ -206,24 +199,14 @@ export default function BookingsPage() {
               {/* Phone field */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">
-                  <Phone className="inline h-3.5 w-3.5 mr-1 mb-0.5" />
                   {isFr ? "Numéro WhatsApp" : "WhatsApp number"}
                 </label>
-                <div className="flex">
-                  <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-input bg-muted text-sm text-muted-foreground font-medium select-none">
-                    +225
-                  </span>
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    value={phoneInput}
-                    onChange={(e) => setPhoneInput(e.target.value)}
-                    placeholder="07 00 00 00 00"
-                    required
-                    autoFocus
-                    className="flex-1 rounded-r-xl border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-                  />
-                </div>
+                <PhoneInput
+                  defaultValue={phoneInput}
+                  onChange={setPhoneInput}
+                  autoFocus
+                  required
+                />
               </div>
 
               {/* Reference field */}
