@@ -575,6 +575,80 @@ def moderate_review(review_id):
     return jsonify({'success': True, 'id': r.id, 'display_status': status, 'moderation_status': r.moderation_status})
 
 
+# ── Dashboard Overview ────────────────────────────────────────
+
+@admin_bp.route('/overview', methods=['GET'])
+@admin_required
+def get_overview():
+    """Single endpoint for all dashboard KPIs."""
+    from sqlalchemy import func
+    from datetime import datetime
+
+    now = datetime.utcnow()
+    first_of_month = datetime(now.year, now.month, 1)
+
+    # ── GMV (sum of final_amount for paid bookings) ────────────
+    gmv_total = db.session.query(
+        func.coalesce(func.sum(ClientBooking.final_amount), 0)
+    ).filter(ClientBooking.payment_status == 'paid').scalar()
+
+    gmv_month = db.session.query(
+        func.coalesce(func.sum(ClientBooking.final_amount), 0)
+    ).filter(
+        ClientBooking.payment_status == 'paid',
+        ClientBooking.created_at >= first_of_month
+    ).scalar()
+
+    # ── Revenue Shizu (15% commission) ────────────────────────
+    revenue_shizu = db.session.query(
+        func.coalesce(func.sum(ClientBooking.shizu_commission), 0)
+    ).filter(ClientBooking.payment_status == 'paid').scalar()
+
+    # ── Provider payouts ──────────────────────────────────────
+    payouts_due = db.session.query(
+        func.coalesce(func.sum(ClientBooking.provider_payout), 0)
+    ).filter(
+        ClientBooking.payment_status == 'paid',
+        ClientBooking.payout_status != 'sent'
+    ).scalar()
+
+    payouts_sent = db.session.query(
+        func.coalesce(func.sum(ClientBooking.provider_payout), 0)
+    ).filter(ClientBooking.payout_status == 'sent').scalar()
+
+    # ── Booking counts ────────────────────────────────────────
+    total_bookings     = db.session.query(func.count(ClientBooking.id)).scalar()
+    completed_bookings = db.session.query(func.count(ClientBooking.id)).filter(ClientBooking.status == 'completed').scalar()
+    cancelled_bookings = db.session.query(func.count(ClientBooking.id)).filter(ClientBooking.status == 'cancelled').scalar()
+    pending_bookings   = db.session.query(func.count(ClientBooking.id)).filter(ClientBooking.status.in_(['pending', 'under_review', 'requested'])).scalar()
+    confirmed_bookings = db.session.query(func.count(ClientBooking.id)).filter(ClientBooking.status.in_(['confirmed', 'assigned', 'accepted', 'in_progress'])).scalar()
+
+    # Completion rate: completed / (total − cancelled)
+    denominator = (total_bookings or 0) - (cancelled_bookings or 0)
+    completion_rate = round((completed_bookings / denominator * 100), 1) if denominator > 0 else 0.0
+
+    # ── Active providers (distinct users) ─────────────────────
+    active_providers = db.session.query(ServiceProvider.user_id).filter(
+        ServiceProvider.verification_status == 'approved',
+        ServiceProvider.provider_status == 'active'
+    ).distinct().count()
+
+    return jsonify({
+        'gmv_total':          int(gmv_total),
+        'gmv_month':          int(gmv_month),
+        'revenue_shizu':      int(revenue_shizu),
+        'payouts_due':        int(payouts_due),
+        'payouts_sent':       int(payouts_sent),
+        'total_bookings':     total_bookings,
+        'completed_bookings': completed_bookings,
+        'cancelled_bookings': cancelled_bookings,
+        'pending_bookings':   pending_bookings,
+        'confirmed_bookings': confirmed_bookings,
+        'completion_rate':    completion_rate,
+        'active_providers':   active_providers,
+    })
+
+
 # ── Finance Overview ──────────────────────────────────────────
 
 @admin_bp.route('/finance/summary', methods=['GET'])
