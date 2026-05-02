@@ -373,6 +373,38 @@ export default function ProviderDashboard() {
     });
   };
 
+  const handleStartBooking = async (bookingId: string): Promise<void> => {
+    const token = localStorage.getItem("provider_token");
+    const res = await fetch(`${FLASK_API}/api/provider/bookings/${bookingId}/start`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      toast({ title: "Erreur", description: "Impossible de démarrer la mission.", variant: "destructive" });
+      throw new Error("Start failed");
+    }
+    setBookings((prev) =>
+      prev.map((b) => b.id === bookingId ? { ...b, status: "in_progress" as ProviderBookingStatus } : b)
+    );
+    toast({ title: "Mission démarrée !", description: "Le client est informé que vous êtes arrivé.", variant: "success" });
+  };
+
+  const handleCompleteBooking = async (bookingId: string): Promise<void> => {
+    const token = localStorage.getItem("provider_token");
+    const res = await fetch(`${FLASK_API}/api/provider/bookings/${bookingId}/complete`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      toast({ title: "Erreur", description: "Impossible de terminer la mission.", variant: "destructive" });
+      throw new Error("Complete failed");
+    }
+    setBookings((prev) =>
+      prev.map((b) => b.id === bookingId ? { ...b, status: "completed" as ProviderBookingStatus } : b)
+    );
+    toast({ title: "Mission terminée !", description: "Bravo ! La réservation est marquée comme terminée.", variant: "success" });
+  };
+
   const handleRescheduleBooking = async (
     bookingId: string,
     newDate: string,
@@ -970,6 +1002,8 @@ export default function ProviderDashboard() {
                 onAccept={handleAcceptBooking}
                 onReject={handleRejectBooking}
                 onReschedule={handleRescheduleBooking}
+                onStart={handleStartBooking}
+                onComplete={handleCompleteBooking}
               />
             ))}
           </div>

@@ -39,6 +39,8 @@ import {
   CircleDashed,
   XCircle,
   Clock3,
+  MapPin,
+  Flag,
 } from "lucide-react";
 import { useState } from "react";
 import type { ProviderBooking, ProviderBookingStatus } from "@/data/mockProviderBookings";
@@ -51,6 +53,8 @@ interface ProviderBookingCardProps {
   onAccept?: (bookingId: string) => Promise<void> | void;
   onReject?: (bookingId: string) => Promise<void> | void;
   onReschedule?: (bookingId: string, newDate: string, newTime: string) => Promise<void> | void;
+  onStart?: (bookingId: string) => Promise<void> | void;
+  onComplete?: (bookingId: string) => Promise<void> | void;
 }
 
 export default function ProviderBookingCard({
@@ -59,11 +63,15 @@ export default function ProviderBookingCard({
   onAccept,
   onReject,
   onReschedule,
+  onStart,
+  onComplete,
 }: ProviderBookingCardProps) {
   const t = useTranslations("providerBookingCard");
   const [isAccepting, setIsAccepting] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [isRescheduling, setIsRescheduling] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
   const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = useState(false);
   const [rescheduleDate, setRescheduleDate] = useState(booking.date);
   const [rescheduleTime, setRescheduleTime] = useState(booking.time);
@@ -106,33 +114,50 @@ export default function ProviderBookingCard({
   };
 
   const statusStyles: Record<ProviderBookingStatus, string> = {
-    confirmed:  "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    pending:    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-    requested:  "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-    cancelled:  "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-    completed:  "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+    confirmed:   "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+    pending:     "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+    requested:   "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
+    cancelled:   "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+    completed:   "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+    in_progress: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
   };
 
   const statusLabels: Record<ProviderBookingStatus, string> = {
-    confirmed:  t("status.confirmed"),
-    pending:    t("status.pending"),
-    requested:  t("status.pending"),   // treat "requested" same as "pending" in display
-    cancelled:  t("status.cancelled"),
-    completed:  t("status.completed"),
+    confirmed:   t("status.confirmed"),
+    pending:     t("status.pending"),
+    requested:   t("status.pending"),
+    cancelled:   t("status.cancelled"),
+    completed:   t("status.completed"),
+    in_progress: "En cours",
   };
 
   const statusIcons: Record<ProviderBookingStatus, typeof CheckCircle2> = {
-    confirmed: CheckCircle2,
-    pending:   CircleDashed,
-    requested: CircleDashed,
-    cancelled: XCircle,
-    completed: Check,
+    confirmed:   CheckCircle2,
+    pending:     CircleDashed,
+    requested:   CircleDashed,
+    cancelled:   XCircle,
+    completed:   Check,
+    in_progress: MapPin,
+  };
+
+  const handleStart = async () => {
+    if (!onStart) return;
+    setIsStarting(true);
+    try { await onStart(booking.id); } catch { /* noop */ } finally { setIsStarting(false); }
+  };
+
+  const handleComplete = async () => {
+    if (!onComplete) return;
+    setIsCompleting(true);
+    try { await onComplete(booking.id); } catch { /* noop */ } finally { setIsCompleting(false); }
   };
 
   const StatusIcon = statusIcons[booking.status as ProviderBookingStatus] ?? CircleDashed;
   const isPending = booking.status === "pending" || booking.status === "requested";
-  const isActionable = isPending || booking.status === "confirmed";
-  const isAnyLoading = isAccepting || isRejecting || isRescheduling;
+  const isConfirmed = booking.status === "confirmed";
+  const isInProgress = booking.status === "in_progress";
+  const isActionable = isPending || isConfirmed || isInProgress;
+  const isAnyLoading = isAccepting || isRejecting || isRescheduling || isStarting || isCompleting;
 
   return (
     <>
@@ -233,7 +258,43 @@ export default function ProviderBookingCard({
               </div>
             )}
 
-            {isActionable && (
+            {/* "Je suis arrivé" button — shown when booking is confirmed */}
+            {isConfirmed && onStart && (
+              <div className="pt-3 border-t -mx-4 sm:-mx-6 mt-3 -mb-4 sm:-mb-6 bg-amber-50/60">
+                <div className="px-4 sm:px-6 pb-4 sm:pb-6">
+                  <button
+                    onClick={handleStart}
+                    disabled={isAnyLoading}
+                    className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
+                  >
+                    {isStarting
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : <MapPin className="h-4 w-4" />}
+                    {isStarting ? "Démarrage…" : "Je suis arrivé — Démarrer la mission"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* "Terminer la mission" button — shown when in_progress */}
+            {isInProgress && onComplete && (
+              <div className="pt-3 border-t -mx-4 sm:-mx-6 mt-3 -mb-4 sm:-mb-6 bg-green-50/60">
+                <div className="px-4 sm:px-6 pb-4 sm:pb-6">
+                  <button
+                    onClick={handleComplete}
+                    disabled={isAnyLoading}
+                    className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
+                  >
+                    {isCompleting
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : <Flag className="h-4 w-4" />}
+                    {isCompleting ? "Finalisation…" : "Terminer la mission"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {isActionable && isPending && (
               <div className="pt-3 border-t -mx-4 sm:-mx-6 mt-3 -mb-4 sm:-mb-6 bg-muted/30">
                 <div className="flex flex-col sm:flex-row gap-2 px-4 sm:px-6 pb-4 sm:pb-6">
                   {isPending && onAccept && (
