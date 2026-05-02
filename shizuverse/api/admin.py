@@ -615,6 +615,11 @@ def get_provider_profile():
         if svc and svc.name not in services:
             services.append(svc.name)
 
+    from shizuverse.models.review import Review as ReviewModel
+    pub_reviews = ReviewModel.query.filter_by(provider_id=sp.id, is_published=True).all()
+    review_count = len(pub_reviews)
+    avg_rating = round(sum(r.rating for r in pub_reviews) / review_count, 1) if review_count > 0 else None
+
     return jsonify({
         'id': sp.id,
         'user_id': sp.user_id,
@@ -638,6 +643,8 @@ def get_provider_profile():
         'submitted_at': sp.submitted_at.isoformat() if sp.submitted_at else None,
         'reviewed_at': sp.reviewed_at.isoformat() if sp.reviewed_at else None,
         'services': services,
+        'avg_rating': avg_rating,
+        'review_count': review_count,
     })
 
 
@@ -737,6 +744,36 @@ def update_provider_availability():
 
     db.session.commit()
     return jsonify({'success': True, 'available_today': sp.available_today})
+
+
+@admin_bp.route('/providers/<int:provider_id>/reviews', methods=['GET'])
+@require_admin_token
+def get_provider_reviews_admin(provider_id):
+    from shizuverse.models.review import Review
+    reviews = Review.query.filter_by(provider_id=provider_id).order_by(Review.created_at.desc()).all()
+    return jsonify([
+        {
+            'id': r.id,
+            'client_name': r.client_name,
+            'rating': r.rating,
+            'comment': r.text or '',
+            'is_published': r.is_published,
+            'created_at': r.created_at.isoformat() if r.created_at else '',
+        }
+        for r in reviews
+    ])
+
+
+@admin_bp.route('/reviews/<int:review_id>', methods=['PATCH'])
+@require_admin_token
+def patch_review(review_id):
+    from shizuverse.models.review import Review
+    review = Review.query.get_or_404(review_id)
+    data = request.get_json() or {}
+    if 'is_published' in data:
+        review.is_published = bool(data['is_published'])
+    db.session.commit()
+    return jsonify({'success': True, 'id': review.id, 'is_published': review.is_published})
 
 
 @admin_bp.route('/waitlist', methods=['GET'])

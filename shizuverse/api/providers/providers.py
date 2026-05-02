@@ -30,10 +30,10 @@ def get_public_provider(provider_id):
     # Zones: parse comma-separated address field into a list
     zones = [z.strip() for z in (sp.address or '').split(',') if z.strip()]
 
-    # Average rating from approved (or unmoderated) reviews
+    # Average rating from published reviews
     reviews = Review.query.filter(
         Review.provider_id == provider_id,
-        db.or_(Review.moderation_status == 'approved', Review.moderation_status == None)
+        Review.is_published == True,
     ).all()
     review_count = len(reviews)
     average_rating = round(sum(r.rating for r in reviews) / review_count, 1) if review_count > 0 else None
@@ -76,8 +76,8 @@ def get_provider_reviews(provider_id):
 
     reviews = Review.query.filter(
         Review.provider_id == provider_id,
-        db.or_(Review.moderation_status == 'approved', Review.moderation_status == None)
-    ).order_by(Review.created_at.desc()).all()
+        Review.is_published == True,
+    ).order_by(Review.created_at.desc()).limit(10).all()
 
     result = [
         {
@@ -85,6 +85,8 @@ def get_provider_reviews(provider_id):
             'client_name': r.client_name,
             'rating': r.rating,
             'comment': r.text or '',
+            'punctuality': r.punctuality,
+            'respect': r.respect,
             'created_at': r.created_at.isoformat() if r.created_at else '',
         }
         for r in reviews

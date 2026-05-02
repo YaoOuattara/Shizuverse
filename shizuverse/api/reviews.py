@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from shizuverse.models import db
 from shizuverse.models.review import Review
 from shizuverse.models.client_booking import ClientBooking
+from shizuverse.models.service_provider import ServiceProvider
 
 reviews_bp = Blueprint("reviews", __name__)
 
@@ -30,6 +31,13 @@ def submit_review():
     punctuality = data.get("punctuality")
     respect = data.get("respect")
 
+    # Resolve provider_id from the booking's assigned provider name
+    provider_id = None
+    if booking.provider_name:
+        sp = ServiceProvider.query.filter_by(company_name=booking.provider_name).first()
+        if sp:
+            provider_id = sp.id
+
     review = Review(
         booking_id=booking_id,
         client_name=booking.client_name,
@@ -37,8 +45,10 @@ def submit_review():
         rating=rating,
         text=(data.get("comment") or "").strip() or None,
         service_slug=booking.service_slug or "",
+        provider_id=provider_id,
         punctuality=bool(punctuality) if punctuality is not None else None,
         respect=bool(respect) if respect is not None else None,
+        is_published=True,
     )
     db.session.add(review)
     db.session.commit()

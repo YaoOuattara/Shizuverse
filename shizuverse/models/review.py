@@ -16,4 +16,5 @@ class Review(db.Model):
     moderation_status = db.Column(db.String(20), default='pending')
     punctuality = db.Column(db.Boolean, nullable=True)
     respect = db.Column(db.Boolean, nullable=True)
+    is_published = db.Column(db.Boolean, default=True, nullable=False, server_default='true')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
