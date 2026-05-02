@@ -115,6 +115,8 @@ export default function ProviderDashboard() {
   const [bookings, setBookings] = useState<ProviderBooking[]>([]);
 
   const [providerInfo, setProviderInfo] = useState<{ id: string | null; verificationStatus: string; rejectionReason: string }>({ id: null, verificationStatus: '', rejectionReason: '' });
+  const [avgRating, setAvgRating]       = useState<number | null>(null);
+  const [ratingCount, setRatingCount]   = useState<number>(0);
 
   // Hydrate state from localStorage after mount (SSR-safe)
   useEffect(() => {
@@ -180,6 +182,15 @@ export default function ProviderDashboard() {
     } catch { /* ignore */ }
 
     const url = `${FLASK_API}/api/provider/bookings${providerId ? `?provider_id=${providerId}` : ""}`;
+    // Fetch profile for avg_rating
+    fetch(`${FLASK_API}/api/provider/profile`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.avg_rating != null) setAvgRating(data.avg_rating);
+        if (data?.review_count != null) setRatingCount(data.review_count);
+      })
+      .catch(() => {});
+
     fetch(url, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => {
         if (res.status === 401) {
@@ -961,7 +972,7 @@ export default function ProviderDashboard() {
           const accepted = statusCounts.confirmed + statusCounts.completed;
           const acceptRate = totalWithOutcome > 0 ? Math.round((accepted / totalWithOutcome) * 100) : null;
           const perfItems = [
-            { label: "Note moyenne", value: "—", sub: "Bientôt disponible" },
+            { label: "Note moyenne", value: avgRating !== null ? String(avgRating.toFixed(1)) : "—", sub: ratingCount > 0 ? `${ratingCount} avis` : "Pas encore d'avis" },
             { label: "Missions terminées", value: String(statusCounts.completed), sub: "au total" },
             { label: "Taux d'acceptation", value: acceptRate !== null ? `${acceptRate}%` : "—", sub: totalWithOutcome > 0 ? `${accepted}/${totalWithOutcome} demandes` : "Pas encore de données" },
             { label: "Délai de réponse", value: "< 2h", sub: "estimation" },

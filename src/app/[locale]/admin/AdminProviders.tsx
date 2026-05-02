@@ -428,6 +428,37 @@ export default function AdminProviders() {
     setSuspendModalOpen(true);
   };
 
+  // ── Provider reviews state ────────────────────────────────────────────────
+  const [providerReviews, setProviderReviews] = useState<{
+    id: number; client_name: string; rating: number; comment: string; is_published: boolean; created_at: string;
+  }[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selectedProvider) return;
+    const base = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
+    const token = typeof window !== "undefined" ? localStorage.getItem("shizu_admin_token") : null;
+    setReviewsLoading(true);
+    fetch(`${base}/api/admin/providers/${selectedProvider.id}/reviews`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setProviderReviews(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setReviewsLoading(false));
+  }, [selectedProvider?.id]);
+
+  const handleUnpublishReview = async (reviewId: number) => {
+    const base = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
+    const token = typeof window !== "undefined" ? localStorage.getItem("shizu_admin_token") : null;
+    await fetch(`${base}/api/admin/reviews/${reviewId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ is_published: false }),
+    });
+    setProviderReviews(prev => prev.map(r => r.id === reviewId ? { ...r, is_published: false } : r));
+  };
+
   // ── Edit services state ───────────────────────────────────────────────────
   const [editServicesMode, setEditServicesMode] = useState(false);
   const [editingServices, setEditingServices] = useState<string[]>([]);
@@ -1002,6 +1033,50 @@ export default function AdminProviders() {
                     <p className="text-xs text-muted-foreground">{isFr ? "Revenus" : "Revenue"}</p>
                   </div>
                 </div>
+              </div>
+
+              {/* Reviews */}
+              <div className="space-y-3 pt-4 border-t">
+                <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1.5">
+                  <Star className="h-4 w-4 text-amber-500" />
+                  {isFr ? `Avis clients (${providerReviews.length})` : `Reviews (${providerReviews.length})`}
+                </h4>
+                {reviewsLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mx-auto" />
+                ) : providerReviews.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">
+                    {isFr ? "Aucun avis pour ce prestataire." : "No reviews yet."}
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {providerReviews.map(r => (
+                      <div key={r.id} className={`rounded-lg border p-3 space-y-1 text-sm ${!r.is_published ? "opacity-50 bg-muted/30" : "bg-background"}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium text-xs">{r.client_name}</span>
+                          <div className="flex items-center gap-0.5">
+                            {[1,2,3,4,5].map(s => (
+                              <Star key={s} className={`h-3 w-3 ${s <= r.rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/20"}`} />
+                            ))}
+                          </div>
+                        </div>
+                        {r.comment && <p className="text-xs text-muted-foreground line-clamp-2">{r.comment}</p>}
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[10px] text-muted-foreground">{new Date(r.created_at).toLocaleDateString("fr-FR")}</span>
+                          {r.is_published ? (
+                            <button
+                              onClick={() => handleUnpublishReview(r.id)}
+                              className="text-[10px] text-red-500 hover:text-red-700 font-medium underline underline-offset-2 transition-colors"
+                            >
+                              {isFr ? "Dépublier" : "Unpublish"}
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground italic">{isFr ? "Dépublié" : "Unpublished"}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Timestamps */}
