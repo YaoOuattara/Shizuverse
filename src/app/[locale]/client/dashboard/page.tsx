@@ -158,7 +158,20 @@ export default function ClientDashboard() {
         }
         return r.json();
       })
-      .then(data => { if (data) setBookings(data.items ?? []); })
+      .then(data => {
+        if (!data) return;
+        const items: ApiBooking[] = data.items ?? [];
+        setBookings(items);
+        // Persist the active provider_id so /provider/[id] can show the arrival banner
+        const activeItem = items.find(b => ACTIVE_STATUSES.has(b.status) && b.provider_id);
+        try {
+          if (activeItem?.provider_id) {
+            localStorage.setItem("shizu_active_provider_id", String(activeItem.provider_id));
+          } else {
+            localStorage.removeItem("shizu_active_provider_id");
+          }
+        } catch { /* ignore */ }
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
