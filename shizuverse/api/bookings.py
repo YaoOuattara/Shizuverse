@@ -13,12 +13,34 @@ bookings_bp = Blueprint("bookings", __name__)
 def list_bookings():
     # accept both ?phone= (public lookup) and ?client_phone= (legacy)
     phone  = request.args.get("phone") or request.args.get("client_phone")
+    ref    = (request.args.get("ref") or "").strip().lstrip("#").upper()
     status = request.args.get("status")
     limit  = min(int(request.args.get("limit", 50)), 200)
 
-    query = ClientBooking.query
-    if phone:
-        query = query.filter_by(client_phone=phone)
+    if not phone:
+        return jsonify({"count": 0, "items": []}), 200
+
+    # Security: require a valid booking reference that belongs to this phone.
+    # Format: SHZ-YYYY-ID  (e.g. SHZ-2025-32)
+    # If ref is absent or doesn't match → return empty, never an error.
+    if not ref:
+        return jsonify({"count": 0, "items": []}), 200
+
+    try:
+        parts = ref.split("-")
+        booking_id = int(parts[2]) if len(parts) >= 3 else None
+    except (ValueError, IndexError):
+        booking_id = None
+
+    if not booking_id:
+        return jsonify({"count": 0, "items": []}), 200
+
+    verify = ClientBooking.query.filter_by(id=booking_id, client_phone=phone).first()
+    if not verify:
+        return jsonify({"count": 0, "items": []}), 200
+
+    # Reference validated — return all bookings for this phone
+    query = ClientBooking.query.filter_by(client_phone=phone)
     if status:
         if status not in VALID_STATUSES:
             return jsonify({"error": f"Invalid status. Must be one of: {VALID_STATUSES}"}), 400
