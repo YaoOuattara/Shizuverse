@@ -14,6 +14,52 @@ import os
 admin_bp = Blueprint('admin', __name__)
 
 
+def normalize_phone(phone: str) -> str:
+    """Normalize any CI phone format to +225XXXXXXXXX (E.164)."""
+    p = phone.strip().replace(' ', '').replace('-', '')
+    if p.startswith('00225'):
+        return '+225' + p[5:]
+    if p.startswith('+225'):
+        return p
+    if p.startswith('+'):
+        return p                      # non-CI number, keep as-is
+    if p.startswith('225') and len(p) >= 12:
+        return '+' + p
+    if p.startswith('0') and len(p) == 10:
+        return '+225' + p[1:]
+    return p
+
+
+def phone_to_email(phone: str, domain: str) -> str:
+    """Strip + from normalized phone and build synthetic email."""
+    return normalize_phone(phone).replace('+', '') + f'@{domain}'
+
+
+def client_email_variants(phone: str) -> list:
+    """Return all plausible synthetic emails for backward compat with old accounts."""
+    norm = normalize_phone(phone)
+    emails = set()
+    emails.add(norm.replace('+', '') + '@client.shizu.ci')
+    if norm.startswith('+225'):
+        local = norm[4:]                             # e.g. "0700000000"
+        emails.add(local + '@client.shizu.ci')
+        if local.startswith('0'):
+            emails.add(local[1:] + '@client.shizu.ci')  # e.g. "700000000"
+    return list(emails)
+
+
+def provider_email_variants(phone: str) -> list:
+    norm = normalize_phone(phone)
+    emails = set()
+    emails.add(norm.replace('+', '') + '@shizu.ci')
+    if norm.startswith('+225'):
+        local = norm[4:]
+        emails.add(local + '@shizu.ci')
+        if local.startswith('0'):
+            emails.add(local[1:] + '@shizu.ci')
+    return list(emails)
+
+
 def require_admin_token(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -287,18 +333,26 @@ def require_provider_token(f):
 @provider_bp.route('/login', methods=['POST'])
 def provider_login():
     data = request.get_json() or {}
-    phone = (data.get('phone') or '').strip().replace(' ', '').replace('+', '')
-    password = data.get('password', '')
-    if not phone or not password:
+    raw_phone = (data.get('phone') or '').strip()
+    password  = data.get('password', '')
+    if not raw_phone or not password:
         return jsonify({'error': 'phone and password required'}), 400
-    # Look up by phone number stored on ServiceProvider
-    sp = ServiceProvider.query.filter_by(phone_number=phone).first()
+
+    canonical = normalize_phone(raw_phone)
+    # Try matching by phone_number stored on ServiceProvider (try both formats)
+    sp = ServiceProvider.query.filter_by(phone_number=canonical).first()
     if not sp:
-        # Fallback: try synthetic email pattern
-        synthetic_email = f"{phone}@shizu.ci"
-        user = User.query.filter_by(email=synthetic_email, user_type='provider').first()
-        if user:
-            sp = ServiceProvider.query.filter_by(user_id=user.id).first()
+        sp = ServiceProvider.query.filter_by(phone_number=canonical.replace('+', '')).first()
+    if not sp:
+        sp = ServiceProvider.query.filter_by(phone_number=raw_phone.replace(' ', '')).first()
+    if not sp:
+        # Fallback: try all synthetic email variants
+        for email in provider_email_variants(raw_phone):
+            user = User.query.filter_by(email=email, user_type='provider').first()
+            if user:
+                sp = ServiceProvider.query.filter_by(user_id=user.id).first()
+                if sp:
+                    break
     if not sp:
         return jsonify({'error': 'Invalid credentials'}), 401
     user = User.query.get(sp.user_id)
@@ -355,9 +409,14 @@ def provider_register():
     if account_type == 'company' and not business_name:
         return jsonify({'error': 'company_name is required for company accounts'}), 400
 
-    # Use phone as synthetic email so User.email constraint is satisfied
-    synthetic_email = f"{phone.replace(' ', '').replace('+', '')}@shizu.ci"
-    if User.query.filter_by(email=synthetic_email).first():
+    canonical_phone = normalize_phone(phone)
+    synthetic_email = phone_to_email(phone, 'shizu.ci')
+    existing = None
+    for variant in provider_email_variants(phone):
+        existing = User.query.filter_by(email=variant).first()
+        if existing:
+            break
+    if existing:
         return jsonify({'error': 'A provider with this phone number already exists'}), 409
 
     user = User(email=synthetic_email, user_type='provider', preferred_language='fr')
@@ -836,8 +895,15 @@ def client_register():
     if account_type == 'company' and not company_name:
         return jsonify({'error': 'company_name is required for company accounts'}), 400
 
-    synthetic_email = f"{phone.replace(' ', '').replace('+', '')}@client.shizu.ci"
-    if User.query.filter_by(email=synthetic_email).first():
+    canonical_phone = normalize_phone(phone)
+    synthetic_email = phone_to_email(phone, 'client.shizu.ci')
+    # Also check legacy format so we don't create a duplicate
+    existing = None
+    for variant in client_email_variants(phone):
+        existing = User.query.filter_by(email=variant).first()
+        if existing:
+            break
+    if existing:
         return jsonify({'error': 'A client with this phone number already exists'}), 409
 
     user = User(
@@ -847,7 +913,7 @@ def client_register():
         account_type=account_type,
         company_name=company_name,
         full_name=full_name,
-        phone=phone,
+        phone=canonical_phone,
     )
     user.set_password(password)
     db.session.add(user)
@@ -909,8 +975,11 @@ def client_login():
     if not phone or not password:
         return jsonify({'error': 'phone and password are required'}), 400
 
-    synthetic_email = f"{phone.replace(' ', '').replace('+', '')}@client.shizu.ci"
-    user = User.query.filter_by(email=synthetic_email, user_type='client').first()
+    user = None
+    for email in client_email_variants(phone):
+        user = User.query.filter_by(email=email, user_type='client').first()
+        if user:
+            break
 
     if not user or not user.check_password(password):
         return jsonify({'error': 'Numéro de téléphone ou mot de passe invalide.'}), 401
