@@ -35,10 +35,21 @@ import {
   ShieldAlert,
   Eye,
   EyeOff,
+  TrendingUp,
+  ArrowDownToLine,
+  Send,
 } from "lucide-react";
+
+function formatFCFA(amount: number): string {
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'decimal',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount) + ' FCFA';
+}
 import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
-import { useAdminStats, useAdminBookings, useAdminProviders, useAdminReviews, type ApiBooking } from "@/hooks/useAdminApi";
+import { useAdminStats, useAdminBookings, useAdminProviders, useAdminReviews, useAdminOverview, type ApiBooking } from "@/hooks/useAdminApi";
 import { useAdminStore, type AdminProvider, type DateRangeOption, type VerificationStatus } from "@/data/adminStore";
 import { useToast } from "@/hooks/use-toast";
 import { formatMoney } from "@/lib/currency";
@@ -93,6 +104,7 @@ export default function AdminOverview() {
   const { bookings: liveBookings } = useAdminBookings();
   const { providers: liveProviders } = useAdminProviders();
   const { reviews: liveReviews } = useAdminReviews();
+  const { overview, loading: overviewLoading } = useAdminOverview();
 
   // Provider counts — derived from the live providers list (single source of truth)
   const liveActiveProviders = liveProviders.filter(p => p.provider_status === 'active').length;
@@ -253,133 +265,157 @@ export default function AdminOverview() {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4" data-testid="grid-kpis">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">{isFr ? "Total réservations" : "Total Bookings"}</p>
-                  <p className="text-2xl font-bold" data-testid="kpi-total-bookings">{kpis.totalBookings}</p>
-                </div>
-                <Calendar className="h-8 w-8 text-muted-foreground/50" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">{isFr ? "En attente" : "Pending"}</p>
-                  <p className="text-2xl font-bold text-amber-600" data-testid="kpi-pending">{kpis.pendingBookings}</p>
-                </div>
-                <Clock className="h-8 w-8 text-amber-500/50" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">{isFr ? "Confirmées" : "Confirmed"}</p>
-                  <p className="text-2xl font-bold text-blue-600" data-testid="kpi-confirmed">{kpis.confirmedBookings}</p>
-                </div>
-                <CheckCircle2 className="h-8 w-8 text-blue-500/50" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">{isFr ? "Terminées" : "Completed"}</p>
-                  <p className="text-2xl font-bold text-emerald-600" data-testid="kpi-completed">{kpis.completedBookings}</p>
-                </div>
-                <CheckCircle2 className="h-8 w-8 text-emerald-500/50" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">{isFr ? "Annulées" : "Cancelled"}</p>
-                  <p className="text-2xl font-bold text-red-600" data-testid="kpi-cancelled">{kpis.cancelledBookings}</p>
-                </div>
-                <XCircle className="h-8 w-8 text-red-500/50" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">{isFr ? "Volume total (GMV)" : "Total GMV"}</p>
-                  <p className="text-2xl font-bold" data-testid="kpi-gmv">{formatMoney(kpis.totalGMV)}</p>
-                </div>
-                <Banknote className="h-8 w-8 text-muted-foreground/50" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">{isFr ? "Note moyenne" : "Avg Rating"}</p>
-                  <p className="text-2xl font-bold" data-testid="kpi-avg-rating">
-                    {liveAvgRating !== null ? liveAvgRating.toFixed(1) : "—"}
-                  </p>
-                  {liveReviews.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      {liveReviews.length} {isFr ? "avis" : "reviews"}
+        {overviewLoading ? (
+          <div className="flex items-center justify-center py-8 text-muted-foreground gap-2">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span className="text-sm">{isFr ? "Chargement des stats…" : "Loading stats…"}</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4" data-testid="grid-kpis">
+            {/* Row 1 — Financial */}
+            <Card className="border-l-4 border-l-emerald-500">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium">{isFr ? "GMV Total" : "Total GMV"}</p>
+                    <p className="text-xl font-bold mt-0.5 truncate" data-testid="kpi-gmv">
+                      {formatFCFA(overview?.gmv_total ?? 0)}
                     </p>
-                  )}
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {isFr ? "Encaissé (final)" : "Collected (final)"}
+                    </p>
+                  </div>
+                  <Banknote className="h-7 w-7 text-emerald-500/60 shrink-0 mt-0.5" />
                 </div>
-                <Star className="h-8 w-8 text-amber-500/50" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">{isFr ? "Prestataires" : "Providers"}</p>
-                  <p className="text-2xl font-bold" data-testid="kpi-active-providers">
-                    {liveActiveProviders}
-                    <span className="text-sm font-normal text-muted-foreground ml-1">
-                      {isFr ? "actifs" : "active"}
-                    </span>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {isFr ? `sur ${liveTotalProviders} au total` : `of ${liveTotalProviders} total`}
-                  </p>
+            <Card className="border-l-4 border-l-blue-400">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium">{isFr ? "GMV ce mois" : "GMV This Month"}</p>
+                    <p className="text-xl font-bold mt-0.5 truncate" data-testid="kpi-gmv-month">
+                      {formatFCFA(overview?.gmv_month ?? 0)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {new Date().toLocaleString(isFr ? 'fr-FR' : 'en-US', { month: 'long' })}
+                    </p>
+                  </div>
+                  <Calendar className="h-7 w-7 text-blue-400/60 shrink-0 mt-0.5" />
                 </div>
-                <Users className="h-8 w-8 text-muted-foreground/50" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">{isFr ? "Prestataires éligibles" : "Eligible Providers"}</p>
-                  <p className="text-2xl font-bold text-emerald-600" data-testid="kpi-eligible-providers">
-                    {kpis.eligibleProviders}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{isFr ? "Approuvés + listés" : "Approved + Listed"}</p>
+            <Card className="border-l-4 border-l-violet-500">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium">{isFr ? "Revenus Shizu" : "Shizu Revenue"}</p>
+                    <p className="text-xl font-bold mt-0.5 truncate" data-testid="kpi-revenue-shizu">
+                      {formatFCFA(overview?.revenue_shizu ?? 0)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {isFr ? "Commission 15%" : "15% commission"}
+                    </p>
+                  </div>
+                  <TrendingUp className="h-7 w-7 text-violet-500/60 shrink-0 mt-0.5" />
                 </div>
-                <ShieldCheck className="h-8 w-8 text-emerald-500/50" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-amber-500">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium">{isFr ? "Versements dus" : "Payouts Due"}</p>
+                    <p className="text-xl font-bold mt-0.5 truncate text-amber-600" data-testid="kpi-payouts-due">
+                      {formatFCFA(overview?.payouts_due ?? 0)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {isFr
+                        ? `${formatFCFA(overview?.payouts_sent ?? 0)} envoyé`
+                        : `${formatFCFA(overview?.payouts_sent ?? 0)} sent`}
+                    </p>
+                  </div>
+                  <ArrowDownToLine className="h-7 w-7 text-amber-500/60 shrink-0 mt-0.5" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Row 2 — Operations */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">{isFr ? "Réservations" : "Bookings"}</p>
+                    <p className="text-2xl font-bold mt-0.5" data-testid="kpi-total-bookings">
+                      {overview?.total_bookings ?? kpis.totalBookings}
+                    </p>
+                    <div className="flex gap-2 mt-0.5 text-xs text-muted-foreground flex-wrap">
+                      <span className="text-amber-600">{overview?.pending_bookings ?? livePending} {isFr ? "en attente" : "pending"}</span>
+                      <span className="text-emerald-600">{overview?.completed_bookings ?? liveCompleted} {isFr ? "terminées" : "done"}</span>
+                    </div>
+                  </div>
+                  <Calendar className="h-7 w-7 text-muted-foreground/50 shrink-0 mt-0.5" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">{isFr ? "Taux de complétion" : "Completion Rate"}</p>
+                    <p className="text-2xl font-bold mt-0.5 text-emerald-600" data-testid="kpi-completion-rate">
+                      {overview ? `${overview.completion_rate}%` : "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {isFr ? "Hors annulations" : "Excl. cancelled"}
+                    </p>
+                  </div>
+                  <CheckCircle2 className="h-7 w-7 text-emerald-500/50 shrink-0 mt-0.5" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">{isFr ? "Prestataires actifs" : "Active Providers"}</p>
+                    <p className="text-2xl font-bold mt-0.5" data-testid="kpi-active-providers">
+                      {overview?.active_providers ?? liveActiveProviders}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {isFr ? `sur ${liveTotalProviders} inscrits` : `of ${liveTotalProviders} registered`}
+                    </p>
+                  </div>
+                  <Users className="h-7 w-7 text-muted-foreground/50 shrink-0 mt-0.5" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">{isFr ? "Note moyenne" : "Avg Rating"}</p>
+                    <p className="text-2xl font-bold mt-0.5" data-testid="kpi-avg-rating">
+                      {liveAvgRating !== null ? liveAvgRating.toFixed(1) : "—"}
+                    </p>
+                    {liveReviews.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {liveReviews.length} {isFr ? "avis" : "reviews"}
+                      </p>
+                    )}
+                  </div>
+                  <Star className="h-7 w-7 text-amber-500/50 shrink-0 mt-0.5" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Recent Bookings & Top Providers */}
         <div className="grid lg:grid-cols-2 gap-6">

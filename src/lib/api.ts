@@ -96,6 +96,7 @@ export const adminApi = {
     const qs = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => !!v).map(([k, v]) => [k, v as string])).toString() : "";
     return adminFetch(`/admin/bookings${qs ? `?${qs}` : ""}`);
   },
+  portalGetOverview: () => adminFetch("/admin/overview"),
   portalGetFinanceSummary: () => adminFetch("/admin/finance/summary"),
   portalUpdateFinance: (bookingId: string, body: { payment_status?: string; payout_status?: string; final_amount?: number }) =>
     adminFetch(`/admin/bookings/${bookingId}/finance`, { method: "POST", body: JSON.stringify(body) }),

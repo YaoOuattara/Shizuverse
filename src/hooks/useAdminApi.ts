@@ -140,6 +140,35 @@ export function useAdminServices() {
   return { services, loading };
 }
 
+export interface ApiOverview {
+  gmv_total: number;
+  gmv_month: number;
+  revenue_shizu: number;
+  payouts_due: number;
+  payouts_sent: number;
+  total_bookings: number;
+  completed_bookings: number;
+  cancelled_bookings: number;
+  pending_bookings: number;
+  confirmed_bookings: number;
+  completion_rate: number;
+  active_providers: number;
+}
+
+export function useAdminOverview() {
+  const [overview, setOverview] = useState<ApiOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    adminApi.portalGetOverview()
+      .then((data: ApiOverview) => setOverview(data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  return { overview, loading };
+}
+
 export interface FinanceSummary {
   completed_bookings: number;
   total_paid_xof: number;
