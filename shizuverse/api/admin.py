@@ -805,6 +805,53 @@ def update_provider_availability():
     return jsonify({'success': True, 'available_today': sp.available_today})
 
 
+@admin_bp.route('/clients', methods=['GET'])
+@require_admin_token
+def get_clients():
+    phone_q = (request.args.get('phone') or '').strip().replace(' ', '')
+    query = User.query.filter_by(user_type='client')
+    if phone_q:
+        like_pat = f'%{phone_q}%'
+        query = query.filter(
+            db.or_(
+                User.phone.ilike(like_pat),
+                User.email.ilike(like_pat),
+                User.full_name.ilike(f'%{phone_q}%'),
+            )
+        )
+    users = query.order_by(User.id.desc()).limit(100).all()
+    result = []
+    for u in users:
+        phone_val = u.phone or u.email.split('@')[0]
+        booking_count = ClientBooking.query.filter_by(client_phone=phone_val).count()
+        first_booking = (
+            ClientBooking.query.filter_by(client_phone=phone_val)
+            .order_by(ClientBooking.id.asc()).first()
+        )
+        result.append({
+            'id': u.id,
+            'name': u.full_name or '',
+            'phone': phone_val,
+            'account_type': u.account_type or 'individual',
+            'registered_at': first_booking.created_at.isoformat() if first_booking and first_booking.created_at else None,
+            'booking_count': booking_count,
+        })
+    return jsonify({'clients': result, 'count': len(result)})
+
+
+@admin_bp.route('/clients/<int:client_id>/reset-password', methods=['PATCH'])
+@require_admin_token
+def reset_client_password(client_id):
+    user = User.query.filter_by(id=client_id, user_type='client').first_or_404()
+    data = request.get_json() or {}
+    new_password = (data.get('new_password') or '').strip()
+    if not new_password or len(new_password) < 6:
+        return jsonify({'error': 'new_password must be at least 6 characters'}), 400
+    user.set_password(new_password)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
 @admin_bp.route('/providers/<int:provider_id>/reviews', methods=['GET'])
 @require_admin_token
 def get_provider_reviews_admin(provider_id):
@@ -1007,6 +1054,26 @@ def client_login():
             'company_name': user.company_name,
         },
     }), 200
+
+
+@client_bp.route('/password', methods=['PATCH'])
+@require_client_token
+def change_client_password():
+    user = User.query.get(g.client_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    data             = request.get_json() or {}
+    current_password = data.get('current_password', '')
+    new_password     = (data.get('new_password') or '').strip()
+    if not current_password or not new_password:
+        return jsonify({'error': 'current_password and new_password are required'}), 400
+    if not user.check_password(current_password):
+        return jsonify({'error': 'Mot de passe actuel incorrect.'}), 401
+    if len(new_password) < 6:
+        return jsonify({'error': 'Le nouveau mot de passe doit contenir au moins 6 caractères.'}), 400
+    user.set_password(new_password)
+    db.session.commit()
+    return jsonify({'success': True})
 
 
 @client_bp.route('/bookings', methods=['GET'])
