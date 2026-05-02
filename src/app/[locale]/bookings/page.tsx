@@ -10,6 +10,7 @@ import {
   Phone,
   Star,
   RefreshCw,
+  Hash,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -29,8 +30,9 @@ interface ApiBooking {
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const SHIZU_WA = (process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "").replace(/\D/g, "");
-const PHONE_KEY = "shizu_client_phone";
+const SHIZU_WA  = (process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "").replace(/\D/g, "");
+const PHONE_KEY   = "shizu_client_phone";
+const REF_KEY     = "shizu_client_ref";
 const REVIEWED_KEY = "dashboard_reviewed_bookings";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -40,6 +42,10 @@ function normalizePhone(input: string): string {
   if (p.startsWith("00225")) p = "+" + p.slice(2);
   if (!p.startsWith("+")) p = "+225" + p;
   return p;
+}
+
+function normalizeRef(input: string): string {
+  return input.trim().replace(/^#/, "").toUpperCase();
 }
 
 function formatDate(iso: string): string {
@@ -56,15 +62,10 @@ function formatTime(iso: string): string {
 }
 
 function formatRef(id: number): string {
-  return `#${id.toString().padStart(4, "0")}`;
+  return `#SHZ-${new Date().getFullYear()}-${id}`;
 }
 
-interface StatusInfo {
-  label: string;
-  bg: string;
-  text: string;
-  dot: string;
-}
+interface StatusInfo { label: string; bg: string; text: string; dot: string }
 
 function getStatusInfo(status: string, providerName: string | null): StatusInfo {
   if (status === "completed")
@@ -79,10 +80,9 @@ function getStatusInfo(status: string, providerName: string | null): StatusInfo 
 }
 
 function shizuWaHref(bookingId: number, statusLabel: string): string {
-  const msg = `Bonjour Shizu, je vous contacte au sujet de ma réservation ${formatRef(bookingId)} (${statusLabel}).`;
-  return SHIZU_WA
-    ? `https://wa.me/${SHIZU_WA}?text=${encodeURIComponent(msg)}`
-    : `#`;
+  const ref = formatRef(bookingId);
+  const msg = `Bonjour Shizu, je vous contacte au sujet de ma réservation ${ref} (${statusLabel}).`;
+  return SHIZU_WA ? `https://wa.me/${SHIZU_WA}?text=${encodeURIComponent(msg)}` : "#";
 }
 
 function providerWaHref(providerPhone: string, bookingId: number): string {
@@ -94,42 +94,49 @@ function providerWaHref(providerPhone: string, bookingId: number): string {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function BookingsPage() {
-  const params = useParams();
-  const locale = (params?.locale as string) ?? "fr";
-  const router = useRouter();
-  const isFr = locale === "fr";
+  const params  = useParams();
+  const locale  = (params?.locale as string) ?? "fr";
+  const router  = useRouter();
+  const isFr    = locale === "fr";
 
-  const [phase, setPhase] = useState<"lookup" | "loading" | "results">("lookup");
+  const [phase, setPhase]           = useState<"lookup" | "loading" | "results">("lookup");
   const [phoneInput, setPhoneInput] = useState("");
+  const [refInput, setRefInput]     = useState("");
   const [activePhone, setActivePhone] = useState<string | null>(null);
-  const [bookings, setBookings] = useState<ApiBooking[]>([]);
+  const [bookings, setBookings]     = useState<ApiBooking[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
 
-  // Hydrate from localStorage on mount
+  // Hydrate from localStorage — auto-fetch if both phone + ref are stored
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(PHONE_KEY);
-      const reviewed = localStorage.getItem(REVIEWED_KEY);
+      const savedPhone = localStorage.getItem(PHONE_KEY);
+      const savedRef   = localStorage.getItem(REF_KEY);
+      const reviewed   = localStorage.getItem(REVIEWED_KEY);
       if (reviewed) setReviewedIds(new Set(JSON.parse(reviewed)));
-      if (saved) {
-        setActivePhone(saved);
-        doFetch(saved);
+      if (savedPhone && savedRef) {
+        setActivePhone(savedPhone);
+        doFetch(savedPhone, savedRef);
       }
     } catch { /* keep defaults */ }
   }, []);
 
-  async function doFetch(phone: string) {
+  async function doFetch(phone: string, ref: string) {
     setPhase("loading");
     setFetchError(null);
     try {
-      const res = await fetch(`/api/bookings?client_phone=${encodeURIComponent(phone)}`);
-      if (!res.ok) throw new Error("error");
+      const url = `/api/bookings?client_phone=${encodeURIComponent(phone)}&ref=${encodeURIComponent(ref)}`;
+      const res  = await fetch(url);
+      if (!res.ok) throw new Error("network");
       const data = await res.json();
       const items: ApiBooking[] = data.items ?? [];
       setBookings(items);
       setPhase("results");
-      if (items.length > 0) localStorage.setItem(PHONE_KEY, phone);
+      // Persist credentials only if lookup succeeded with results
+      if (items.length > 0) {
+        localStorage.setItem(PHONE_KEY, phone);
+        localStorage.setItem(REF_KEY, ref);
+      }
     } catch {
       setFetchError(
         isFr
@@ -142,22 +149,27 @@ export default function BookingsPage() {
 
   function handleLookup(e: React.FormEvent) {
     e.preventDefault();
-    if (!phoneInput.trim()) return;
+    if (!phoneInput.trim() || !refInput.trim()) return;
     const phone = normalizePhone(phoneInput);
+    const ref   = normalizeRef(refInput);
     setActivePhone(phone);
-    doFetch(phone);
+    doFetch(phone, ref);
   }
 
   function handleReset() {
     localStorage.removeItem(PHONE_KEY);
+    localStorage.removeItem(REF_KEY);
     setActivePhone(null);
     setPhoneInput("");
+    setRefInput("");
     setBookings([]);
     setPhase("lookup");
     setFetchError(null);
   }
 
-  // ── Phone lookup form ──────────────────────────────────────────────────────
+  const canSubmit = phoneInput.trim().length > 0 && refInput.trim().length > 0;
+
+  // ── Phone + ref lookup form ────────────────────────────────────────────────
 
   if (phase === "lookup") {
     return (
@@ -185,15 +197,17 @@ export default function BookingsPage() {
               </h1>
               <p className="text-sm text-muted-foreground mt-2">
                 {isFr
-                  ? "Entrez votre numéro WhatsApp pour retrouver vos réservations."
-                  : "Enter your WhatsApp number to view your bookings."}
+                  ? "Entrez votre numéro WhatsApp et votre référence de réservation."
+                  : "Enter your WhatsApp number and booking reference."}
               </p>
             </div>
 
             <form onSubmit={handleLookup} className="space-y-4">
+              {/* Phone field */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">
-                  {isFr ? "Votre numéro WhatsApp" : "Your WhatsApp number"}
+                  <Phone className="inline h-3.5 w-3.5 mr-1 mb-0.5" />
+                  {isFr ? "Numéro WhatsApp" : "WhatsApp number"}
                 </label>
                 <div className="flex">
                   <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-input bg-muted text-sm text-muted-foreground font-medium select-none">
@@ -212,15 +226,37 @@ export default function BookingsPage() {
                 </div>
               </div>
 
+              {/* Reference field */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  <Hash className="inline h-3.5 w-3.5 mr-1 mb-0.5" />
+                  {isFr ? "Numéro de réservation" : "Booking reference"}
+                </label>
+                <input
+                  type="text"
+                  value={refInput}
+                  onChange={(e) => setRefInput(e.target.value)}
+                  placeholder="#SHZ-2025-XXXX"
+                  required
+                  autoComplete="off"
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground placeholder:font-sans"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isFr
+                    ? "Reçu par SMS ou par email après votre réservation"
+                    : "Received by SMS or email after your booking"}
+                </p>
+              </div>
+
               {fetchError && (
                 <p className="text-sm text-destructive">{fetchError}</p>
               )}
 
               <button
                 type="submit"
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
+                disabled={!canSubmit}
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
               >
-                <Phone className="h-4 w-4" />
                 {isFr ? "Voir mes réservations" : "View my bookings"}
               </button>
             </form>
@@ -270,7 +306,10 @@ export default function BookingsPage() {
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground hidden sm:inline">{displayPhone}</span>
             <button
-              onClick={() => doFetch(displayPhone)}
+              onClick={() => {
+                const savedRef = localStorage.getItem(REF_KEY) ?? "";
+                doFetch(displayPhone, savedRef);
+              }}
               className="text-muted-foreground hover:text-foreground transition-colors"
               aria-label={isFr ? "Rafraîchir" : "Refresh"}
             >
@@ -295,15 +334,15 @@ export default function BookingsPage() {
             </h2>
             <p className="mt-1 text-sm text-muted-foreground max-w-xs">
               {isFr
-                ? `Aucune réservation associée au numéro ${displayPhone}.`
-                : `No bookings linked to ${displayPhone}.`}
+                ? `Aucune réservation associée à ce numéro et cette référence.`
+                : `No bookings found for this number and reference.`}
             </p>
             <div className="flex flex-col sm:flex-row gap-3 mt-6">
               <button
                 onClick={handleReset}
                 className="text-sm border border-input px-4 py-2 rounded-xl hover:bg-muted transition-colors"
               >
-                {isFr ? "Essayer un autre numéro" : "Try another number"}
+                {isFr ? "Réessayer" : "Try again"}
               </button>
               <button
                 onClick={() => router.push(`/${locale}/services`)}
@@ -322,20 +361,17 @@ export default function BookingsPage() {
             </p>
 
             {bookings.map((b) => {
-              const status = getStatusInfo(b.status, b.provider_name);
+              const status     = getStatusInfo(b.status, b.provider_name);
               const isCompleted = b.status === "completed";
-              const isReviewed = reviewedIds.has(String(b.id));
-              const reviewQs = new URLSearchParams({
-                service: b.service_name,
+              const isReviewed  = reviewedIds.has(String(b.id));
+              const reviewQs    = new URLSearchParams({
+                service:  b.service_name,
                 provider: b.provider_name ?? "",
-                date: formatDate(b.appointment_date),
+                date:     formatDate(b.appointment_date),
               }).toString();
 
               return (
-                <div
-                  key={b.id}
-                  className="rounded-2xl border border-border bg-card p-5 space-y-4"
-                >
+                <div key={b.id} className="rounded-2xl border border-border bg-card p-5 space-y-4">
                   {/* Top row: ref + status */}
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -351,9 +387,7 @@ export default function BookingsPage() {
                   {/* Date + time */}
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <CalendarDays className="h-4 w-4 shrink-0" />
-                    <span>
-                      {formatDate(b.appointment_date)} à {formatTime(b.appointment_date)}
-                    </span>
+                    <span>{formatDate(b.appointment_date)} à {formatTime(b.appointment_date)}</span>
                   </div>
 
                   {/* Provider row */}
@@ -391,7 +425,6 @@ export default function BookingsPage() {
 
                   {/* Action buttons */}
                   <div className="flex flex-wrap gap-2 pt-1">
-                    {/* Contacter Shizu — always */}
                     {SHIZU_WA && (
                       <a
                         href={shizuWaHref(b.id, status.label)}
@@ -404,12 +437,9 @@ export default function BookingsPage() {
                       </a>
                     )}
 
-                    {/* Laisser un avis — completed + not reviewed */}
                     {isCompleted && !isReviewed && (
                       <button
-                        onClick={() =>
-                          router.push(`/${locale}/review/${b.id}?${reviewQs}`)
-                        }
+                        onClick={() => router.push(`/${locale}/review/${b.id}?${reviewQs}`)}
                         className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
                       >
                         <Star className="h-3.5 w-3.5" />

@@ -50,5 +50,9 @@ export async function submitBooking(formData: FormData) {
     throw new Error(`Booking failed (${res.status}): ${text}`);
   }
 
-  redirect(`/${locale}/booking/success`);
+  const data = await res.json().catch(() => ({})) as { id?: number };
+  const bookingId = data.id;
+  const year = new Date().getFullYear();
+  const ref = bookingId ? `SHZ-${year}-${bookingId}` : null;
+  redirect(`/${locale}/booking/success${ref ? `?ref=${ref}` : ''}`);
 }

@@ -279,6 +279,10 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
       if (!res.ok) throw new Error(data.error ?? `Erreur ${res.status}`);
 
       localStorage.setItem("shizu_client_phone", phone.trim());
+      if (data.id) {
+        const year = new Date().getFullYear();
+        localStorage.setItem("shizu_client_ref", `SHZ-${year}-${data.id}`);
+      }
       setBookingId(data.id ?? null);
       setSuccess(true);
     } catch (err) {
