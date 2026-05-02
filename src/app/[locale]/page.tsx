@@ -78,20 +78,12 @@ function HowItWorks({ locale }: { locale: string }) {
                 </p>
               </div>
 
-              {/* CTA after step 2 — mobile only */}
-              {i === 1 && (
-                <div className="md:hidden w-full pt-1 pb-1">
-                  <Link href={ctaHref} className={`block text-center ${ctaClass}`}>
-                    {ctaLabel}
-                  </Link>
-                </div>
-              )}
             </Fragment>
           ))}
         </div>
 
-        {/* CTA at bottom — desktop only */}
-        <div className="hidden md:flex justify-center mt-12">
+        {/* CTA below all steps */}
+        <div className="flex justify-center mt-8 md:mt-12">
           <Link href={ctaHref} className={ctaClass}>
             {ctaLabel}
           </Link>

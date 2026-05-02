@@ -5,19 +5,24 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { useEffect, useState } from 'react';
+import { Menu, X } from 'lucide-react';
 
 export default function Navbar() {
   const locale = useLocale();
   const pathname = usePathname();
   const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}(?=\/|$)/, '') || '';
-  const [mounted, setMounted] = useState(false);
-  const [isProvider, setIsProvider] = useState(false);
+  const [mounted, setMounted]           = useState(false);
+  const [isProvider, setIsProvider]     = useState(false);
   const [isHeroVisible, setIsHeroVisible] = useState(true);
+  const [menuOpen, setMenuOpen]         = useState(false);
 
   useEffect(() => {
     setIsProvider(!!localStorage.getItem('provider_token'));
     setMounted(true);
   }, []);
+
+  // Close menu on route change
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
 
   const isHomePage = pathWithoutLocale === '';
 
@@ -37,32 +42,51 @@ export default function Navbar() {
     pathWithoutLocale.startsWith('/provider/register') ||
     pathWithoutLocale.startsWith('/booking/');
 
-  const providerHref = isProvider ? `/${locale}/provider` : `/${locale}/provider/register`;
+  const providerHref  = isProvider ? `/${locale}/provider` : `/${locale}/provider/register`;
   const providerLabel = isProvider
     ? (locale === 'fr' ? 'Mon tableau de bord' : 'My Dashboard')
     : (locale === 'fr' ? 'Devenir prestataire' : 'Become a Provider');
 
   const staticLinks = [
-    { label: locale === 'fr' ? 'Accueil' : 'Home', href: `/${locale}` },
-    { label: locale === 'fr' ? 'Réservations' : 'Bookings', href: `/${locale}/bookings` },
+    { label: locale === 'fr' ? 'Accueil'       : 'Home',     href: `/${locale}` },
+    { label: locale === 'fr' ? 'Réservations'  : 'Bookings', href: `/${locale}/bookings` },
   ];
   const navLinks = mounted
     ? [...staticLinks, { label: providerLabel, href: providerHref }]
     : staticLinks;
 
+  const LangPill = ({ size = 'md' }: { size?: 'sm' | 'md' }) => (
+    <div className={`flex items-center bg-gray-100 rounded-full p-0.5 font-medium ${size === 'sm' ? 'text-xs' : 'text-xs'}`}>
+      {(['en', 'fr'] as const).map((code) => (
+        <Link
+          key={code}
+          href={`/${code}${pathWithoutLocale}`}
+          className={`px-2.5 py-1 rounded-full transition-all ${
+            locale === code
+              ? 'bg-white text-[#0F3A7A] shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          {code.toUpperCase()}
+        </Link>
+      ))}
+    </div>
+  );
+
   return (
     <nav className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+
         {/* Logo */}
-        <Link href={`/${locale}`} className="flex items-center gap-2">
+        <Link href={`/${locale}`} className="flex items-center gap-2 shrink-0">
           <Image
             src={locale === 'fr' ? '/FR Logo Shizu.PNG' : '/EN Logo Shizu.PNG'}
             alt="Shizu"
-            width={44}
-            height={44}
+            width={40}
+            height={40}
             className="rounded-lg"
           />
-          <span className="font-bold text-[#0F3A7A] tracking-widest text-lg hidden sm:block">
+          <span className="font-bold text-[#0F3A7A] tracking-widest text-base hidden sm:block">
             SHIZU
           </span>
         </Link>
@@ -80,32 +104,16 @@ export default function Navbar() {
           ))}
         </div>
 
-        {/* Right: locale pill + CTA */}
-        <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center bg-gray-100 rounded-full p-0.5 text-xs font-medium">
-            {(['en', 'fr'] as const).map((code) => (
-              <Link
-                key={code}
-                href={`/${code}${pathWithoutLocale}`}
-                className={`px-3 py-1 rounded-full transition-all ${
-                  locale === code
-                    ? 'bg-white text-[#0F3A7A] shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {code.toUpperCase()}
-              </Link>
-            ))}
-          </div>
+        {/* Right controls */}
+        <div className="flex items-center gap-2">
+          {/* Language switcher — always visible */}
+          <LangPill />
 
+          {/* Desktop: Réserver CTA */}
           {!hideBookCta && (
-            <div
-              className={`transition-all duration-300 ${
-                isHomePage && isHeroVisible
-                  ? 'opacity-0 -translate-y-1 pointer-events-none'
-                  : 'opacity-100 translate-y-0'
-              }`}
-            >
+            <div className={`hidden md:block transition-all duration-300 ${
+              isHomePage && isHeroVisible ? 'opacity-0 -translate-y-1 pointer-events-none' : 'opacity-100'
+            }`}>
               {isHomePage ? (
                 <button
                   onClick={() => {
@@ -126,8 +134,52 @@ export default function Navbar() {
               )}
             </div>
           )}
+
+          {/* Mobile: Réserver pill */}
+          {!hideBookCta && (
+            <Link
+              href={`/${locale}/services`}
+              className="md:hidden bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-green-700 transition-colors"
+            >
+              {locale === 'fr' ? 'Réserver' : 'Book'}
+            </Link>
+          )}
+
+          {/* Hamburger — mobile only */}
+          <button
+            className="md:hidden p-1.5 rounded-lg text-gray-600 hover:text-[#0F3A7A] hover:bg-gray-100 transition-colors"
+            onClick={() => setMenuOpen(v => !v)}
+            aria-label="Menu"
+          >
+            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile dropdown menu */}
+      {menuOpen && (
+        <div className="md:hidden border-t border-gray-100 bg-white px-4 py-3 space-y-1">
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setMenuOpen(false)}
+              className="flex items-center py-2.5 px-2 text-sm font-medium text-gray-700 hover:text-[#0F3A7A] hover:bg-gray-50 rounded-lg transition-colors"
+            >
+              {link.label}
+            </Link>
+          ))}
+          <div className="pt-2 border-t border-gray-100">
+            <Link
+              href={`/${locale}/services`}
+              onClick={() => setMenuOpen(false)}
+              className="flex items-center justify-center w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl text-sm hover:bg-green-700 transition-colors"
+            >
+              {locale === 'fr' ? '+ Réserver un service' : '+ Book a service'}
+            </Link>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

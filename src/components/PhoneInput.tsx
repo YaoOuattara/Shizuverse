@@ -143,6 +143,7 @@ export default function PhoneInput({
         id={id}
         type="tel"
         inputMode="numeric"
+        pattern="[0-9]*"
         value={local}
         onChange={handleLocalChange}
         placeholder={placeholder}
