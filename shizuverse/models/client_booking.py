@@ -29,6 +29,9 @@ class ClientBooking(db.Model):
         db.Enum('not_due', 'due', 'sent', 'failed', name='payout_status_enum'),
         default='not_due', nullable=False)
     amount_xof = db.Column(db.Integer, nullable=True)
+    final_amount = db.Column(db.Integer, nullable=True)
+    shizu_commission = db.Column(db.Integer, nullable=True)
+    provider_payout = db.Column(db.Integer, nullable=True)
     decline_reason = db.Column(db.Text, nullable=True)
     cancellation_reason = db.Column(db.Text, nullable=True)
     created_at       = db.Column(db.DateTime, default=datetime.utcnow)
@@ -59,6 +62,9 @@ class ClientBooking(db.Model):
             "payment_status":       self.payment_status,
             "payout_status":        self.payout_status,
             "amount_xof":           self.amount_xof,
+            "final_amount":         self.final_amount,
+            "shizu_commission":     self.shizu_commission,
+            "provider_payout":      self.provider_payout,
             "decline_reason":       self.decline_reason,
             "cancellation_reason":  self.cancellation_reason,
         }

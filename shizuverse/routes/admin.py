@@ -83,10 +83,21 @@ def get_provider_detail(provider_id):
 @admin_bp.route('/providers/<int:provider_id>/approve', methods=['POST'])
 @admin_required
 def approve_provider(provider_id):
-    """Approve a provider. Sets all 3 status fields and notifies."""
+    """Approve a provider. Sets all 3 status fields and notifies. Beauty providers require id_document_url."""
     p = ServiceProvider.query.get_or_404(provider_id)
     if p.verification_status != 'submitted':
         return jsonify({'error': 'Provider is not in submitted state'}), 400
+
+    # Beauty gate: check if any service contains "beaut" and require ID document
+    all_rows = ServiceProvider.query.filter_by(user_id=p.user_id).all()
+    services = []
+    for row in all_rows:
+        svc = Service.query.get(row.service_id) if row.service_id else None
+        if svc:
+            services.append(svc.name)
+    is_beauty = any('beaut' in s.lower() for s in services)
+    if is_beauty and not p.id_document_url:
+        return jsonify({'error': 'Les prestataires beauté doivent télécharger une pièce d\'identité avant approbation.'}), 422
 
     p.verification_status = 'approved'
     p.listed_status = 'listed'
@@ -334,6 +345,7 @@ def get_all_providers():
             'submitted_at': p.submitted_at.isoformat() if p.submitted_at else None,
             'created_at': p.created_at.isoformat() if p.created_at else None,
             'services': data['services'],
+            'id_document_url': p.id_document_url,
         })
 
     return jsonify(result)
@@ -422,12 +434,13 @@ def cancel_booking(booking_id):
 @admin_bp.route('/bookings/<int:booking_id>/finance', methods=['POST'])
 @admin_required
 def update_finance(booking_id):
-    """Manually update payment_status or payout_status."""
+    """Update payment_status, payout_status, and/or record final_amount with commission breakdown."""
     b = ClientBooking.query.get_or_404(booking_id)
     data = request.get_json()
 
     payment = data.get('payment_status')
     payout = data.get('payout_status')
+    final_amount = data.get('final_amount')
 
     valid_payment = ('unpaid', 'pending', 'paid', 'refunded')
     valid_payout = ('not_due', 'due', 'sent', 'failed')
@@ -439,13 +452,26 @@ def update_finance(booking_id):
     if payout == 'due' and b.payment_status != 'paid':
         return jsonify({'error': 'Cannot set payout to due until payment_status is paid'}), 400
 
+    if final_amount is not None:
+        fa = int(final_amount)
+        b.final_amount = fa
+        b.shizu_commission = round(fa * 0.15)
+        b.provider_payout = fa - b.shizu_commission
+
     if payment:
         b.payment_status = payment
     if payout:
         b.payout_status = payout
 
     db.session.commit()
-    return jsonify({'message': 'Finance status updated', 'payment_status': b.payment_status, 'payout_status': b.payout_status})
+    return jsonify({
+        'message': 'Finance status updated',
+        'payment_status': b.payment_status,
+        'payout_status': b.payout_status,
+        'final_amount': b.final_amount,
+        'shizu_commission': b.shizu_commission,
+        'provider_payout': b.provider_payout,
+    })
 
 
 @admin_bp.route('/bookings/<int:booking_id>/dispute', methods=['POST'])
