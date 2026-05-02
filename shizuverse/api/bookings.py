@@ -11,7 +11,8 @@ bookings_bp = Blueprint("bookings", __name__)
 # Query params: client_phone, status, limit (default 50)
 @bookings_bp.route("/", methods=["GET"])
 def list_bookings():
-    phone  = request.args.get("client_phone")
+    # accept both ?phone= (public lookup) and ?client_phone= (legacy)
+    phone  = request.args.get("phone") or request.args.get("client_phone")
     status = request.args.get("status")
     limit  = min(int(request.args.get("limit", 50)), 200)
 
