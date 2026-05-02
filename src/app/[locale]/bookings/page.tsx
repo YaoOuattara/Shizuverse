@@ -226,8 +226,8 @@ export default function BookingsPage() {
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   {isFr
-                    ? "Reçu par SMS ou par email après votre réservation"
-                    : "Received by SMS or email after your booking"}
+                    ? "Reçu sur WhatsApp après votre réservation"
+                    : "Received on WhatsApp after your booking"}
                 </p>
               </div>
 
