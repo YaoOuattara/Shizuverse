@@ -1,586 +1,434 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import BookingCard, { type BookingCardProps, type BookingStatus } from "@/components/BookingCard";
-import BookingModal, { type BookingWithNotes, type PreSelectedProvider } from "@/components/BookingModal";
-import ProviderProfileModal from "@/components/ProviderProfileModal";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useParams, useRouter } from "next/navigation";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Search, CalendarDays, Loader2, X, Plus, ArrowLeft } from "lucide-react";
-import {
-  serviceTypes,
-  providerNames,
-  bookingDates,
-} from "@/data/mockBookings";
-import {
-  mockProviders,
-  mockReviews,
-  getEligibleProviders,
-  type Provider,
-  type Review,
-} from "@/data/mockProviders";
-import { useToast } from "@/hooks/use-toast";
-import { useTranslations, useLocale } from "next-intl";
-import { useRouter } from "next/navigation";
-import { trackEvent } from "@/lib/analytics";
+  CalendarDays,
+  Loader2,
+  ArrowLeft,
+  MessageCircle,
+  Phone,
+  Star,
+  RefreshCw,
+} from "lucide-react";
 
-// localStorage keys for persistence
-const STORAGE_KEYS = {
-  BOOKINGS: "dashboard_bookings",
-  REVIEWS: "dashboard_reviews",
-  REVIEWED_BOOKINGS: "dashboard_reviewed_bookings",
-  FILTERS: "dashboard_filters",
-} as const;
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-// Helper to safely parse JSON from localStorage
-function getStoredData<T>(key: string, fallback: T): T {
-  try {
-    const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : fallback;
-  } catch {
-    return fallback;
-  }
+interface ApiBooking {
+  id: number;
+  service_name: string;
+  service_slug: string | null;
+  appointment_date: string;
+  status: string;
+  provider_name: string | null;
+  provider_phone: string | null;
+  amount_xof: number | null;
+  created_at: string | null;
+  notes: string | null;
 }
 
+// ── Config ────────────────────────────────────────────────────────────────────
+
+const SHIZU_WA = (process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "").replace(/\D/g, "");
+const PHONE_KEY = "shizu_client_phone";
+const REVIEWED_KEY = "dashboard_reviewed_bookings";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function normalizePhone(input: string): string {
+  let p = input.trim().replace(/\s+/g, "");
+  if (p.startsWith("00225")) p = "+" + p.slice(2);
+  if (!p.startsWith("+")) p = "+225" + p;
+  return p;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getHours().toString().padStart(2, "0")}h${d.getMinutes().toString().padStart(2, "0")}`;
+}
+
+function formatRef(id: number): string {
+  return `#${id.toString().padStart(4, "0")}`;
+}
+
+interface StatusInfo {
+  label: string;
+  bg: string;
+  text: string;
+  dot: string;
+}
+
+function getStatusInfo(status: string, providerName: string | null): StatusInfo {
+  if (status === "completed")
+    return { label: "Terminée",      bg: "bg-green-50",  text: "text-green-700", dot: "bg-green-500" };
+  if (status === "cancelled" || status === "declined" || status === "disputed")
+    return { label: "Annulée",       bg: "bg-red-50",    text: "text-red-700",   dot: "bg-red-500"   };
+  if (status === "accepted" || status === "in_progress")
+    return { label: "Confirmée",     bg: "bg-green-50",  text: "text-green-700", dot: "bg-green-500" };
+  if (providerName)
+    return { label: "Assignée",      bg: "bg-blue-50",   text: "text-blue-700",  dot: "bg-blue-500"  };
+  return   { label: "Demande reçue", bg: "bg-gray-100",  text: "text-gray-600",  dot: "bg-gray-400"  };
+}
+
+function shizuWaHref(bookingId: number, statusLabel: string): string {
+  const msg = `Bonjour Shizu, je vous contacte au sujet de ma réservation ${formatRef(bookingId)} (${statusLabel}).`;
+  return SHIZU_WA
+    ? `https://wa.me/${SHIZU_WA}?text=${encodeURIComponent(msg)}`
+    : `#`;
+}
+
+function providerWaHref(providerPhone: string, bookingId: number): string {
+  const p = providerPhone.replace(/\D/g, "");
+  const msg = `Bonjour, je vous contacte pour ma réservation ${formatRef(bookingId)} effectuée via Shizu.`;
+  return `https://wa.me/${p}?text=${encodeURIComponent(msg)}`;
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function BookingsPage() {
-  const t = useTranslations("bookingsPage");
-  const locale = useLocale();
+  const params = useParams();
+  const locale = (params?.locale as string) ?? "fr";
   const router = useRouter();
+  const isFr = locale === "fr";
 
-  // Load saved filters from localStorage
-  const savedFilters = getStoredData(STORAGE_KEYS.FILTERS, {
-    statusFilter: "all",
-    dateFilter: "all",
-    serviceTypeFilter: "all",
-    providerFilter: "all",
-  });
+  const [phase, setPhase] = useState<"lookup" | "loading" | "results">("lookup");
+  const [phoneInput, setPhoneInput] = useState("");
+  const [activePhone, setActivePhone] = useState<string | null>(null);
+  const [bookings, setBookings] = useState<ApiBooking[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>(savedFilters.statusFilter);
-  const [dateFilter, setDateFilter] = useState<string>(savedFilters.dateFilter);
-  const [serviceTypeFilter, setServiceTypeFilter] = useState<string>(savedFilters.serviceTypeFilter);
-  const [providerFilter, setProviderFilter] = useState<string>(savedFilters.providerFilter);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-
-  // Provider profile modal state
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
-  const [providerReviews, setProviderReviews] = useState<Review[]>([]);
-  const [preSelectedProvider, setPreSelectedProvider] = useState<PreSelectedProvider | null>(null);
-
-
-  // todo: remove mock functionality - replace with API data
-  const [reviews, setReviews] = useState<Review[]>(() =>
-    getStoredData(STORAGE_KEYS.REVIEWS, mockReviews)
-  );
-  const [reviewedBookings, setReviewedBookings] = useState<Set<string>>(() =>
-    new Set(getStoredData<string[]>(STORAGE_KEYS.REVIEWED_BOOKINGS, []))
-  );
-  const [providers, setProviders] = useState<Provider[]>(() => getEligibleProviders(mockProviders));
-
-  const { toast } = useToast();
-
-  // todo: remove mock functionality - replace useState with useQuery for real API data
-  const [bookings, setBookings] = useState<BookingCardProps[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Persist filters to localStorage
+  // Hydrate from localStorage on mount
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.FILTERS, JSON.stringify({
-      statusFilter,
-      dateFilter,
-      serviceTypeFilter,
-      providerFilter,
-    }));
-  }, [statusFilter, dateFilter, serviceTypeFilter, providerFilter]);
-
-  // Persist reviews to localStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.REVIEWS, JSON.stringify(reviews));
-  }, [reviews]);
-
-  // Persist reviewed bookings to localStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.REVIEWED_BOOKINGS, JSON.stringify(Array.from(reviewedBookings)));
-  }, [reviewedBookings]);
-
-  const clientPhone = typeof window !== "undefined"
-    ? localStorage.getItem("shizu_client_phone")
-    : null;
-
-  useEffect(() => {
-    const loadBookings = async () => {
-      setIsLoading(true);
-      try {
-        if (clientPhone) {
-          const res = await fetch(`/api/bookings?client_phone=${encodeURIComponent(clientPhone)}`);
-          const data = await res.json();
-          if (data.items && data.items.length > 0) {
-            const mapped = data.items.map((b: { id: number; service_name: string; service_slug: string; appointment_date: string; status: BookingStatus; notes?: string; provider_name?: string; client_location?: string }) => ({
-              id: String(b.id),
-              serviceName: b.service_name,
-              serviceType: b.service_slug,
-              providerName: b.provider_name || (locale === "fr" ? "En attente d'assignation" : "Awaiting assignment"),
-              providerId: "pending",
-              clientLocation: b.client_location || "",
-              date: new Date(b.appointment_date).toLocaleDateString(
-                locale === "fr" ? "fr-FR" : "en-US",
-                { month: "short", day: "numeric", year: "numeric" }
-              ),
-              time: (() => {
-                const d = new Date(b.appointment_date);
-                if (locale === "fr") {
-                  const h = d.getHours().toString().padStart(2, "0");
-                  const m = d.getMinutes().toString().padStart(2, "0");
-                  return `${h}h${m}`;
-                }
-                return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-              })(),
-              status: b.status,
-              notes: b.notes,
-            }));
-            setBookings(mapped);
-            setIsLoading(false);
-            return;
-          }
-        }
-      } catch (e) {
-        console.error("Failed to load bookings:", e);
+    try {
+      const saved = localStorage.getItem(PHONE_KEY);
+      const reviewed = localStorage.getItem(REVIEWED_KEY);
+      if (reviewed) setReviewedIds(new Set(JSON.parse(reviewed)));
+      if (saved) {
+        setActivePhone(saved);
+        doFetch(saved);
       }
-      // No phone or no bookings from API — show empty state
-      setBookings(getStoredData<BookingCardProps[]>(STORAGE_KEYS.BOOKINGS, []));
-      setIsLoading(false);
-    };
-    loadBookings();
-  }, [clientPhone, locale]);
+    } catch { /* keep defaults */ }
+  }, []);
 
-  // Persist bookings to localStorage
-  useEffect(() => {
-    if (!isLoading && bookings.length > 0) {
-      localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings));
+  async function doFetch(phone: string) {
+    setPhase("loading");
+    setFetchError(null);
+    try {
+      const res = await fetch(`/api/bookings?client_phone=${encodeURIComponent(phone)}`);
+      if (!res.ok) throw new Error("error");
+      const data = await res.json();
+      const items: ApiBooking[] = data.items ?? [];
+      setBookings(items);
+      setPhase("results");
+      if (items.length > 0) localStorage.setItem(PHONE_KEY, phone);
+    } catch {
+      setFetchError(
+        isFr
+          ? "Impossible de charger vos réservations. Vérifiez votre connexion et réessayez."
+          : "Could not load your bookings. Check your connection and try again."
+      );
+      setPhase("lookup");
     }
-  }, [bookings, isLoading]);
+  }
 
-  const handleBookingCreated = (newBooking: BookingWithNotes) => {
-    setBookings((prev) => [newBooking, ...prev]);
-    setPreSelectedProvider(null);
-    toast({
-      title: t("requestSent"),
-      description: t("requestSentDesc"),
-      variant: "success",
-    });
-  };
+  function handleLookup(e: React.FormEvent) {
+    e.preventDefault();
+    if (!phoneInput.trim()) return;
+    const phone = normalizePhone(phoneInput);
+    setActivePhone(phone);
+    doFetch(phone);
+  }
 
-  // todo: remove mock functionality - replace with API call for cancel
-  const handleCancelBooking = async (bookingId: string): Promise<void> => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  function handleReset() {
+    localStorage.removeItem(PHONE_KEY);
+    setActivePhone(null);
+    setPhoneInput("");
+    setBookings([]);
+    setPhase("lookup");
+    setFetchError(null);
+  }
 
-    const bookingToCancel = bookings.find((b) => b.id === bookingId);
-    setBookings((prev) => prev.filter((booking) => booking.id !== bookingId));
-    toast({
-      title: t("bookingCancelled"),
-      description: bookingToCancel
-        ? t("bookingCancelledDesc", { service: bookingToCancel.serviceName, provider: bookingToCancel.providerName })
-        : t("bookingCancelled"),
-      variant: "destructive",
-    });
-  };
+  // ── Phone lookup form ──────────────────────────────────────────────────────
 
-  // todo: remove mock functionality - replace with API call for status update
-  const handleStatusChange = async (bookingId: string, newStatus: BookingStatus): Promise<void> => {
-    const statusLabels: Record<BookingStatus, string> = {
-      confirmed: t("confirmed"),
-      pending: t("pending"),
-      cancelled: t("cancelled"),
-      completed: t("completed"),
-      under_review: t("under_review"),
-      assigned: t("assigned"),
-    };
-
-    await new Promise((resolve) => setTimeout(resolve, 600));
-
-    // Mock error scenario: 10% chance of failure for demonstration
-    const shouldFail = Math.random() < 0.1;
-    if (shouldFail) {
-      toast({
-        title: t("statusUpdateFailed"),
-        description: t("statusUpdateFailedDesc"),
-        variant: "destructive",
-      });
-      throw new Error("Status update failed");
-    }
-
-    setBookings((prev) =>
-      prev.map((booking) =>
-        booking.id === bookingId ? { ...booking, status: newStatus } : booking
-      )
-    );
-
-    toast({
-      title: t("statusUpdated", { status: statusLabels[newStatus] }),
-      description: t("statusUpdatedDesc"),
-      variant: "success",
-    });
-  };
-
-  // Handle accepting a quote - updates booking to confirmed
-  const handleAcceptQuote = async (bookingId: string): Promise<void> => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    setBookings((prev) =>
-      prev.map((booking) =>
-        booking.id === bookingId
-          ? { ...booking, quoteStatus: "accepted" as const, status: "confirmed" as BookingStatus }
-          : booking
-      )
-    );
-
-    toast({
-      title: t("quoteAccepted"),
-      description: t("quoteAcceptedDesc"),
-      variant: "success",
-    });
-  };
-
-  // Handle declining a quote - cancels the booking request
-  const handleDeclineQuote = async (bookingId: string): Promise<void> => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    setBookings((prev) =>
-      prev.map((booking) =>
-        booking.id === bookingId
-          ? { ...booking, quoteStatus: "declined" as const, status: "cancelled" as BookingStatus }
-          : booking
-      )
-    );
-
-    toast({
-      title: t("quoteDeclined"),
-      description: t("quoteDeclinedDesc"),
-      variant: "destructive",
-    });
-  };
-
-  // todo: remove mock functionality - replace with API call for viewing provider profile
-  const handleViewProfile = (providerId: string) => {
-    const provider = providers.find((p) => p.id === providerId);
-    if (provider) {
-      const providerReviewsList = reviews.filter((r) => r.providerId === provider.id);
-      setSelectedProvider(provider);
-      setProviderReviews(providerReviewsList);
-      setIsProfileModalOpen(true);
-    }
-  };
-
-  // todo: remove mock functionality - replace with API call for booking from profile
-  const handleBookFromProfile = (provider: Provider) => {
-    setPreSelectedProvider({
-      name: provider.name,
-      serviceType: provider.serviceType,
-    });
-    setIsProfileModalOpen(false);
-    setIsCreateModalOpen(true);
-  };
-
-  const handleOpenReviewModal = (booking: BookingCardProps) => {
-    const qs = new URLSearchParams({
-      service: booking.serviceName,
-      provider: booking.providerName,
-      date: booking.date,
-    }).toString();
-    router.push(`/${locale}/review/${booking.id}?${qs}`);
-  };
-
-
-  const hasBookingBeenReviewed = (bookingId: string): boolean => {
-    return reviewedBookings.has(bookingId) || reviews.some((r) => r.bookingId === bookingId);
-  };
-
-  const handleRebook = (booking: BookingCardProps) => {
-    const [commune, ...addrParts] = (booking.clientLocation || "").split(", ");
-    const address = addrParts.join(", ");
-    const params = new URLSearchParams();
-    if (commune) params.set("commune", commune);
-    if (address) params.set("address", address);
-    const qs = params.toString();
-    router.push(`/${locale}/booking/${booking.serviceType}${qs ? `?${qs}` : ""}`);
-  };
-
-  const filteredBookings = bookings.filter((booking) => {
-    const matchesSearch =
-      booking.serviceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      booking.providerName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus =
-      statusFilter === "all" || booking.status === statusFilter;
-    const matchesDate = dateFilter === "all" || booking.date === dateFilter;
-    const matchesServiceType =
-      serviceTypeFilter === "all" || booking.serviceType === serviceTypeFilter;
-    const matchesProvider =
-      providerFilter === "all" || booking.providerName === providerFilter;
-
+  if (phase === "lookup") {
     return (
-      matchesSearch &&
-      matchesStatus &&
-      matchesDate &&
-      matchesServiceType &&
-      matchesProvider
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+          <div className="mx-auto max-w-2xl px-4 py-4">
+            <button
+              onClick={() => router.push(`/${locale}`)}
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors -ml-1"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              {isFr ? "Retour à l'accueil" : "Back to home"}
+            </button>
+          </div>
+        </header>
+
+        <main className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4 py-12">
+          <div className="w-full max-w-sm">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0F3A7A]/10 mb-4">
+                <CalendarDays className="h-7 w-7 text-[#0F3A7A]" />
+              </div>
+              <h1 className="text-2xl font-bold text-foreground">
+                {isFr ? "Mes réservations" : "My Bookings"}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-2">
+                {isFr
+                  ? "Entrez votre numéro WhatsApp pour retrouver vos réservations."
+                  : "Enter your WhatsApp number to view your bookings."}
+              </p>
+            </div>
+
+            <form onSubmit={handleLookup} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  {isFr ? "Votre numéro WhatsApp" : "Your WhatsApp number"}
+                </label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-input bg-muted text-sm text-muted-foreground font-medium select-none">
+                    +225
+                  </span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    value={phoneInput}
+                    onChange={(e) => setPhoneInput(e.target.value)}
+                    placeholder="07 00 00 00 00"
+                    required
+                    autoFocus
+                    className="flex-1 rounded-r-xl border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
+                  />
+                </div>
+              </div>
+
+              {fetchError && (
+                <p className="text-sm text-destructive">{fetchError}</p>
+              )}
+
+              <button
+                type="submit"
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
+              >
+                <Phone className="h-4 w-4" />
+                {isFr ? "Voir mes réservations" : "View my bookings"}
+              </button>
+            </form>
+
+            <p className="text-center mt-6 text-sm text-muted-foreground">
+              {isFr ? "Pas encore de réservation ?" : "No booking yet?"}{" "}
+              <button
+                onClick={() => router.push(`/${locale}/services`)}
+                className="text-[#0F3A7A] font-medium hover:underline"
+              >
+                {isFr ? "Réserver un service" : "Book a service"}
+              </button>
+            </p>
+          </div>
+        </main>
+      </div>
     );
-  });
+  }
 
-  const hasActiveFilters =
-    statusFilter !== "all" ||
-    dateFilter !== "all" ||
-    serviceTypeFilter !== "all" ||
-    providerFilter !== "all" ||
-    searchQuery !== "";
+  // ── Loading ────────────────────────────────────────────────────────────────
 
-  const clearAllFilters = () => {
-    setSearchQuery("");
-    setStatusFilter("all");
-    setDateFilter("all");
-    setServiceTypeFilter("all");
-    setProviderFilter("all");
-  };
+  if (phase === "loading") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-[#0F3A7A]" />
+        <p className="text-sm text-muted-foreground">
+          {isFr ? "Chargement de vos réservations…" : "Loading your bookings…"}
+        </p>
+      </div>
+    );
+  }
+
+  // ── Results ────────────────────────────────────────────────────────────────
+
+  const displayPhone = activePhone ?? "";
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto max-w-7xl px-4 py-4 md:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push(`/${locale}`)}
-                className="gap-1 text-muted-foreground hover:text-foreground -ml-2"
-                data-testid="button-back-home"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                {t("backHome")}
-              </Button>
-              <CalendarDays className="h-6 w-6 text-primary" aria-hidden="true" />
-              <h1
-                className="text-2xl font-semibold text-foreground"
-                data-testid="text-dashboard-title"
-              >
-                {t("title")}
-              </h1>
-            </div>
-            <Button
-              onClick={() => { router.push(`/${locale}/services`); trackEvent("booking_started"); }}
-              data-testid="button-new-booking"
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+        <div className="mx-auto max-w-2xl px-4 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-[#0F3A7A]" />
+            <h1 className="text-base font-semibold text-foreground">
+              {isFr ? "Mes réservations" : "My Bookings"}
+            </h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground hidden sm:inline">{displayPhone}</span>
+            <button
+              onClick={() => doFetch(displayPhone)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label={isFr ? "Rafraîchir" : "Refresh"}
             >
-              <Plus className="mr-2 h-4 w-4" />
-              {t("newBooking")}
-            </Button>
+              <RefreshCw className="h-4 w-4" />
+            </button>
+            <button
+              onClick={handleReset}
+              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+            >
+              {isFr ? "Changer de numéro" : "Change number"}
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
-        <div className="mb-6 space-y-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative flex-1 sm:max-w-xs">
-              <Search
-                className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <Input
-                type="search"
-                placeholder={t("searchPlaceholder")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-                data-testid="input-search"
-              />
-            </div>
-
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearAllFilters}
-                className="gap-1"
-                data-testid="button-clear-filters"
-              >
-                <X className="h-4 w-4" />
-                {t("clearFilters")}
-              </Button>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger
-                className="w-[140px]"
-                data-testid="select-status-filter"
-              >
-                <SelectValue placeholder={t("statusLabel")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("allStatus")}</SelectItem>
-                <SelectItem value="confirmed">{t("confirmed")}</SelectItem>
-                <SelectItem value="pending">{t("pending")}</SelectItem>
-                <SelectItem value="completed">{t("completed")}</SelectItem>
-                <SelectItem value="cancelled">{t("cancelled")}</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={dateFilter} onValueChange={setDateFilter}>
-              <SelectTrigger
-                className="w-[160px]"
-                data-testid="select-date-filter"
-              >
-                <SelectValue placeholder={t("dateLabel")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("allDates")}</SelectItem>
-                {bookingDates.map((date) => (
-                  <SelectItem key={date} value={date}>
-                    {date}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={serviceTypeFilter}
-              onValueChange={setServiceTypeFilter}
-            >
-              <SelectTrigger
-                className="w-[150px]"
-                data-testid="select-service-type-filter"
-              >
-                <SelectValue placeholder={t("serviceTypeLabel")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("allServices")}</SelectItem>
-                {serviceTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={providerFilter} onValueChange={setProviderFilter}>
-              <SelectTrigger
-                className="w-[180px]"
-                data-testid="select-provider-filter"
-              >
-                <SelectValue placeholder={t("providerLabel")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("allProviders")}</SelectItem>
-                {providerNames.map((name) => (
-                  <SelectItem key={name} value={name}>
-                    {name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {isLoading ? (
-          <div
-            className="flex flex-col items-center justify-center py-16 text-center"
-            data-testid="loading-state"
-          >
-            <Loader2 className="mb-4 h-8 w-8 animate-spin text-primary" />
-            <p className="text-base font-medium text-muted-foreground">
-              {t("loadingBookings")}
-            </p>
-          </div>
-        ) : filteredBookings.length > 0 ? (
-          <div
-            className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
-            data-testid="grid-bookings"
-          >
-            {filteredBookings.map((booking) => (
-              <BookingCard
-                key={booking.id}
-                {...booking}
-                onCancel={handleCancelBooking}
-                onStatusChange={undefined}
-                onViewProfile={handleViewProfile}
-                onLeaveReview={handleOpenReviewModal}
-                onAcceptQuote={handleAcceptQuote}
-                onDeclineQuote={handleDeclineQuote}
-                onRebook={handleRebook}
-                hasReview={hasBookingBeenReviewed(booking.id)}
-              />
-            ))}
-          </div>
-        ) : hasActiveFilters ? (
-          <div
-            className="flex flex-col items-center justify-center py-16 text-center"
-            data-testid="empty-state-filtered"
-          >
-            <Search className="mb-4 h-12 w-12 text-muted-foreground" />
-            <h2 className="text-lg font-medium text-foreground">
-              {t("noResultsTitle")}
+      <main className="mx-auto max-w-2xl px-4 py-6 space-y-4">
+        {bookings.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <CalendarDays className="mb-4 h-12 w-12 text-muted-foreground/40" />
+            <h2 className="text-base font-semibold text-foreground">
+              {isFr ? "Aucune réservation trouvée" : "No bookings found"}
             </h2>
-            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-              {t("noResultsDesc")}
+            <p className="mt-1 text-sm text-muted-foreground max-w-xs">
+              {isFr
+                ? `Aucune réservation associée au numéro ${displayPhone}.`
+                : `No bookings linked to ${displayPhone}.`}
             </p>
-            <Button
-              className="mt-4"
-              onClick={clearAllFilters}
-              data-testid="button-clear-filters-empty"
-            >
-              {t("clearFilters")}
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-3 mt-6">
+              <button
+                onClick={handleReset}
+                className="text-sm border border-input px-4 py-2 rounded-xl hover:bg-muted transition-colors"
+              >
+                {isFr ? "Essayer un autre numéro" : "Try another number"}
+              </button>
+              <button
+                onClick={() => router.push(`/${locale}/services`)}
+                className="text-sm bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors"
+              >
+                {isFr ? "Réserver un service" : "Book a service"}
+              </button>
+            </div>
           </div>
         ) : (
-          <div
-            className="flex flex-col items-center justify-center py-16 text-center"
-            data-testid="empty-state"
-          >
-            <CalendarDays className="mb-4 h-12 w-12 text-muted-foreground" />
-            <h2 className="text-lg font-medium text-foreground">
-              {t("noBookingsTitle")}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {t("noBookingsDesc")}
+          <>
+            <p className="text-xs text-muted-foreground">
+              {isFr
+                ? `${bookings.length} réservation${bookings.length > 1 ? "s" : ""} trouvée${bookings.length > 1 ? "s" : ""}`
+                : `${bookings.length} booking${bookings.length > 1 ? "s" : ""} found`}
             </p>
-            <Button
-              className="mt-4"
-              onClick={() => { router.push(`/${locale}/services`); trackEvent("booking_started"); }}
-              data-testid="button-create-first"
-            >
-              {t("createFirst")}
-            </Button>
-          </div>
+
+            {bookings.map((b) => {
+              const status = getStatusInfo(b.status, b.provider_name);
+              const isCompleted = b.status === "completed";
+              const isReviewed = reviewedIds.has(String(b.id));
+              const reviewQs = new URLSearchParams({
+                service: b.service_name,
+                provider: b.provider_name ?? "",
+                date: formatDate(b.appointment_date),
+              }).toString();
+
+              return (
+                <div
+                  key={b.id}
+                  className="rounded-2xl border border-border bg-card p-5 space-y-4"
+                >
+                  {/* Top row: ref + status */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground font-mono">{formatRef(b.id)}</p>
+                      <p className="font-semibold text-foreground mt-0.5">{b.service_name}</p>
+                    </div>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium shrink-0 ${status.bg} ${status.text}`}>
+                      <span className={`inline-block w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                      {status.label}
+                    </span>
+                  </div>
+
+                  {/* Date + time */}
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <CalendarDays className="h-4 w-4 shrink-0" />
+                    <span>
+                      {formatDate(b.appointment_date)} à {formatTime(b.appointment_date)}
+                    </span>
+                  </div>
+
+                  {/* Provider row */}
+                  {b.provider_name && (
+                    <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 px-3 py-2.5">
+                      <div>
+                        <p className="text-xs text-muted-foreground">
+                          {isFr ? "Prestataire assigné" : "Assigned provider"}
+                        </p>
+                        <p className="text-sm font-medium text-foreground">{b.provider_name}</p>
+                      </div>
+                      {b.provider_phone && (
+                        <a
+                          href={providerWaHref(b.provider_phone, b.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="shrink-0 flex items-center gap-1.5 bg-[#25D366] hover:bg-[#1ebe5c] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          <MessageCircle className="h-3.5 w-3.5" />
+                          {isFr ? "Contacter" : "Contact"}
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Amount */}
+                  {b.amount_xof != null && (
+                    <p className="text-sm text-muted-foreground">
+                      {isFr ? "Montant :" : "Amount:"}{" "}
+                      <span className="font-semibold text-foreground">
+                        {new Intl.NumberFormat("fr-CI").format(b.amount_xof)} FCFA
+                      </span>
+                    </p>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {/* Contacter Shizu — always */}
+                    {SHIZU_WA && (
+                      <a
+                        href={shizuWaHref(b.id, status.label)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 border border-[#25D366] text-[#25D366] hover:bg-[#25D366] hover:text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        {isFr ? "Contacter Shizu" : "Contact Shizu"}
+                      </a>
+                    )}
+
+                    {/* Laisser un avis — completed + not reviewed */}
+                    {isCompleted && !isReviewed && (
+                      <button
+                        onClick={() =>
+                          router.push(`/${locale}/review/${b.id}?${reviewQs}`)
+                        }
+                        className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
+                      >
+                        <Star className="h-3.5 w-3.5" />
+                        {isFr ? "Laisser un avis" : "Leave a review"}
+                      </button>
+                    )}
+                    {isCompleted && isReviewed && (
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground px-1 py-2">
+                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                        {isFr ? "Avis laissé" : "Reviewed"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </>
         )}
       </main>
-
-      <BookingModal
-        open={isCreateModalOpen}
-        onOpenChange={(open) => {
-          setIsCreateModalOpen(open);
-          if (!open) setPreSelectedProvider(null);
-        }}
-        mode="create"
-        onSubmit={handleBookingCreated}
-        preSelectedProvider={preSelectedProvider}
-      />
-
-      <ProviderProfileModal
-        open={isProfileModalOpen}
-        onOpenChange={setIsProfileModalOpen}
-        provider={selectedProvider}
-        reviews={providerReviews}
-        onBookNow={handleBookFromProfile}
-      />
-
     </div>
   );
 }
