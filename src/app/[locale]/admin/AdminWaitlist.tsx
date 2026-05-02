@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
 import AdminLayout from "./AdminLayout";
 import { getAdminToken } from "@/lib/adminAuth";
 import { Loader2, MapPin, Phone, Users } from "lucide-react";
@@ -14,6 +15,9 @@ interface WaitlistEntry {
 }
 
 export default function AdminWaitlist() {
+  const params = useParams();
+  const isFr = (params?.locale as string) === "fr";
+
   const [data, setData]       = useState<WaitlistEntry[]>([]);
   const [total, setTotal]     = useState(0);
   const [loading, setLoading] = useState(true);
@@ -34,20 +38,26 @@ export default function AdminWaitlist() {
   }, []);
 
   return (
-    <AdminLayout title="Liste d'attente">
+    <AdminLayout title={isFr ? "Liste d'attente" : "Waitlist"}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Zones en attente</h2>
+            <h2 className="text-lg font-bold text-gray-900">
+              {isFr ? "Zones en attente" : "Pending Zones"}
+            </h2>
             <p className="text-sm text-gray-500 mt-0.5">
-              Communes hors zone de lancement — triées par demande
+              {isFr
+                ? "Communes hors zone de lancement — triées par demande"
+                : "Communes outside launch zone — sorted by demand"}
             </p>
           </div>
           {!loading && (
             <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2">
               <Users className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-semibold text-green-700">{total} inscrit{total !== 1 ? "s" : ""}</span>
+              <span className="text-sm font-semibold text-green-700">
+                {total} {isFr ? `inscrit${total !== 1 ? "s" : ""}` : `signup${total !== 1 ? "s" : ""}`}
+              </span>
             </div>
           )}
         </div>
@@ -58,7 +68,7 @@ export default function AdminWaitlist() {
           </div>
         ) : data.length === 0 ? (
           <div className="text-center py-16 text-gray-400 text-sm">
-            Aucune inscription pour l&apos;instant.
+            {isFr ? "Aucune inscription pour l'instant." : "No signups yet."}
           </div>
         ) : (
           <div className="space-y-3">
@@ -77,7 +87,9 @@ export default function AdminWaitlist() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-bold text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-0.5">
-                      {entry.count} {entry.count === 1 ? "personne" : "personnes"}
+                      {entry.count} {isFr
+                        ? (entry.count === 1 ? "personne" : "personnes")
+                        : (entry.count === 1 ? "person" : "people")}
                     </span>
                     <span className="text-gray-400 text-sm">{expanded === entry.commune ? "▲" : "▼"}</span>
                   </div>

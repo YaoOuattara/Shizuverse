@@ -172,6 +172,7 @@ export default function AdminProviders() {
         hasIdProof: false,
         hasWorkPhoto: false,
         hasReference: false,
+        idDocumentUrl: p.id_document_url || undefined,
       }))
     );
   }, [apiProviders]);
@@ -290,9 +291,20 @@ export default function AdminProviders() {
         reviewedAt: new Date().toISOString().split('T')[0],
       });
       toast({ title: isFr ? "Prestataire approuvé" : "Provider Approved", description: isFr ? "Le prestataire a été approuvé et listé." : "Provider has been approved and listed." });
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Failed to approve provider:", err);
-      toast({ title: "Error", description: "Failed to approve provider.", variant: "destructive" });
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("422") || msg.includes("identit")) {
+        toast({
+          title: isFr ? "Document requis" : "Document Required",
+          description: isFr
+            ? "Ce prestataire beauté doit télécharger une pièce d'identité avant d'être approuvé."
+            : "This beauty provider must upload an ID document before approval.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'approuver le prestataire." : "Failed to approve provider.", variant: "destructive" });
+      }
     } finally {
       setIsUpdating(false);
     }
@@ -314,7 +326,7 @@ export default function AdminProviders() {
       setCustomRejectionNote("");
     } catch (err) {
       console.error("Failed to reject provider:", err);
-      toast({ title: "Error", description: "Failed to reject provider.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de refuser le prestataire." : "Failed to reject provider.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -343,7 +355,7 @@ export default function AdminProviders() {
       setPendingActionProviderId(null);
     } catch (err) {
       console.error("Failed to suspend provider:", err);
-      toast({ title: "Error", description: "Failed to suspend provider.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de suspendre le prestataire." : "Failed to suspend provider.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -656,6 +668,13 @@ export default function AdminProviders() {
                       
                       {/* Status Chips Row */}
                       <div className="flex items-center gap-2 flex-wrap">
+                        {/* Beauty gate warning badge */}
+                        {provider.services.some(s => /beaut/i.test(s)) && !provider.idDocumentUrl && (
+                          <Badge className="text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            {isFr ? "Vérif. renforcée" : "Enhanced check"}
+                          </Badge>
+                        )}
                         {/* Verification Status */}
                         {getVerificationBadge(provider.verificationStatus, isFr)}
                         
@@ -1094,11 +1113,23 @@ export default function AdminProviders() {
               {selectedProvider.verificationStatus === 'submitted' && (
                 <div className="space-y-3 pt-4 border-t">
                   <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Examiner la candidature" : "Review Application"}</h4>
-                  
+
+                  {/* Beauty gate warning */}
+                  {selectedProvider.services.some(s => /beaut/i.test(s)) && !selectedProvider.idDocumentUrl && (
+                    <div className="flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2.5">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-700 dark:text-amber-400">
+                        {isFr
+                          ? "Ce prestataire propose des services beauté. Une pièce d'identité est obligatoire avant approbation."
+                          : "This provider offers beauty services. An ID document is required before approval."}
+                      </p>
+                    </div>
+                  )}
+
                   <Button
                     className="w-full"
                     onClick={() => handleApprove(selectedProvider.id)}
-                    disabled={isUpdating}
+                    disabled={isUpdating || (selectedProvider.services.some(s => /beaut/i.test(s)) && !selectedProvider.idDocumentUrl)}
                     data-testid="button-approve"
                   >
                     {isUpdating ? (
@@ -1230,10 +1261,20 @@ export default function AdminProviders() {
               {selectedProvider.verificationStatus === 'rejected' && (
                 <div className="space-y-3 pt-4 border-t">
                   <h4 className="font-medium text-sm text-muted-foreground">Actions</h4>
+                  {selectedProvider.services.some(s => /beaut/i.test(s)) && !selectedProvider.idDocumentUrl && (
+                    <div className="flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2.5">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-700 dark:text-amber-400">
+                        {isFr
+                          ? "Pièce d'identité requise pour les prestataires beauté."
+                          : "ID document required for beauty providers."}
+                      </p>
+                    </div>
+                  )}
                   <Button
                     className="w-full"
                     onClick={() => handleApprove(selectedProvider.id)}
-                    disabled={isUpdating}
+                    disabled={isUpdating || (selectedProvider.services.some(s => /beaut/i.test(s)) && !selectedProvider.idDocumentUrl)}
                     data-testid="button-reapprove"
                   >
                     {isUpdating ? (

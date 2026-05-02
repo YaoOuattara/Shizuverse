@@ -31,6 +31,9 @@ export interface ApiBooking {
   time_slot?: string;
   time_preference?: string;
   urgency?: string;
+  final_amount?: number | null;
+  shizu_commission?: number | null;
+  provider_payout?: number | null;
 }
 
 export interface ApiProvider {
@@ -55,6 +58,7 @@ export interface ApiProvider {
   email?: string;
   verified?: boolean;
   created_at?: string;
+  id_document_url?: string | null;
 }
 
 export interface ApiReview {

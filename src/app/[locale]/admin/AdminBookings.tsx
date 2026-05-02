@@ -338,9 +338,9 @@ export default function AdminBookings() {
     status: ((b.status === "requested" ? "pending" : b.status) as AdminBooking["status"]) || "pending",
     price: b.amount_xof ?? 0,
     currency: "XOF",
-    baseAmount: b.amount_xof ?? 0,
-    platformFeeAmount: 0,
-    providerPayoutAmount: 0,
+    baseAmount: b.final_amount ?? b.amount_xof ?? 0,
+    platformFeeAmount: b.shizu_commission ?? 0,
+    providerPayoutAmount: b.provider_payout ?? 0,
     paymentStatus: (b.payment_status as AdminBooking["paymentStatus"]) || "unpaid",
     payoutStatus: (b.payout_status as AdminBooking["payoutStatus"]) || "not_due",
     address: b.client_location || "",
@@ -397,6 +397,10 @@ export default function AdminBookings() {
   const [quotePrice, setQuotePrice] = useState("");
   const [quoteNote, setQuoteNote] = useState("");
   const [pricingSuggestion, setPricingSuggestion] = useState<PricingSuggestion | null>(null);
+
+  // Payment confirmation modal state
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [finalAmountInput, setFinalAmountInput] = useState("");
 
   const eligibleProviders = useMemo(() => {
     return liveProviders.filter((p: ApiProvider) =>
@@ -608,23 +612,40 @@ export default function AdminBookings() {
     }
   };
 
-  const handleMarkPaid = async () => {
+  const openPaymentModal = () => {
     if (!selectedBooking || selectedBooking.status === 'cancelled' || selectedBooking.paymentStatus === 'paid') return;
     if (selectedBooking.status !== 'confirmed' && selectedBooking.status !== 'completed') return;
+    setFinalAmountInput(String(selectedBooking.baseAmount || selectedBooking.price || ""));
+    setPaymentModalOpen(true);
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!selectedBooking || !finalAmountInput || Number(finalAmountInput) <= 0) return;
+    const finalAmt = Math.round(Number(finalAmountInput));
+    const commission = Math.round(finalAmt * 0.15);
+    const payout = finalAmt - commission;
     setIsUpdating(true);
     const prevPaymentStatus = selectedBooking.paymentStatus;
     updateLocalBooking(selectedBooking.id, {
       paymentStatus: 'paid',
       paidAt: new Date().toISOString().split('T')[0],
       paymentMethod: 'cash',
+      price: finalAmt,
+      baseAmount: finalAmt,
+      platformFeeAmount: commission,
+      providerPayoutAmount: payout,
     });
+    setPaymentModalOpen(false);
     try {
-      await adminApi.portalUpdateFinance(selectedBooking.id, { payment_status: 'paid' });
+      await adminApi.portalUpdateFinance(selectedBooking.id, {
+        payment_status: 'paid',
+        final_amount: finalAmt,
+      });
       toast({
         title: isFr ? "Paiement enregistré" : "Payment Recorded",
         description: isFr
-          ? `Paiement de ${formatMoney(selectedBooking.price, selectedBooking.currency)} enregistré.`
-          : `Payment of ${formatMoney(selectedBooking.price, selectedBooking.currency)} has been recorded.`,
+          ? `Paiement de ${formatMoney(finalAmt, 'XOF')} enregistré.`
+          : `Payment of ${formatMoney(finalAmt, 'XOF')} has been recorded.`,
         duration: 3000,
       });
     } catch (err) {
@@ -973,17 +994,21 @@ export default function AdminBookings() {
                 {/* Fee Breakdown */}
                 <div className="text-xs text-muted-foreground space-y-1 bg-muted/50 rounded-md p-2">
                   <div className="flex justify-between">
-                    <span>{isFr ? "Montant de base" : "Base Amount"}</span>
-                    <span>{formatMoney(selectedBooking.baseAmount, selectedBooking.currency)}</span>
+                    <span>{isFr ? "Montant du devis" : "Quoted Amount"}</span>
+                    <span>{formatMoney(selectedBooking.price, selectedBooking.currency)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>{isFr ? "Commission (15%)" : "Platform Fee (15%)"}</span>
-                    <span>{formatMoney(selectedBooking.platformFeeAmount, selectedBooking.currency)}</span>
-                  </div>
-                  <div className="flex justify-between font-medium text-foreground">
-                    <span>{isFr ? "Versement prestataire" : "Provider Payout"}</span>
-                    <span>{formatMoney(selectedBooking.providerPayoutAmount, selectedBooking.currency)}</span>
-                  </div>
+                  {selectedBooking.platformFeeAmount > 0 && (
+                    <>
+                      <div className="flex justify-between">
+                        <span>{isFr ? "Commission Shizu (15%)" : "Shizu Commission (15%)"}</span>
+                        <span>{formatMoney(selectedBooking.platformFeeAmount, selectedBooking.currency)}</span>
+                      </div>
+                      <div className="flex justify-between font-medium text-foreground">
+                        <span>{isFr ? "Versement prestataire (85%)" : "Provider Payout (85%)"}</span>
+                        <span>{formatMoney(selectedBooking.providerPayoutAmount, selectedBooking.currency)}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -1164,14 +1189,12 @@ export default function AdminBookings() {
                     <Button
                       variant="outline"
                       className="w-full border-emerald-500/50 text-emerald-700 dark:text-emerald-400"
-                      onClick={handleMarkPaid}
+                      onClick={openPaymentModal}
                       disabled={isUpdating}
                       data-testid="button-mark-paid"
                     >
-                      {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Banknote className="h-4 w-4 mr-2" />}
-                      {isFr
-                        ? `Marquer payé (${formatMoney(selectedBooking.price, selectedBooking.currency)})`
-                        : `Mark Paid (${formatMoney(selectedBooking.price, selectedBooking.currency)})`}
+                      <Banknote className="h-4 w-4 mr-2" />
+                      {isFr ? "Enregistrer le paiement" : "Record Payment"}
                     </Button>
                   </div>
                 )}
@@ -1600,6 +1623,77 @@ export default function AdminBookings() {
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               {isFr ? "Assigner" : "Assign Provider"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Confirmation Modal */}
+      <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-emerald-600" />
+              {isFr ? "Confirmer le paiement" : "Confirm Payment"}
+            </DialogTitle>
+            <DialogDescription>
+              {isFr
+                ? "Saisissez le montant final encaissé. La commission et le versement seront calculés automatiquement."
+                : "Enter the final amount collected. Commission and payout will be calculated automatically."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Quoted price read-only */}
+            <div className="flex justify-between items-center text-sm bg-muted/50 rounded-md px-3 py-2">
+              <span className="text-muted-foreground">{isFr ? "Montant du devis" : "Quoted Price"}</span>
+              <span className="font-medium">{formatMoney(selectedBooking?.price ?? 0, "XOF")}</span>
+            </div>
+            {/* Editable final amount */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">{isFr ? "Montant final encaissé (CFA) *" : "Final Amount Collected (CFA) *"}</label>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="number"
+                  value={finalAmountInput}
+                  onChange={(e) => setFinalAmountInput(e.target.value)}
+                  placeholder="0"
+                  min={1}
+                  data-testid="input-final-amount"
+                />
+                <span className="text-sm text-muted-foreground whitespace-nowrap">CFA</span>
+              </div>
+            </div>
+            {/* Live commission breakdown */}
+            {finalAmountInput && Number(finalAmountInput) > 0 && (() => {
+              const fa = Math.round(Number(finalAmountInput));
+              const commission = Math.round(fa * 0.15);
+              const payout = fa - commission;
+              return (
+                <div className="rounded-md border bg-muted/30 p-3 space-y-1.5 text-sm">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>{isFr ? "Commission Shizu (15%)" : "Shizu Commission (15%)"}</span>
+                    <span className="font-medium text-foreground">{formatMoney(commission, "XOF")}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold pt-1 border-t">
+                    <span>{isFr ? "Versement prestataire (85%)" : "Provider Payout (85%)"}</span>
+                    <span className="text-emerald-700">{formatMoney(payout, "XOF")}</span>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentModalOpen(false)}>
+              {isFr ? "Annuler" : "Cancel"}
+            </Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={handleConfirmPayment}
+              disabled={!finalAmountInput || Number(finalAmountInput) <= 0 || isUpdating}
+              data-testid="button-confirm-payment"
+            >
+              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+              {isFr ? "Confirmer le paiement" : "Confirm Payment"}
             </Button>
           </DialogFooter>
         </DialogContent>

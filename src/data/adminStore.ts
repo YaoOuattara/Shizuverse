@@ -149,6 +149,7 @@ export interface AdminProvider {
   hasIdProof: boolean;
   hasWorkPhoto: boolean;
   hasReference: boolean;
+  idDocumentUrl?: string;
 }
 
 export interface AdminService {
