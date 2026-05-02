@@ -10,6 +10,7 @@ import {
   Star,
   RefreshCw,
   Hash,
+  LogIn,
 } from "lucide-react";
 import PhoneInput from "@/components/PhoneInput";
 
@@ -100,9 +101,13 @@ export default function BookingsPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
 
-  // Hydrate from localStorage — auto-fetch if both phone + ref are stored
+  // If client is already logged in, send them straight to their dashboard
   useEffect(() => {
     try {
+      if (localStorage.getItem("client_token")) {
+        router.replace(`/${locale}/client/dashboard`);
+        return;
+      }
       const savedPhone = localStorage.getItem(PHONE_KEY);
       const savedRef   = localStorage.getItem(REF_KEY);
       const reviewed   = localStorage.getItem(REVIEWED_KEY);
@@ -253,6 +258,31 @@ export default function BookingsPage() {
                 {isFr ? "Réserver un service" : "Book a service"}
               </button>
             </p>
+
+            {/* Account login nudge */}
+            <div className="relative mt-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-background px-3 text-xs text-muted-foreground">
+                  {isFr ? "ou" : "or"}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-sm text-gray-600">
+                {isFr ? "Vous avez un compte Shizu ?" : "Have a Shizu account?"}
+              </p>
+              <button
+                onClick={() => router.push(`/${locale}/login`)}
+                className="flex items-center gap-1.5 shrink-0 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+              >
+                <LogIn className="h-3.5 w-3.5" />
+                {isFr ? "Se connecter" : "Log in"}
+              </button>
+            </div>
           </div>
         </main>
       </div>
