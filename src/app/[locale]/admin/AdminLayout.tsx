@@ -22,6 +22,7 @@ import {
   Shield,
   Menu,
   LogOut,
+  MapPin,
 } from "lucide-react";
 import {useState, useEffect} from "react";
 
@@ -37,6 +38,7 @@ const getNavItems = (locale: string, isFr: boolean) => [
   { path: `/${locale}/admin/providers`, label: isFr ? "Prestataires" : "Providers", icon: Users },
   { path: `/${locale}/admin/services`, label: isFr ? "Services" : "Services", icon: Wrench },
   { path: `/${locale}/admin/reviews`, label: isFr ? "Avis" : "Reviews", icon: MessageSquare },
+  { path: `/${locale}/admin/waitlist`, label: isFr ? "Liste d'attente" : "Waitlist", icon: MapPin },
 ];
 
 export default function AdminLayout({ children, title }: AdminLayoutProps) {

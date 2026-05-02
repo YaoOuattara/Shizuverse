@@ -4,9 +4,8 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Loader2, Sparkles, CheckCircle, MessageCircle, CalendarCheck,
-  ShieldCheck, UserPlus, X, ChevronLeft, ChevronRight, MapPin,
+  ShieldCheck, UserPlus, X, ChevronLeft, ChevronRight, MapPin, Check,
 } from "lucide-react";
-import CommuneAutocomplete, { COMMUNES } from "@/components/CommuneAutocomplete";
 import PhoneInput from "@/components/PhoneInput";
 
 interface Props {
@@ -16,6 +15,8 @@ interface Props {
 }
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
+
+const LAUNCH_ZONES = ["Cocody", "Bingerville", "Marcory", "Zone 4", "Biétry"];
 
 // ── i18n helpers ──────────────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ const PRICE_RANGES: [string, string][] = [
   ["ménage",         "5 000–15 000 FCFA"],
   ["nettoyage",      "5 000–15 000 FCFA"],
   ["plomberie",      "10 000–35 000 FCFA"],
-  ["lectricit",      "15 000–50 000 FCFA"],   // électricité / electrical
+  ["lectricit",      "15 000–50 000 FCFA"],
   ["lectrique",      "15 000–50 000 FCFA"],
   ["bricolage",      "8 000–25 000 FCFA"],
   ["nounou",         "5 000–12 000 FCFA"],
@@ -65,8 +66,8 @@ function getPriceRange(name: string): string {
 // ── Calendar helpers ──────────────────────────────────────────────────────────
 
 function buildCalendarCells(year: number, month: number): (number | null)[] {
-  const firstDow = new Date(year, month, 1).getDay(); // 0=Sun
-  const offset = (firstDow + 6) % 7;                  // Monday-first offset
+  const firstDow = new Date(year, month, 1).getDay();
+  const offset = (firstDow + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const cells: (number | null)[] = [];
   for (let i = 0; i < offset; i++) cells.push(null);
@@ -100,15 +101,12 @@ function ProgressBar({ step, isFr }: { step: number; isFr: boolean }) {
         const current = n === step;
         return (
           <div key={n} className="flex flex-col items-center gap-1 flex-1">
-            {/* Circle + connector line */}
             <div className="relative flex items-center w-full justify-center">
-              {/* Left line */}
               {i > 0 && (
                 <div className={`absolute right-1/2 top-1/2 -translate-y-1/2 h-0.5 w-full
                   ${done || current ? "bg-green-400" : "bg-gray-200"}`}
                 />
               )}
-              {/* Right line */}
               {i < labels.length - 1 && (
                 <div className={`absolute left-1/2 top-1/2 -translate-y-1/2 h-0.5 w-full
                   ${done ? "bg-green-400" : "bg-gray-200"}`}
@@ -146,7 +144,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   const isFr = locale === "fr";
   const searchParams = useSearchParams();
 
-  // ── Service info (resolved from API) ─────────────────────────────────────
+  // ── Service info ──────────────────────────────────────────────────────────
   const [categoryName, setCategoryName] = useState<string>("");
   const [subName, setSubName] = useState<string>(serviceName ?? "");
 
@@ -170,35 +168,48 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   // ── Multi-step state ──────────────────────────────────────────────────────
   const [step, setStep] = useState(1);
 
-  // Provider preference from URL (?provider=6&providerName=Kouassi+Nettoyage)
   const providerParam     = searchParams?.get("provider") ?? null;
   const providerNameParam = searchParams?.get("providerName") ?? null;
   const providerNote      = providerParam && providerNameParam
     ? `Demande pour le prestataire : ${providerNameParam}`
     : null;
 
-  // Step 2 — pre-select urgency from URL param (?urgency=urgent_2h)
-  const [urgencyChip, setUrgencyChip]   = useState<string | null>(() =>
+  const [urgencyChip, setUrgencyChip] = useState<string | null>(() =>
     searchParams?.get("urgency") === "urgent_2h" ? "urgent_2h" : null
   );
-  const [timeSlot, setTimeSlot]         = useState<string | null>(null);
-  const [notes, setNotes]               = useState("");
+  const [timeSlot, setTimeSlot]  = useState<string | null>(null);
+  const [notes, setNotes]        = useState("");
 
-  // Step 3 — calendar
+  // Calendar
   const today = new Date();
+  const todayStr = toDateStr(today.getFullYear(), today.getMonth(), today.getDate());
   const [calDate, setCalDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [date, setDate] = useState<string | null>(null);
 
-  // Step 4 — commune/address pre-filled from URL params (rebook flow)
+  // Auto-set date to today when urgent_2h is selected (including from URL param)
+  useEffect(() => {
+    if (urgencyChip === "urgent_2h" && !date) {
+      setDate(todayStr);
+    }
+  }, [urgencyChip, todayStr, date]);
+
+  // Step 4
   const [name, setName]       = useState("");
   const [phone, setPhone]     = useState("");
   const [commune, setCommune] = useState(() => searchParams?.get("commune") ?? "");
   const [address, setAddress] = useState(() => searchParams?.get("address") ?? "");
 
+  // Waitlist state
+  const [waitlistOpen, setWaitlistOpen]           = useState(false);
+  const [waitlistCommune, setWaitlistCommune]     = useState("");
+  const [waitlistPhone, setWaitlistPhone]         = useState("");
+  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
+  const [waitlistSuccess, setWaitlistSuccess]     = useState(false);
+
   // ── AI intake ─────────────────────────────────────────────────────────────
-  const [aiInput, setAiInput]       = useState("");
+  const [aiInput, setAiInput]         = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [dateHint, setDateHint]     = useState<string | null>(null);
+  const [dateHint, setDateHint]       = useState<string | null>(null);
 
   const handleAnalyze = async () => {
     if (!aiInput.trim() || isAnalyzing) return;
@@ -214,7 +225,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
       if (data.suggested_date_hint) setDateHint(data.suggested_date_hint);
       if (data.suggested_location_hint) {
         const hint = (data.suggested_location_hint as string).toLowerCase();
-        const match = COMMUNES.find((c) => hint.includes(c.toLowerCase()));
+        const match = LAUNCH_ZONES.find((c) => hint.includes(c.toLowerCase()));
         if (match) setCommune(match);
       }
     } catch (err) {
@@ -224,7 +235,25 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
     }
   };
 
-  // ── Submit state ──────────────────────────────────────────────────────────
+  // ── Waitlist handler ──────────────────────────────────────────────────────
+  const handleWaitlistSubmit = async () => {
+    if (!waitlistCommune.trim() || !waitlistPhone.trim() || waitlistSubmitting) return;
+    setWaitlistSubmitting(true);
+    try {
+      await fetch(`${FLASK_API}/api/waitlist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commune: waitlistCommune.trim(), phone: waitlistPhone.trim() }),
+      });
+      setWaitlistSuccess(true);
+    } catch {
+      setWaitlistSuccess(true); // silent fail — still show success
+    } finally {
+      setWaitlistSubmitting(false);
+    }
+  };
+
+  // ── Submit ────────────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError]               = useState<string | null>(null);
   const [success, setSuccess]           = useState(false);
@@ -239,20 +268,19 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
     setError(null);
     setIsSubmitting(true);
 
-    // Wake up Render if sleeping
     fetch("https://shizu-verse.onrender.com/health").catch(() => {});
 
-    // Map new state to API fields
+    const effectiveDate = date ?? todayStr;
     const timeStr  = timeSlot === "morning" ? "09:00" : timeSlot === "afternoon" ? "13:00" : "17:00";
     const urgency  = urgencyChip === "urgent_2h" ? "urgent_2h"
                    : urgencyChip === "today"     ? "same_day"
                    : urgencyChip === "this_week" ? "under_24h"
                    : "normal";
-    const timePref = timeSlot === "morning"  ? "morning"  : timeSlot === "afternoon"   ? "afternoon" : "evening";
+    const timePref = timeSlot === "morning" ? "morning" : timeSlot === "afternoon" ? "afternoon" : "evening";
     const location = [commune, address].filter(Boolean).join(", ");
 
     const [hours, minutes] = timeStr.split(":").map(Number);
-    const dateObj = new Date(`${date}T00:00:00`);
+    const dateObj = new Date(`${effectiveDate}T00:00:00`);
     dateObj.setHours(hours, minutes, 0, 0);
     const appointmentIso = dateObj.toISOString().split(".")[0];
 
@@ -293,7 +321,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
     }
   };
 
-  // ── Success screen (unchanged) ────────────────────────────────────────────
+  // ── Success screen ────────────────────────────────────────────────────────
   if (success) {
     const year = new Date().getFullYear();
     const ref  = bookingId ? `#SHZ-${year}-${bookingId}` : `#SHZ-${year}-???`;
@@ -385,11 +413,10 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
     );
   }
 
-  // ── Calendar state helpers ────────────────────────────────────────────────
+  // ── Calendar state ────────────────────────────────────────────────────────
   const calYear  = calDate.getFullYear();
   const calMonth = calDate.getMonth();
   const cells    = buildCalendarCells(calYear, calMonth);
-  const todayStr = toDateStr(today.getFullYear(), today.getMonth(), today.getDate());
 
   const canGoPrev =
     calYear > today.getFullYear() ||
@@ -410,22 +437,20 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
     </button>
   );
 
-  // ── Step content ──────────────────────────────────────────────────────────
-
-  // Step 1: Service confirmé
+  // ── Step 1: Service confirmé ──────────────────────────────────────────────
   const step1 = (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <h2 className="text-xl font-bold text-gray-900">{isFr ? "Service confirmé" : "Service confirmed"}</h2>
         <p className="text-gray-500 text-sm mt-1">{isFr ? "Voici le service que vous souhaitez réserver." : "Here is the service you want to book."}</p>
       </div>
 
-      <div className="rounded-2xl border-2 border-[#0F3A7A]/20 bg-[#0F3A7A]/5 p-5">
+      <div className="rounded-xl border border-[#0F3A7A]/10 bg-[#0F3A7A]/5 p-4">
         {categoryName && (
           <p className="text-xs font-semibold text-[#0F3A7A]/60 uppercase tracking-wide mb-1">{categoryName}</p>
         )}
         <p className="text-lg font-bold text-[#0F3A7A]">{subName || serviceName || (isFr ? "Service à domicile" : "Home service")}</p>
-        <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+        <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
           <MapPin className="h-3.5 w-3.5 shrink-0" />
           {isFr ? "Intervention à domicile · Abidjan" : "Home service · Abidjan"}
         </div>
@@ -438,24 +463,24 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
       <button type="button" onClick={() => setStep(2)}
         className="w-full bg-green-600 text-white font-semibold py-3 rounded-xl hover:bg-green-700 transition-colors">
-        {isFr ? "Continuer" : "Continue"}
+        {isFr ? "C'est parti →" : "Let's go →"}
       </button>
     </div>
   );
 
-  // Step 2: Décrire votre besoin
+  // ── Step 2: Décrire votre besoin ──────────────────────────────────────────
   const urgencyOptions = isFr
     ? [{ val: "urgent_2h", label: "⚡ Urgence — 2h", urgent: true }, { val: "today", label: "Aujourd'hui" }, { val: "this_week", label: "Cette semaine" }, { val: "later", label: "3+ jours" }]
-    : [{ val: "urgent_2h", label: "⚡ Urgent — 2h", urgent: true }, { val: "today", label: "Today" },       { val: "this_week", label: "This week" },      { val: "later", label: "3+ days" }];
+    : [{ val: "urgent_2h", label: "⚡ Urgent — 2h", urgent: true }, { val: "today", label: "Today" }, { val: "this_week", label: "This week" }, { val: "later", label: "3+ days" }];
 
   const timeOptions = isFr
     ? [{ val: "morning", label: "Matin · 8h–12h" }, { val: "afternoon", label: "Après-midi · 12h–17h" }, { val: "evening", label: "Soirée · 17h–20h" }]
-    : [{ val: "morning", label: "Morning · 8–12" }, { val: "afternoon", label: "Afternoon · 12–17" },     { val: "evening", label: "Evening · 17–20" }];
+    : [{ val: "morning", label: "Morning · 8–12" }, { val: "afternoon", label: "Afternoon · 12–17" }, { val: "evening", label: "Evening · 17–20" }];
 
   const step2CanContinue = !!urgencyChip && !!timeSlot;
 
   const step2 = (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
         <h2 className="text-xl font-bold text-gray-900">{isFr ? "Décrire votre besoin" : "Describe your need"}</h2>
         <p className="text-gray-500 text-sm mt-1">{isFr ? "Aidez-nous à trouver le bon prestataire." : "Help us find the right provider."}</p>
@@ -463,15 +488,17 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
       {/* Urgency */}
       <div>
-        <p className="text-sm font-semibold text-gray-700 mb-2">{isFr ? "Quand avez-vous besoin du service ?" : "When do you need the service?"}</p>
+        <p className="text-sm font-semibold text-gray-800 mb-2">{isFr ? "Quand ?" : "When?"}</p>
         <div className="flex flex-wrap gap-2">
           {urgencyOptions.map((o) => chip(o.val, urgencyChip === o.val, () => setUrgencyChip(o.val), o.label, o.urgent))}
         </div>
       </div>
 
+      <div className="border-t border-gray-100" />
+
       {/* Time slot */}
       <div>
-        <p className="text-sm font-semibold text-gray-700 mb-2">{isFr ? "Quelle plage horaire vous convient ?" : "What time slot works for you?"}</p>
+        <p className="text-sm font-semibold text-gray-800 mb-2">{isFr ? "À quelle heure ?" : "What time?"}</p>
         <div className="flex flex-wrap gap-2">
           {timeOptions.map((o) => chip(o.val, timeSlot === o.val, () => setTimeSlot(o.val), o.label))}
         </div>
@@ -527,7 +554,9 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
     </div>
   );
 
-  // Step 3: Date — French calendar
+  // ── Step 3: Date ──────────────────────────────────────────────────────────
+  const isUrgent = urgencyChip === "urgent_2h";
+
   const step3 = (
     <div className="space-y-6">
       <div>
@@ -535,67 +564,81 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
         <p className="text-gray-500 text-sm mt-1">{isFr ? "Sélectionnez votre date préférée." : "Select your preferred date."}</p>
       </div>
 
-      {/* Calendar */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-4">
-        {/* Month header */}
-        <div className="flex items-center justify-between mb-4">
-          <button type="button" onClick={() => setCalDate(new Date(calYear, calMonth - 1, 1))}
-            disabled={!canGoPrev}
-            className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-            <ChevronLeft className="h-5 w-5 text-gray-600" />
-          </button>
-          <span className="font-semibold text-gray-900 text-sm">
-            {MONTHS_FR[calMonth]} {calYear}
-          </span>
-          <button type="button" onClick={() => setCalDate(new Date(calYear, calMonth + 1, 1))}
-            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-            <ChevronRight className="h-5 w-5 text-gray-600" />
-          </button>
+      {isUrgent ? (
+        <div className="rounded-2xl bg-green-50 border-2 border-green-200 p-5 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+            <Check className="h-5 w-5 text-green-600" />
+          </div>
+          <div>
+            <p className="font-bold text-green-800 text-sm">
+              {isFr ? "Intervention dès que possible" : "As soon as possible"}
+            </p>
+            <p className="text-green-700 text-xs mt-0.5">
+              {isFr ? "dans les 2 heures" : "within 2 hours"}
+            </p>
+          </div>
         </div>
-
-        {/* Day headers */}
-        <div className="grid grid-cols-7 mb-2">
-          {DAYS_FR.map((d) => (
-            <div key={d} className="text-center text-xs font-medium text-gray-400 py-1">{d}</div>
-          ))}
-        </div>
-
-        {/* Day cells */}
-        <div className="grid grid-cols-7 gap-y-1">
-          {cells.map((day, idx) => {
-            if (day === null) return <div key={`e${idx}`} />;
-            const ds      = toDateStr(calYear, calMonth, day);
-            const isPast  = ds < todayStr;
-            const isSel   = ds === date;
-            const isToday = ds === todayStr;
-            return (
-              <button key={ds} type="button" disabled={isPast}
-                onClick={() => setDate(ds)}
-                className={`mx-auto w-9 h-9 rounded-full text-sm font-medium transition-all
-                  ${isPast  ? "text-gray-300 cursor-not-allowed"
-                  : isSel   ? "bg-[#0F3A7A] text-white"
-                  : isToday ? "border-2 border-[#0F3A7A] text-[#0F3A7A]"
-                              : "hover:bg-gray-100 text-gray-700"}`}>
-                {day}
+      ) : (
+        <>
+          {/* Calendar */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-4">
+            <div className="flex items-center justify-between mb-4">
+              <button type="button" onClick={() => setCalDate(new Date(calYear, calMonth - 1, 1))}
+                disabled={!canGoPrev}
+                className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                <ChevronLeft className="h-5 w-5 text-gray-600" />
               </button>
-            );
-          })}
-        </div>
-      </div>
+              <span className="font-semibold text-gray-900 text-sm">
+                {MONTHS_FR[calMonth]} {calYear}
+              </span>
+              <button type="button" onClick={() => setCalDate(new Date(calYear, calMonth + 1, 1))}
+                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                <ChevronRight className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
 
-      {/* AI date hint */}
-      {dateHint && (
-        <p className="text-xs text-purple-600 flex items-center gap-1.5">
-          <Sparkles className="h-3.5 w-3.5" />
-          {isFr ? `Suggestion IA : ${dateHint}` : `AI suggestion: ${dateHint}`}
-        </p>
-      )}
+            <div className="grid grid-cols-7 mb-2">
+              {DAYS_FR.map((d) => (
+                <div key={d} className="text-center text-xs font-medium text-gray-400 py-1">{d}</div>
+              ))}
+            </div>
 
-      {date && (
-        <p className="text-sm font-medium text-green-700 flex items-center gap-2">
-          <CheckCircle className="h-4 w-4 text-green-500" />
-          {isFr ? formatDateFr(date) : date}
-        </p>
+            <div className="grid grid-cols-7 gap-y-1">
+              {cells.map((day, idx) => {
+                if (day === null) return <div key={`e${idx}`} />;
+                const ds      = toDateStr(calYear, calMonth, day);
+                const isPast  = ds < todayStr;
+                const isSel   = ds === date;
+                const isToday = ds === todayStr;
+                return (
+                  <button key={ds} type="button" disabled={isPast}
+                    onClick={() => setDate(ds)}
+                    className={`mx-auto w-9 h-9 rounded-full text-sm font-medium transition-all
+                      ${isPast  ? "text-gray-300 cursor-not-allowed"
+                      : isSel   ? "bg-[#0F3A7A] text-white"
+                      : isToday ? "border-2 border-[#0F3A7A] text-[#0F3A7A]"
+                                  : "hover:bg-gray-100 text-gray-700"}`}>
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {dateHint && (
+            <p className="text-xs text-purple-600 flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" />
+              {isFr ? `Suggestion IA : ${dateHint}` : `AI suggestion: ${dateHint}`}
+            </p>
+          )}
+
+          {date && (
+            <p className="text-sm font-medium text-green-700 flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              {isFr ? formatDateFr(date) : date}
+            </p>
+          )}
+        </>
       )}
 
       <div className="flex gap-3">
@@ -603,7 +646,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           className="flex-1 border border-gray-200 text-gray-600 font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors">
           {isFr ? "Retour" : "Back"}
         </button>
-        <button type="button" onClick={() => setStep(4)} disabled={!date}
+        <button type="button" onClick={() => setStep(4)} disabled={!isUrgent && !date}
           className="flex-1 bg-green-600 text-white font-semibold py-3 rounded-xl hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
           {isFr ? "Continuer" : "Continue"}
         </button>
@@ -611,7 +654,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
     </div>
   );
 
-  // Step 4: Vos informations
+  // ── Step 4: Vos informations ──────────────────────────────────────────────
   const step4CanContinue = name.trim() && phone.trim() && commune.trim();
 
   const step4 = (
@@ -641,16 +684,72 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
         />
       </div>
 
-      {/* Commune */}
-      <CommuneAutocomplete
-        label={isFr ? "Commune *" : "District *"}
-        value={commune}
-        onChange={setCommune}
-      />
-
-      {/* Address */}
+      {/* Commune chips */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">{isFr ? "Adresse précise (optionnel)" : "Detailed address (optional)"}</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">{isFr ? "Commune *" : "District *"}</label>
+        <div className="flex flex-wrap gap-2">
+          {LAUNCH_ZONES.map((zone) => (
+            <button key={zone} type="button"
+              onClick={() => setCommune(zone)}
+              className={`px-4 py-2 rounded-full border-2 text-sm font-medium transition-all
+                ${commune === zone
+                  ? "border-green-600 bg-green-600 text-white"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
+              {zone}
+            </button>
+          ))}
+        </div>
+
+        {/* Waitlist link */}
+        {!waitlistOpen && !waitlistSuccess && (
+          <button type="button"
+            onClick={() => { setWaitlistOpen(true); setWaitlistPhone(phone); }}
+            className="mt-3 text-xs text-gray-400 hover:text-gray-600 underline-offset-2 hover:underline transition-colors">
+            {isFr ? "Ma zone n'est pas listée →" : "My zone isn't listed →"}
+          </button>
+        )}
+
+        {/* Inline waitlist form */}
+        {waitlistOpen && !waitlistSuccess && (
+          <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+            <p className="text-xs font-semibold text-gray-700">
+              {isFr ? "Rejoindre la liste d'attente" : "Join the waitlist"}
+            </p>
+            <input type="text" value={waitlistCommune}
+              onChange={(e) => setWaitlistCommune(e.target.value)}
+              placeholder={isFr ? "Votre commune (ex: Yopougon)" : "Your district (e.g. Yopougon)"}
+              className={inputCls} />
+            <PhoneInput
+              defaultValue={waitlistPhone}
+              onChange={setWaitlistPhone}
+              placeholder="07 XX XX XX XX"
+              selectClassName="rounded-l-md border-gray-300 bg-gray-50 text-gray-500 focus:ring-[#0F3A7A]/30"
+              inputClassName="rounded-none rounded-r-md border-gray-300 bg-white py-2 focus:ring-[#0F3A7A]/30 focus:border-[#0F3A7A]"
+            />
+            <button type="button" onClick={handleWaitlistSubmit}
+              disabled={!waitlistCommune.trim() || !waitlistPhone.trim() || waitlistSubmitting}
+              className="w-full bg-green-600 text-white text-sm font-semibold py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5">
+              {waitlistSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isFr ? "Me prévenir" : "Notify me"}
+            </button>
+          </div>
+        )}
+
+        {waitlistSuccess && (
+          <p className="mt-3 text-xs text-green-600 flex items-center gap-1.5">
+            <Check className="h-3.5 w-3.5" />
+            {isFr
+              ? "Merci ! Nous vous préviendrons dès que Shizu arrive dans votre quartier."
+              : "Thanks! We'll notify you when Shizu reaches your area."}
+          </p>
+        )}
+      </div>
+
+      {/* Address (optional) */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {isFr ? "Adresse ou point de repère (optionnel)" : "Address or landmark (optional)"}
+        </label>
         <input type="text" value={address} onChange={(e) => setAddress(e.target.value)}
           placeholder={isFr ? "Rue, quartier, repère..." : "Street, neighbourhood, landmark..."}
           className={inputCls} />
@@ -679,7 +778,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
     </div>
   );
 
-  // Step 5: Récapitulatif
+  // ── Step 5: Récapitulatif ─────────────────────────────────────────────────
   const urgencyLabel = isFr
     ? (urgencyChip === "urgent_2h" ? "⚡ Urgence — 2h" : urgencyChip === "today" ? "Aujourd'hui" : urgencyChip === "this_week" ? "Cette semaine" : "3+ jours")
     : (urgencyChip === "urgent_2h" ? "⚡ Urgent — 2h"  : urgencyChip === "today" ? "Today"       : urgencyChip === "this_week" ? "This week"     : "3+ days");
@@ -697,6 +796,8 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
     </div>
   );
 
+  const effectiveDate = date ?? todayStr;
+
   const step5 = (
     <div className="space-y-6">
       <div>
@@ -704,13 +805,12 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
         <p className="text-gray-500 text-sm mt-1">{isFr ? "Vérifiez les détails avant de confirmer." : "Review your details before confirming."}</p>
       </div>
 
-      {/* Summary card */}
       <div className="rounded-2xl border border-gray-200 bg-white divide-y divide-gray-100 px-4">
         <RecapRow label={isFr ? "Service"    : "Service"}    value={subName || serviceName || ""} />
         {categoryName && <RecapRow label={isFr ? "Catégorie" : "Category"} value={categoryName} />}
         <RecapRow label={isFr ? "Urgence"    : "Urgency"}    value={urgencyLabel} />
         <RecapRow label={isFr ? "Horaire"    : "Time slot"}  value={timeLabel} />
-        <RecapRow label={isFr ? "Date"       : "Date"}       value={date ? (isFr ? formatDateFr(date) : date) : ""} />
+        <RecapRow label={isFr ? "Date"       : "Date"}       value={isFr ? formatDateFr(effectiveDate) : effectiveDate} />
         <RecapRow label={isFr ? "Nom"        : "Name"}       value={name} />
         <RecapRow label={isFr ? "Téléphone"  : "Phone"}      value={phone} />
         <RecapRow label={isFr ? "Commune"    : "District"}   value={commune} />
@@ -718,19 +818,16 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
         {notes   && <RecapRow label={isFr ? "Précisions" : "Notes"} value={notes} />}
       </div>
 
-      {/* Price range */}
       <div className="rounded-xl bg-[#0F3A7A]/5 border border-[#0F3A7A]/15 px-4 py-3 flex items-center justify-between">
         <span className="text-sm text-[#0F3A7A]/80 font-medium">{isFr ? "Fourchette indicative" : "Indicative range"}</span>
         <span className="text-sm font-bold text-[#0F3A7A]">{priceRange}</span>
       </div>
 
-      {/* Payment note */}
       <div className="flex items-center gap-2 text-xs text-gray-500">
         <ShieldCheck className="h-3.5 w-3.5 text-green-500 shrink-0" />
         {isFr ? "Paiement après validation du prestataire" : "Payment after provider confirmation"}
       </div>
 
-      {/* Error */}
       {error && <p className="text-sm font-medium text-red-600">{error}</p>}
 
       <div className="flex gap-3">
