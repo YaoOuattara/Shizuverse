@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle, Copy, Check, UserPlus, X, CalendarDays } from "lucide-react";
+import { CheckCircle, Copy, Check, X, CalendarDays } from "lucide-react";
 
 const REF_KEY = "shizu_client_ref";
 
@@ -107,46 +107,39 @@ export default function BookingSuccessPage() {
         </div>
       </div>
 
-      {/* Account nudge — only for anonymous users */}
+      {/* Account nudge — only shown when no client_token */}
       {showNudge && (
-        <div className="mt-5 bg-blue-50 border border-blue-100 rounded-2xl p-6 max-w-md w-full relative">
+        <div className="mt-5 bg-white border border-gray-100 rounded-2xl p-5 max-w-md w-full shadow-sm relative">
           <button
             onClick={() => setShowNudge(false)}
-            className="absolute top-4 right-4 text-blue-300 hover:text-blue-500 transition-colors"
+            className="absolute top-4 right-4 text-gray-300 hover:text-gray-500 transition-colors"
             aria-label="Dismiss"
           >
             <X className="h-4 w-4" />
           </button>
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-              <UserPlus className="h-5 w-5 text-[#0F3A7A]" />
-            </div>
-            <div>
-              <h2 className="font-semibold text-[#0F3A7A] text-sm">
-                {isFr
-                  ? "Suivez vos réservations en temps réel"
-                  : "Track your bookings in real time"}
-              </h2>
-              <p className="text-blue-700/70 text-xs mt-1 leading-relaxed">
-                {isFr
-                  ? "Créez un compte gratuit pour consulter l'état de vos réservations, contacter votre prestataire et gérer vos demandes."
-                  : "Create a free account to check your booking status, contact your provider, and manage your requests."}
-              </p>
-              <div className="flex flex-col sm:flex-row gap-2 mt-4">
-                <Link
-                  href={`/${locale}/auth/register`}
-                  className="bg-[#0F3A7A] text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-[#0d3068] transition-colors text-center"
-                >
-                  {isFr ? "Créer mon compte" : "Create my account"}
-                </Link>
-                <button
-                  onClick={() => setShowNudge(false)}
-                  className="text-xs text-blue-400 hover:text-blue-600 transition-colors px-2"
-                >
-                  {isFr ? "Non merci, continuer sans compte" : "No thanks, continue without account"}
-                </button>
-              </div>
-            </div>
+          <p className="text-sm font-semibold text-gray-800 pr-6">
+            {isFr
+              ? "Suivez toutes vos réservations sans numéro de référence"
+              : "Track all your bookings without a reference number"}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {isFr
+              ? "Créez un compte gratuit et retrouvez toutes vos demandes en un clic."
+              : "Create a free account and find all your requests in one click."}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 mt-4">
+            <Link
+              href={`/${locale}/register`}
+              className="flex-1 text-center bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors"
+            >
+              {isFr ? "Créer mon compte gratuit" : "Create my free account"}
+            </Link>
+            <button
+              onClick={() => setShowNudge(false)}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors px-2"
+            >
+              {isFr ? "Non merci" : "No thanks"}
+            </button>
           </div>
         </div>
       )}

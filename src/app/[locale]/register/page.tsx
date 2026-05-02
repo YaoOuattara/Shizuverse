@@ -1,0 +1,284 @@
+"use client";
+
+import { useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, ArrowRight, MessageCircle, Eye, EyeOff } from "lucide-react";
+
+const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
+const SHIZU_WA  = (process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "").replace(/\D/g, "");
+
+function normalizePhone(local: string): string {
+  let p = local.trim().replace(/\s+/g, "");
+  if (!p.startsWith("+")) p = "+225" + p;
+  return p;
+}
+
+function ProgressBar({ step }: { step: number }) {
+  return (
+    <div className="flex gap-1.5 mb-8">
+      {[1, 2, 3].map((n) => (
+        <div
+          key={n}
+          className={`h-1.5 flex-1 rounded-full transition-colors ${
+            n <= step ? "bg-green-500" : "bg-gray-200"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default function RegisterPage() {
+  const params = useParams();
+  const locale = (params?.locale as string) ?? "fr";
+  const router = useRouter();
+  const isFr   = locale === "fr";
+
+  const [step, setStep]           = useState(1);
+  const [name, setName]           = useState("");
+  const [phone, setPhone]         = useState("");
+  const [password, setPassword]   = useState("");
+  const [confirm, setConfirm]     = useState("");
+  const [showPw, setShowPw]       = useState(false);
+  const [showCf, setShowCf]       = useState(false);
+  const [error, setError]         = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const step1Valid = name.trim().length >= 2;
+  const step2Valid = phone.trim().length >= 7;
+  const step3Valid =
+    password.length >= 6 && password === confirm;
+
+  async function handleSubmit() {
+    setError(null);
+    setSubmitting(true);
+    try {
+      const normalizedPhone = normalizePhone(phone);
+      const res = await fetch(`${FLASK_API}/api/client/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: name.trim(),
+          phone: normalizedPhone,
+          password,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? (isFr ? "Une erreur est survenue." : "Something went wrong."));
+        return;
+      }
+      localStorage.setItem("client_token", data.token);
+      localStorage.setItem("client_info", JSON.stringify(data.client));
+      // Also store phone for booking lookup
+      localStorage.setItem("shizu_client_phone", normalizedPhone);
+      router.push(`/${locale}/client/dashboard`);
+    } catch {
+      setError(isFr ? "Erreur réseau. Veuillez réessayer." : "Network error. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const waSupport = SHIZU_WA
+    ? `https://wa.me/${SHIZU_WA}?text=${encodeURIComponent("Bonjour Shizu, j'ai besoin d'aide pour créer mon compte.")}`
+    : "#";
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm">
+
+        {/* Back */}
+        <button
+          onClick={() => step > 1 ? setStep(s => s - 1) : router.push(`/${locale}`)}
+          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 mb-6 -mt-1 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {step > 1 ? (isFr ? "Retour" : "Back") : (isFr ? "Accueil" : "Home")}
+        </button>
+
+        <ProgressBar step={step} />
+
+        {/* ── Step 1: Name ────────────────────────────────────────────── */}
+        {step === 1 && (
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 mb-1">
+              {isFr ? "Comment vous appelez-vous ?" : "What's your name?"}
+            </h1>
+            <p className="text-sm text-gray-400 mb-6">
+              {isFr ? "Étape 1 sur 3" : "Step 1 of 3"}
+            </p>
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={isFr ? "Votre prénom et nom" : "Your full name"}
+                autoFocus
+                onKeyDown={(e) => e.key === "Enter" && step1Valid && setStep(2)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 placeholder:text-gray-300"
+              />
+              <button
+                onClick={() => setStep(2)}
+                disabled={!step1Valid}
+                className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-green-200 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+              >
+                {isFr ? "Continuer" : "Continue"}
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 2: Phone ───────────────────────────────────────────── */}
+        {step === 2 && (
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 mb-1">
+              {isFr ? "Votre numéro WhatsApp ?" : "Your WhatsApp number?"}
+            </h1>
+            <p className="text-sm text-gray-400 mb-6">
+              {isFr ? "Étape 2 sur 3" : "Step 2 of 3"}
+            </p>
+            <div className="space-y-4">
+              <div>
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-gray-200 bg-gray-50 text-sm text-gray-500 font-medium select-none">
+                    +225
+                  </span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="07 00 00 00 00"
+                    autoFocus
+                    onKeyDown={(e) => e.key === "Enter" && step2Valid && setStep(3)}
+                    className="flex-1 rounded-r-xl border border-gray-200 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 placeholder:text-gray-300"
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  {isFr
+                    ? "Utilisé uniquement pour vos réservations Shizu"
+                    : "Used only for your Shizu bookings"}
+                </p>
+              </div>
+              <button
+                onClick={() => setStep(3)}
+                disabled={!step2Valid}
+                className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-green-200 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+              >
+                {isFr ? "Continuer" : "Continue"}
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 3: Password ────────────────────────────────────────── */}
+        {step === 3 && (
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 mb-1">
+              {isFr ? "Créez votre mot de passe" : "Create your password"}
+            </h1>
+            <p className="text-sm text-gray-400 mb-6">
+              {isFr ? "Étape 3 sur 3" : "Step 3 of 3"}
+            </p>
+            <div className="space-y-4">
+              {/* Password */}
+              <div className="relative">
+                <input
+                  type={showPw ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={isFr ? "Mot de passe (6 caractères min.)" : "Password (min. 6 chars)"}
+                  autoFocus
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 placeholder:text-gray-300"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {/* Confirm */}
+              <div className="relative">
+                <input
+                  type={showCf ? "text" : "password"}
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  placeholder={isFr ? "Confirmez le mot de passe" : "Confirm password"}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 placeholder:text-gray-300"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCf(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showCf ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+
+              {/* Nudge */}
+              <div className="rounded-xl bg-green-50 border border-green-100 px-4 py-3 text-xs text-green-700">
+                {isFr
+                  ? "Vos réservations passées seront automatiquement liées à votre compte"
+                  : "Your past bookings will be automatically linked to your account"}
+              </div>
+
+              {error && <p className="text-sm text-red-600">{error}</p>}
+
+              {confirm && password !== confirm && (
+                <p className="text-xs text-red-500">
+                  {isFr ? "Les mots de passe ne correspondent pas." : "Passwords do not match."}
+                </p>
+              )}
+
+              <button
+                onClick={handleSubmit}
+                disabled={!step3Valid || submitting}
+                className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-green-200 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+              >
+                {submitting ? (
+                  <span className="inline-block h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    {isFr ? "Créer mon compte" : "Create my account"}
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+
+              {/* WhatsApp support — step 3 only */}
+              {SHIZU_WA && (
+                <p className="text-center text-xs text-gray-400">
+                  {isFr ? "Besoin d'aide ?" : "Need help?"}{" "}
+                  <a
+                    href={waSupport}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-600 font-medium hover:underline inline-flex items-center gap-1"
+                  >
+                    <MessageCircle className="h-3 w-3" />
+                    WhatsApp
+                  </a>
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Already have account */}
+        {step < 3 && (
+          <p className="text-center text-xs text-gray-400 mt-6">
+            {isFr ? "Déjà un compte ?" : "Already have an account?"}{" "}
+            <a href={`/${locale}/login`} className="text-green-600 font-medium hover:underline">
+              {isFr ? "Se connecter" : "Log in"}
+            </a>
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
