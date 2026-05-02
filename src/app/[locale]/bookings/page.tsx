@@ -36,6 +36,43 @@ const PHONE_KEY   = "shizu_client_phone";
 const REF_KEY     = "shizu_client_ref";
 const REVIEWED_KEY = "dashboard_reviewed_bookings";
 
+// ── Service name translation ──────────────────────────────────────────────────
+
+const SERVICE_MAP: [string, string][] = [
+  ["cleaning",   "Ménage et nettoyage"],
+  ["nettoyage",  "Ménage et nettoyage"],
+  ["ménage",     "Ménage et nettoyage"],
+  ["plumbing",   "Plomberie"],
+  ["plomberie",  "Plomberie"],
+  ["handyman",   "Bricolage & Réparations"],
+  ["bricolage",  "Bricolage & Réparations"],
+  ["electrical", "Électricité"],
+  ["electr",     "Électricité"],
+  ["childcare",  "Garde d'enfants"],
+  ["baby",       "Garde d'enfants"],
+  ["nounou",     "Garde d'enfants"],
+  ["beauty",     "Beauté à domicile"],
+  ["beauté",     "Beauté à domicile"],
+  ["coiffure",   "Beauté à domicile"],
+  ["garden",     "Jardinage et piscine"],
+  ["jardinage",  "Jardinage et piscine"],
+  ["piscine",    "Jardinage et piscine"],
+  ["ac ",        "Climatisation et électroménager"],
+  ["clim",       "Climatisation et électroménager"],
+  ["electromen", "Climatisation et électroménager"],
+  ["senior",     "Aide aux seniors"],
+  ["painting",   "Peinture & Rénovation"],
+  ["peinture",   "Peinture & Rénovation"],
+];
+
+function translateService(name: string): string {
+  const lower = name.toLowerCase();
+  for (const [key, val] of SERVICE_MAP) {
+    if (lower.includes(key)) return val;
+  }
+  return name;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function normalizeRef(input: string): string {
@@ -389,7 +426,7 @@ export default function BookingsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs text-muted-foreground font-mono">{formatRef(b.id)}</p>
-                      <p className="font-semibold text-foreground mt-0.5">{b.service_name}</p>
+                      <p className="font-semibold text-foreground mt-0.5">{translateService(b.service_name)}</p>
                     </div>
                     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium shrink-0 ${status.bg} ${status.text}`}>
                       <span className={`inline-block w-1.5 h-1.5 rounded-full ${status.dot}`} />
