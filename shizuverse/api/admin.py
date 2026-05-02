@@ -5,7 +5,9 @@ from shizuverse.models.appointment import Appointment
 from shizuverse.models.client_booking import ClientBooking
 from shizuverse.models.service_provider import ServiceProvider
 from shizuverse.models.service_models import Service, ServiceCategory
+from shizuverse.models.waitlist import Waitlist
 from datetime import datetime, timedelta
+from sqlalchemy import func
 import jwt
 import os
 
@@ -677,6 +679,25 @@ def update_provider_availability():
 
     db.session.commit()
     return jsonify({'success': True, 'available_today': sp.available_today})
+
+
+@admin_bp.route('/waitlist', methods=['GET'])
+@require_admin_token
+def get_waitlist():
+    rows = (
+        db.session.query(Waitlist.commune, func.count(Waitlist.id).label("count"))
+        .group_by(Waitlist.commune)
+        .order_by(func.count(Waitlist.id).desc())
+        .all()
+    )
+    result = []
+    for commune, count in rows:
+        phones = [
+            w.phone for w in
+            Waitlist.query.filter_by(commune=commune).order_by(Waitlist.created_at.desc()).all()
+        ]
+        result.append({"commune": commune, "count": count, "phones": phones})
+    return jsonify({"waitlist": result, "total": sum(r["count"] for r in result)})
 
 
 @admin_bp.route('/stats', methods=['GET'])

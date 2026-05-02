@@ -150,3 +150,4 @@ def cancel_booking(booking_id):
     booking.status = "cancelled"
     db.session.commit()
     return jsonify(booking.to_dict()), 200
+
