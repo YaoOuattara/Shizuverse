@@ -479,6 +479,64 @@ def get_provider_bookings():
     return jsonify(result)
 
 
+@provider_bp.route('/bookings/<int:booking_id>/start', methods=['PATCH'])
+@require_provider_token
+def start_provider_booking(booking_id):
+    """Provider has arrived on site — sets status to in_progress."""
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header[7:]
+    payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+    provider_sp_id = payload.get('provider_id')
+    sp = ServiceProvider.query.get(provider_sp_id) if provider_sp_id else None
+
+    booking = ClientBooking.query.get_or_404(booking_id)
+    if booking.status not in ('confirmed', 'accepted'):
+        return jsonify({'error': 'Booking must be confirmed before starting'}), 400
+
+    booking.status = 'in_progress'
+    from shizuverse.models.booking_event import BookingEvent
+    event = BookingEvent(
+        booking_id=booking_id,
+        event_type='started',
+        from_status='confirmed',
+        to_status='in_progress',
+        actor_phone=sp.phone_number if sp else None,
+        note='Provider arrived on site',
+    )
+    db.session.add(event)
+    db.session.commit()
+    return jsonify({'success': True, 'status': 'in_progress'})
+
+
+@provider_bp.route('/bookings/<int:booking_id>/complete', methods=['PATCH'])
+@require_provider_token
+def complete_provider_booking(booking_id):
+    """Provider has finished the mission — sets status to completed."""
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header[7:]
+    payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+    provider_sp_id = payload.get('provider_id')
+    sp = ServiceProvider.query.get(provider_sp_id) if provider_sp_id else None
+
+    booking = ClientBooking.query.get_or_404(booking_id)
+    if booking.status != 'in_progress':
+        return jsonify({'error': 'Booking must be in_progress to complete'}), 400
+
+    booking.status = 'completed'
+    from shizuverse.models.booking_event import BookingEvent
+    event = BookingEvent(
+        booking_id=booking_id,
+        event_type='completed',
+        from_status='in_progress',
+        to_status='completed',
+        actor_phone=sp.phone_number if sp else None,
+        note='Mission completed by provider',
+    )
+    db.session.add(event)
+    db.session.commit()
+    return jsonify({'success': True, 'status': 'completed'})
+
+
 @provider_bp.route('/bookings/<int:booking_id>/accept', methods=['PATCH'])
 @require_provider_token
 def accept_provider_booking(booking_id):
