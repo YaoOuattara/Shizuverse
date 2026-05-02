@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, jsonify, request, current_app, g
 from functools import wraps
 from shizuverse.models import db, User
 from shizuverse.models.appointment import Appointment
@@ -760,3 +760,84 @@ def client_register():
             'company_name': company_name,
         },
     }), 201
+
+
+def require_client_token(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Missing token'}), 401
+        token = auth_header[7:]
+        try:
+            payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+            if payload.get('type') != 'client':
+                return jsonify({'error': 'Invalid token type'}), 401
+            g.client_phone = payload.get('phone', '')
+            g.client_id    = payload.get('client_id')
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Invalid token'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
+@client_bp.route('/login', methods=['POST'])
+def client_login():
+    """Authenticate a client by phone + password. Returns JWT client_token."""
+    data     = request.get_json() or {}
+    phone    = (data.get('phone') or '').strip()
+    password = data.get('password', '')
+
+    if not phone or not password:
+        return jsonify({'error': 'phone and password are required'}), 400
+
+    synthetic_email = f"{phone.replace(' ', '').replace('+', '')}@client.shizu.ci"
+    user = User.query.filter_by(email=synthetic_email, user_type='client').first()
+
+    if not user or not user.check_password(password):
+        return jsonify({'error': 'Numéro de téléphone ou mot de passe invalide.'}), 401
+
+    token = jwt.encode({
+        'sub': str(user.id),
+        'type': 'client',
+        'client_id': user.id,
+        'name': user.full_name,
+        'phone': user.phone,
+        'account_type': user.account_type,
+        'company_name': user.company_name,
+        'iat': datetime.utcnow(),
+        'exp': datetime.utcnow() + timedelta(days=30),
+    }, current_app.config['SECRET_KEY'], algorithm='HS256')
+
+    return jsonify({
+        'success': True,
+        'token': token,
+        'client': {
+            'id': user.id,
+            'name': user.full_name,
+            'phone': user.phone,
+            'account_type': user.account_type,
+            'company_name': user.company_name,
+        },
+    }), 200
+
+
+@client_bp.route('/bookings', methods=['GET'])
+@require_client_token
+def get_client_bookings():
+    """Return all bookings for the authenticated client (matched by phone)."""
+    phone  = g.client_phone
+    status = request.args.get('status')
+    limit  = min(int(request.args.get('limit', 50)), 200)
+
+    query = ClientBooking.query.filter_by(client_phone=phone)
+    if status:
+        if status not in ['requested', 'accepted', 'declined', 'in_progress',
+                          'completed', 'cancelled', 'disputed']:
+            return jsonify({'error': 'Invalid status'}), 400
+        query = query.filter_by(status=status)
+
+    bookings = query.order_by(ClientBooking.appointment_date.desc()).limit(limit).all()
+    return jsonify({'count': len(bookings), 'items': [b.to_dict() for b in bookings]}), 200
