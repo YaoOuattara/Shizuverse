@@ -5,9 +5,9 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, MessageCircle } from "lucide-react";
+import PhoneInput from "@/components/PhoneInput";
 
 const WHATSAPP_NUMBER =
   process.env.NEXT_PUBLIC_SHIZU_WHATSAPP || "2250700000000";
@@ -32,13 +32,12 @@ export default function ForgotPasswordPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="phone">{t("phoneLabel")}</Label>
-            <Input
+            <PhoneInput
               id="phone"
-              type="tel"
-              placeholder={t("phonePlaceholder")}
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              autoComplete="tel"
+              defaultValue={phone}
+              onChange={setPhone}
+              selectClassName="rounded-l-md border-input bg-muted text-muted-foreground"
+              inputClassName="rounded-r-md border-input"
             />
           </div>
 

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2 } from 'lucide-react'
+import PhoneInput from '@/components/PhoneInput'
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? 'https://shizu-verse.onrender.com'
 
@@ -60,14 +61,13 @@ export default function ProviderLoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="phone">{t('phone')}</Label>
-              <Input
+              <PhoneInput
                 id="phone"
-                type="tel"
-                placeholder={t('phonePlaceholder')}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                defaultValue={phone}
+                onChange={setPhone}
                 required
-                autoComplete="tel"
+                selectClassName="rounded-l-md border-input bg-muted text-muted-foreground"
+                inputClassName="rounded-r-md border-input"
               />
             </div>
             <div className="space-y-2">

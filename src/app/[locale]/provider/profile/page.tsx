@@ -6,6 +6,7 @@ import {
   Loader2, Sparkles, Save, CheckCircle2, XCircle,
   ShieldCheck, ShieldAlert, ShieldX, Clock, Upload, Eye, Star,
 } from 'lucide-react'
+import PhoneInput from '@/components/PhoneInput'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -636,12 +637,11 @@ export default function ProviderProfilePage() {
             <label className="block text-xs text-muted-foreground mb-1">
               {isFr ? 'Numéro' : 'Number'}
             </label>
-            <input
-              type="tel"
-              value={profile.mobile_money_number}
-              onChange={e => set('mobile_money_number', e.target.value)}
-              placeholder="+225 07 XX XX XX XX"
-              className={inputCls}
+            <PhoneInput
+              defaultValue={profile.mobile_money_number}
+              onChange={v => set('mobile_money_number', v)}
+              selectClassName="rounded-l-lg border-input bg-muted text-muted-foreground text-sm"
+              inputClassName="rounded-r-lg border-input bg-background text-sm"
             />
           </div>
         </div>

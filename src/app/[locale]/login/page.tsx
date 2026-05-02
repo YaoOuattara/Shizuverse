@@ -3,15 +3,10 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Eye, EyeOff, MessageCircle } from "lucide-react";
+import PhoneInput from "@/components/PhoneInput";
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
 const SHIZU_WA  = (process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "").replace(/\D/g, "");
-
-function normalizePhone(local: string): string {
-  let p = local.trim().replace(/\s+/g, "");
-  if (!p.startsWith("+")) p = "+225" + p;
-  return p;
-}
 
 export default function LoginPage() {
   const params = useParams();
@@ -34,7 +29,7 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const normalizedPhone = normalizePhone(phone);
+      const normalizedPhone = phone.replace(/\s+/g, "");
       const res = await fetch(`${FLASK_API}/api/client/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -73,21 +68,14 @@ export default function LoginPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               {isFr ? "Numéro WhatsApp" : "WhatsApp number"}
             </label>
-            <div className="flex">
-              <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-gray-200 bg-gray-50 text-sm text-gray-500 font-medium select-none">
-                +225
-              </span>
-              <input
-                type="tel"
-                inputMode="numeric"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="07 00 00 00 00"
-                required
-                autoFocus
-                className="flex-1 rounded-r-xl border border-gray-200 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 placeholder:text-gray-300"
-              />
-            </div>
+            <PhoneInput
+              defaultValue={phone}
+              onChange={setPhone}
+              autoFocus
+              required
+              selectClassName="rounded-l-xl border-gray-200 bg-gray-50 text-gray-500"
+              inputClassName="rounded-r-xl border-gray-200 py-3 focus:ring-green-500"
+            />
           </div>
 
           {/* Password */}

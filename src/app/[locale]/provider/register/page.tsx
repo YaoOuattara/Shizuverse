@@ -811,12 +811,12 @@ export default function ProviderRegisterPage() {
               </div>
               {momoOperator && (
                 <div className="space-y-2">
-                  <input
-                    type="tel"
+                  <PhoneInput
+                    defaultValue={momoNumber}
+                    onChange={setMomoNumber}
                     placeholder={isFr ? "Numéro Mobile Money" : "Mobile Money number"}
-                    value={momoNumber}
-                    onChange={(e) => setMomoNumber(e.target.value)}
-                    className={inputCls}
+                    selectClassName="rounded-l-md border-gray-300 bg-gray-50 text-gray-500 focus:ring-[#0F3A7A]/30"
+                    inputClassName="rounded-none rounded-r-md border-gray-300 bg-white py-2 focus:ring-[#0F3A7A]/30 focus:border-[#0F3A7A]"
                   />
                   <input
                     type="text"
