@@ -128,39 +128,45 @@ def main():
         expect_status=200,
     )
 
-    # 3. PUT assign
-    # Spec said {provider_id: 1} but the endpoint takes provider_name (string)
+    # 3. POST quote (sets amount, computes tier)
     check(
-        "3. PUT  /api/admin/bookings/" + str(booking_id) + "/assign  {provider_name: ...}",
+        "3. POST /admin/bookings/" + str(booking_id) + "/quote  {amount_xof: 15000}",
+        "POST", "/admin/bookings/" + str(booking_id) + "/quote",
+        body={"amount_xof": 15000},
+        expect_status=200,
+        note="sets tier=deposit_30 for 15k; path is /admin (not /api/admin)",
+    )
+
+    # 4. POST lock-amount (required before assign)
+    check(
+        "4. POST /admin/bookings/" + str(booking_id) + "/lock-amount  {confirmed_amount: 15000}",
+        "POST", "/admin/bookings/" + str(booking_id) + "/lock-amount",
+        body={"confirmed_amount": 15000},
+        expect_status=200,
+        note="amount must be locked before provider can be assigned",
+    )
+
+    # 5. PUT assign (now allowed after lock)
+    check(
+        "5. PUT  /api/admin/bookings/" + str(booking_id) + "/assign  {provider_name: ...}",
         "PUT", "/api/admin/bookings/" + str(booking_id) + "/assign",
         body={"provider_name": "Prestataire Test", "provider_phone": "0700000000"},
         expect_status=200,
         note="spec had provider_id; actual field is provider_name",
     )
 
-    # 4. POST quote
-    # Lives at /admin/ (not /api/admin/); key is amount_xof (not amount)
+    # 6. POST finance
     check(
-        "4. POST /admin/bookings/" + str(booking_id) + "/quote  {amount_xof: 15000}",
-        "POST", "/admin/bookings/" + str(booking_id) + "/quote",
-        body={"amount_xof": 15000},
-        expect_status=200,
-        note="spec had /api/admin + amount; actual path is /admin + amount_xof",
-    )
-
-    # 5. POST finance
-    # Lives at /admin/ (not /api/admin/); needs payment_status or payout_status
-    check(
-        "5. POST /admin/bookings/" + str(booking_id) + "/finance  {payment_status: paid}",
+        "6. POST /admin/bookings/" + str(booking_id) + "/finance  {payment_status: paid}",
         "POST", "/admin/bookings/" + str(booking_id) + "/finance",
         body={"payment_status": "paid"},
         expect_status=200,
-        note="spec had /api/admin; actual path is /admin",
+        note="path is /admin (not /api/admin)",
     )
 
-    # 6. PUT status -> completed
+    # 7. PUT status -> completed
     check(
-        "6. PUT  /api/admin/bookings/" + str(booking_id) + "/status  {status: completed}",
+        "7. PUT  /api/admin/bookings/" + str(booking_id) + "/status  {status: completed}",
         "PUT", "/api/admin/bookings/" + str(booking_id) + "/status",
         body={"status": "completed"},
         expect_status=200,
@@ -186,14 +192,14 @@ def main():
                  {"status": "confirmed"})
     if cancel_booking_id:
         check(
-            "7. POST /admin/bookings/" + str(cancel_booking_id) + "/cancel  {reason: test}",
+            "8. POST /admin/bookings/" + str(cancel_booking_id) + "/cancel  {reason: test}",
             "POST", "/admin/bookings/" + str(cancel_booking_id) + "/cancel",
             body={"reason": "automated test cancel"},
             expect_status=200,
             note="fresh confirmed booking; spec had /api/admin, actual path is /admin",
         )
     else:
-        print("  SKIP  7. POST /admin/bookings/{id}/cancel  [could not create test booking status=" + str(s7) + "]")
+        print("  SKIP  8. POST /admin/bookings/{id}/cancel  [could not create test booking status=" + str(s7) + "]")
         global FAIL_COUNT
         FAIL_COUNT += 1
 
