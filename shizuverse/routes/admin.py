@@ -562,45 +562,6 @@ def update_finance(booking_id):
     })
 
 
-@admin_bp.route('/bookings/<int:booking_id>/dispute', methods=['POST'])
-@admin_required
-def resolve_dispute(booking_id):
-    b = ClientBooking.query.get_or_404(booking_id)
-    if b.status != 'disputed':
-        return jsonify({'error': 'Booking is not in disputed state'}), 400
-
-    data = request.get_json()
-    resolution = data.get('resolution')
-
-    if resolution not in ('complete', 'cancel'):
-        return jsonify({'error': 'resolution must be complete or cancel'}), 400
-
-    prev_status = b.status
-    if resolution == 'complete':
-        b.status = 'completed'
-        if b.payment_status == 'paid':
-            b.payout_status = 'due'
-        note = 'Dispute resolved in provider favour'
-    else:
-        b.status = 'cancelled'
-        if b.payment_status == 'paid':
-            b.payment_status = 'refunded'
-        note = 'Dispute resolved in client favour'
-
-    event = BookingEvent(
-        booking_id=b.id,
-        event_type='dispute_resolved',
-        from_status=prev_status,
-        to_status=b.status,
-        actor_id=None,
-        note=note
-    )
-    db.session.add(event)
-    db.session.commit()
-
-    return jsonify({'message': f'Dispute resolved: {resolution}', 'booking_id': booking_id})
-
-
 # ── Finance Overview ──────────────────────────────────────────
 
 # ── Reviews ───────────────────────────────────────────────────
