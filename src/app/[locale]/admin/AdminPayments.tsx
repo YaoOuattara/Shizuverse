@@ -169,6 +169,7 @@ export default function AdminPayments() {
   const [refundModalOpen, setRefundModalOpen] = useState(false);
   const [payoutModalOpen, setPayoutModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [finalAmountInput, setFinalAmountInput] = useState("");
 
   // Payment form state
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'mobile_money' | 'bank_transfer'>('cash');
@@ -211,6 +212,9 @@ export default function AdminPayments() {
   }, [bookings, searchQuery, payoutStatusFilter]);
 
   const openPaymentModal = () => {
+    // Pre-fill: price is already final_amount ?? amount_xof ?? 0 from toPaymentBooking
+    const prefill = selectedBooking?.price ?? 0;
+    setFinalAmountInput(prefill > 0 ? String(prefill) : "");
     setPaymentMethod('cash');
     setPaymentReference('');
     setPaymentNote('');
@@ -218,19 +222,22 @@ export default function AdminPayments() {
   };
 
   const handleRecordPayment = async (bookingId: string) => {
+    const finalAmt = Math.round(Number(finalAmountInput) || selectedBooking?.price || 0);
+    if (!finalAmt) return;
+    const commission = Math.round(finalAmt * 0.15);
+    const payout = finalAmt - commission;
     setIsUpdating(true);
     try {
-      const amt = selectedBooking?.price ?? 0;
-      const commission = selectedBooking?.platformFeeAmount ?? Math.round(amt * 0.15);
-      const payout = selectedBooking?.providerPayoutAmount ?? (amt - commission);
       await adminApi.portalUpdateFinance(bookingId, {
         payment_status: 'paid',
-        ...(amt > 0 ? { final_amount: amt } : {}),
+        final_amount: finalAmt,
       });
       updateLocalBooking(bookingId, {
         paymentStatus: 'paid',
         paidAt: new Date().toISOString().split('T')[0],
         paymentMethod,
+        price: finalAmt,
+        baseAmount: finalAmt,
         platformFeeAmount: commission,
         providerPayoutAmount: payout,
       });
@@ -747,22 +754,66 @@ export default function AdminPayments() {
 
       {/* Payment Recording Modal */}
       <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
-            <DialogTitle>{isFr ? "Enregistrer le paiement" : "Record Payment"}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-emerald-600" />
+              {isFr ? "Enregistrer le paiement" : "Record Payment"}
+            </DialogTitle>
             <DialogDescription>
-              {isFr ? "Saisir les détails du paiement." : "Enter payment details for this booking."}
+              {selectedBooking && `${selectedBooking.clientName} · ${selectedBooking.serviceName}`}
             </DialogDescription>
           </DialogHeader>
           {selectedBooking && (
             <div className="space-y-4">
-              <div className="bg-muted/50 rounded-md p-3 text-sm">
-                <p><strong>{isFr ? "N° réservation" : "Booking ID"}:</strong> {selectedBooking.id}</p>
-                <p><strong>{isFr ? "Client" : "Client"}:</strong> {selectedBooking.clientName}</p>
-                <p><strong>{isFr ? "Montant" : "Amount"}:</strong> {formatMoney(selectedBooking.price, selectedBooking.currency)}</p>
+              {/* Context: devis initial */}
+              {selectedBooking.price > 0 && (
+                <div className="flex justify-between items-center text-sm bg-muted/40 rounded-md px-3 py-2">
+                  <span className="text-muted-foreground">{isFr ? "Devis initial" : "Quoted Price"}</span>
+                  <span className="font-medium">{new Intl.NumberFormat('fr-FR').format(selectedBooking.price)} FCFA</span>
+                </div>
+              )}
+
+              {/* Editable final amount */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">
+                  {isFr ? "Montant final encaissé (FCFA) *" : "Final Amount Collected (FCFA) *"}
+                </label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    type="number"
+                    value={finalAmountInput}
+                    onChange={(e) => setFinalAmountInput(e.target.value)}
+                    placeholder="0"
+                    min={1}
+                    autoFocus
+                    data-testid="input-final-amount"
+                  />
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">FCFA</span>
+                </div>
               </div>
 
-              <div className="space-y-3">
+              {/* Live commission breakdown */}
+              {Number(finalAmountInput) > 0 && (() => {
+                const fa = Math.round(Number(finalAmountInput));
+                const commission = Math.round(fa * 0.15);
+                const payout = fa - commission;
+                return (
+                  <div className="rounded-md border bg-muted/30 p-3 space-y-1.5 text-sm">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>{isFr ? "Commission Shizu (15%)" : "Shizu Commission (15%)"}</span>
+                      <span className="font-medium text-foreground">{new Intl.NumberFormat('fr-FR').format(commission)} FCFA</span>
+                    </div>
+                    <div className="flex justify-between font-semibold pt-1 border-t">
+                      <span>{isFr ? "Versement prestataire (85%)" : "Provider Payout (85%)"}</span>
+                      <span className="text-emerald-700">{new Intl.NumberFormat('fr-FR').format(payout)} FCFA</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Payment method + optional fields */}
+              <div className="space-y-3 pt-1">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">{isFr ? "Mode de paiement" : "Payment Method"}</label>
                   <Select value={paymentMethod} onValueChange={(v: 'cash' | 'mobile_money' | 'bank_transfer') => setPaymentMethod(v)}>
@@ -786,7 +837,7 @@ export default function AdminPayments() {
                     data-testid="input-payment-reference"
                   />
                 </div>
-                
+
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">{isFr ? "Note (optionnel)" : "Note (optional)"}</label>
                   <Textarea
@@ -804,13 +855,14 @@ export default function AdminPayments() {
             <Button variant="outline" onClick={() => setPaymentModalOpen(false)} disabled={isUpdating}>
               {isFr ? "Annuler" : "Cancel"}
             </Button>
-            <Button 
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={() => selectedBooking && handleRecordPayment(selectedBooking.id)}
-              disabled={isUpdating}
+              disabled={isUpdating || !Number(finalAmountInput)}
               data-testid="button-confirm-payment"
             >
-              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {isFr ? "Enregistrer le paiement" : "Record Payment"}
+              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+              {isFr ? "Confirmer le paiement" : "Confirm Payment"}
             </Button>
           </DialogFooter>
         </DialogContent>

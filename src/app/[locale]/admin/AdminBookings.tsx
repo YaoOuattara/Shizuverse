@@ -616,8 +616,13 @@ export default function AdminBookings() {
 
   const openPaymentModal = () => {
     if (!selectedBooking || selectedBooking.status === 'cancelled' || selectedBooking.paymentStatus === 'paid') return;
-    if (selectedBooking.status !== 'confirmed' && selectedBooking.status !== 'completed') return;
-    setFinalAmountInput(String(selectedBooking.baseAmount || selectedBooking.price || ""));
+    // Pre-fill: final_amount (if already set) → baseAmount (= amount_xof quoted price) → 0
+    const prefill = selectedBooking.baseAmount > 0
+      ? selectedBooking.baseAmount
+      : selectedBooking.price > 0
+        ? selectedBooking.price
+        : 0;
+    setFinalAmountInput(prefill > 0 ? String(prefill) : "");
     setPaymentModalOpen(true);
   };
 
@@ -1671,14 +1676,18 @@ export default function AdminBookings() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Quoted price read-only */}
-            <div className="flex justify-between items-center text-sm bg-muted/50 rounded-md px-3 py-2">
-              <span className="text-muted-foreground">{isFr ? "Montant du devis" : "Quoted Price"}</span>
-              <span className="font-medium">{formatMoney(selectedBooking?.price ?? 0, "XOF")}</span>
-            </div>
+            {/* Context: quoted price */}
+            {(selectedBooking?.price ?? 0) > 0 && (
+              <div className="flex justify-between items-center text-sm bg-muted/40 rounded-md px-3 py-2">
+                <span className="text-muted-foreground">{isFr ? "Devis initial" : "Quoted Price"}</span>
+                <span className="font-medium">{new Intl.NumberFormat('fr-FR').format(selectedBooking!.price)} FCFA</span>
+              </div>
+            )}
             {/* Editable final amount */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">{isFr ? "Montant final encaissé (CFA) *" : "Final Amount Collected (CFA) *"}</label>
+              <label className="text-sm font-medium">
+                {isFr ? "Montant final encaissé (FCFA) *" : "Final Amount Collected (FCFA) *"}
+              </label>
               <div className="flex gap-2 items-center">
                 <Input
                   type="number"
@@ -1686,13 +1695,14 @@ export default function AdminBookings() {
                   onChange={(e) => setFinalAmountInput(e.target.value)}
                   placeholder="0"
                   min={1}
+                  autoFocus
                   data-testid="input-final-amount"
                 />
-                <span className="text-sm text-muted-foreground whitespace-nowrap">CFA</span>
+                <span className="text-sm text-muted-foreground whitespace-nowrap">FCFA</span>
               </div>
             </div>
             {/* Live commission breakdown */}
-            {finalAmountInput && Number(finalAmountInput) > 0 && (() => {
+            {Number(finalAmountInput) > 0 && (() => {
               const fa = Math.round(Number(finalAmountInput));
               const commission = Math.round(fa * 0.15);
               const payout = fa - commission;
@@ -1700,11 +1710,11 @@ export default function AdminBookings() {
                 <div className="rounded-md border bg-muted/30 p-3 space-y-1.5 text-sm">
                   <div className="flex justify-between text-muted-foreground">
                     <span>{isFr ? "Commission Shizu (15%)" : "Shizu Commission (15%)"}</span>
-                    <span className="font-medium text-foreground">{formatMoney(commission, "XOF")}</span>
+                    <span className="font-medium text-foreground">{new Intl.NumberFormat('fr-FR').format(commission)} FCFA</span>
                   </div>
                   <div className="flex justify-between font-semibold pt-1 border-t">
                     <span>{isFr ? "Versement prestataire (85%)" : "Provider Payout (85%)"}</span>
-                    <span className="text-emerald-700">{formatMoney(payout, "XOF")}</span>
+                    <span className="text-emerald-700">{new Intl.NumberFormat('fr-FR').format(payout)} FCFA</span>
                   </div>
                 </div>
               );
