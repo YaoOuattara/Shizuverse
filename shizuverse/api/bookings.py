@@ -106,6 +106,10 @@ def create_booking():
     if anomaly["flagged"]:
         print(f"[ANOMALY] {anomaly['reason']} - {client_phone}")
 
+    from shizuverse.utils.payment_rules import get_payment_tier
+    prior_bookings = ClientBooking.query.filter_by(client_phone=client_phone).count()
+    initial_tier = get_payment_tier(None, prior_bookings)
+
     booking = ClientBooking(
         client_name=data["client_name"].strip(),
         client_phone=client_phone,
@@ -118,6 +122,9 @@ def create_booking():
         urgency=(data.get("urgency") or "").strip() or None,
         time_preference=(data.get("time_preference") or "").strip() or None,
         time_slot=(data.get("time_slot") or "").strip() or None,
+        payment_tier=initial_tier,
+        deposit_amount=0,
+        cancellation_policy='full_refund',  # no deposit yet, so always full refund
     )
     db.session.add(booking)
     db.session.commit()
@@ -170,6 +177,48 @@ def create_booking():
         pass
 
     return jsonify(booking.to_dict()), 201
+
+
+# ── POST /api/bookings/<id>/payment-declared ─────────────────────────────────
+# Client declares they have made a payment — awaits admin confirmation.
+@bookings_bp.route("/<int:booking_id>/payment-declared", methods=["POST"])
+def payment_declared(booking_id):
+    booking = ClientBooking.query.get_or_404(booking_id)
+
+    if booking.payment_status == 'paid':
+        return jsonify({"error": "Paiement déjà confirmé pour cette réservation"}), 400
+
+    booking.payment_status = 'pending'   # 'pending' = awaiting admin confirmation
+    booking.status = 'pending_payment'
+
+    from shizuverse.models.booking_event import BookingEvent
+    event = BookingEvent(
+        booking_id=booking_id,
+        event_type='payment_declared',
+        from_status=booking.status,
+        to_status='pending_payment',
+        note='Client a déclaré le paiement',
+    )
+    db.session.add(event)
+    db.session.commit()
+
+    # WhatsApp: alert admin that client declared payment
+    try:
+        import os
+        from shizuverse.utils.notifications import send_whatsapp
+        admin_phone = os.environ.get('SHIZU_ADMIN_PHONE') or os.environ.get('NEXT_PUBLIC_SHIZU_WHATSAPP', '')
+        deposit_amt = booking.deposit_amount or booking.amount_xof or 0
+        if admin_phone:
+            send_whatsapp(
+                admin_phone,
+                f"💳 {booking.client_name} a déclaré avoir effectué le paiement pour la "
+                f"réservation #{booking_id} ({deposit_amt:,} FCFA). "
+                f"Vérifiez et confirmez."
+            )
+    except Exception:
+        pass
+
+    return jsonify({"message": "Paiement déclaré — en attente de confirmation Shizu"})
 
 
 # ── PUT /api/bookings/<id>/ ───────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 from . import db
 from datetime import datetime
 
-VALID_STATUSES = ['requested', 'accepted', 'declined', 'in_progress', 'completed', 'cancelled', 'disputed']
+VALID_STATUSES = ['requested', 'accepted', 'declined', 'in_progress', 'completed', 'cancelled', 'disputed', 'pending_payment']
 
 
 class ClientBooking(db.Model):
@@ -39,6 +39,22 @@ class ClientBooking(db.Model):
     cancellation_reason = db.Column(db.Text, nullable=True)
     created_at       = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # ── Payment rules engine ──────────────────────────────────
+    payment_tier        = db.Column(db.String(20),  nullable=True)   # after_service|deposit_30|deposit_40|full_prepay
+    deposit_amount      = db.Column(db.Integer,      nullable=True)   # FCFA deposit due upfront
+    cancellation_policy = db.Column(db.String(30),  nullable=True)   # full_refund|provider_compensation|no_refund
+
+    # ── Amount lock (admin confirms amount before dispatch) ───
+    amount_locked    = db.Column(db.Boolean,   default=False, nullable=False, server_default='false')
+    amount_locked_at = db.Column(db.DateTime,  nullable=True)
+
+    # ── Dispute tracking ──────────────────────────────────────
+    dispute_flag        = db.Column(db.Boolean,  default=False, nullable=False, server_default='false')
+    dispute_reason      = db.Column(db.Text,     nullable=True)
+    dispute_opened_at   = db.Column(db.DateTime, nullable=True)
+    dispute_resolution  = db.Column(db.String(20), nullable=True)    # refund_client|release_provider|split
+    dispute_resolved_at = db.Column(db.DateTime, nullable=True)
+
     # Provider assignment fields (set when admin assigns a provider)
     provider_name  = db.Column(db.String(100), nullable=True)
     provider_phone = db.Column(db.String(20),  nullable=True)
@@ -73,4 +89,16 @@ class ClientBooking(db.Model):
             "provider_payout":      self.provider_payout,
             "decline_reason":       self.decline_reason,
             "cancellation_reason":  self.cancellation_reason,
+            # Payment rules
+            "payment_tier":         self.payment_tier,
+            "deposit_amount":       self.deposit_amount,
+            "cancellation_policy":  self.cancellation_policy,
+            "amount_locked":        self.amount_locked,
+            "amount_locked_at":     self.amount_locked_at.isoformat() if self.amount_locked_at else None,
+            # Dispute
+            "dispute_flag":         self.dispute_flag,
+            "dispute_reason":       self.dispute_reason,
+            "dispute_opened_at":    self.dispute_opened_at.isoformat() if self.dispute_opened_at else None,
+            "dispute_resolution":   self.dispute_resolution,
+            "dispute_resolved_at":  self.dispute_resolved_at.isoformat() if self.dispute_resolved_at else None,
         }

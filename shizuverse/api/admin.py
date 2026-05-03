@@ -128,6 +128,9 @@ def assign_booking(booking_id):
     provider_phone = data.get('provider_phone', '').strip()
     if not provider_name:
         return jsonify({'error': 'provider_name required'}), 400
+    if not booking.amount_locked:
+        return jsonify({'error': "Veuillez confirmer le montant avant d'assigner un prestataire"}), 400
+
     booking.provider_name = provider_name
     booking.provider_phone = provider_phone
     booking.status = 'assigned'

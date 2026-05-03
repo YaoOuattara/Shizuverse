@@ -411,15 +411,40 @@ def get_booking_detail(booking_id):
 @admin_bp.route('/bookings/<int:booking_id>/quote', methods=['POST'])
 @admin_required
 def set_booking_quote(booking_id):
-    """Store a quoted price on the booking (sets amount_xof)."""
+    """Store a quoted price on the booking. Recomputes payment tier and deposit amount."""
     b = ClientBooking.query.get_or_404(booking_id)
     data = request.get_json() or {}
     amount = data.get('amount_xof')
     if amount is None or not isinstance(amount, (int, float)) or int(amount) <= 0:
         return jsonify({'error': 'amount_xof must be a positive number'}), 400
-    b.amount_xof = int(amount)
+
+    from shizuverse.utils.payment_rules import get_payment_tier, get_deposit_amount, get_cancellation_policy
+    from shizuverse.models.client_booking import ClientBooking as CB
+    prior = CB.query.filter_by(client_phone=b.client_phone).count()
+
+    amt = int(amount)
+    tier = get_payment_tier(amt, prior)
+    deposit = get_deposit_amount(amt, tier)
+
+    # Estimate hours until appointment for cancellation policy
+    from datetime import datetime as _dt
+    hours = (b.appointment_date - _dt.utcnow()).total_seconds() / 3600 if b.appointment_date else 999
+    policy = get_cancellation_policy(tier, hours)
+
+    b.amount_xof = amt
+    b.payment_tier = tier
+    b.deposit_amount = deposit
+    b.cancellation_policy = policy
+    b.amount_locked = False  # quote set, but not yet confirmed
     db.session.commit()
-    return jsonify({'success': True, 'id': b.id, 'amount_xof': b.amount_xof})
+
+    return jsonify({
+        'success': True, 'id': b.id,
+        'amount_xof': b.amount_xof,
+        'payment_tier': b.payment_tier,
+        'deposit_amount': b.deposit_amount,
+        'cancellation_policy': b.cancellation_policy,
+    })
 
 
 @admin_bp.route('/bookings/<int:booking_id>/cancel', methods=['POST'])
@@ -733,6 +758,164 @@ def get_overview():
         'confirmed_bookings': confirmed_bookings,
         'completion_rate':    completion_rate,
         'active_providers':   active_providers,
+    })
+
+
+# ── Payment Rules Endpoints ───────────────────────────────────
+
+@admin_bp.route('/bookings/<int:booking_id>/lock-amount', methods=['POST'])
+@admin_required
+def lock_booking_amount(booking_id):
+    """Admin confirms the final quoted amount. Must happen before provider is assigned."""
+    b = ClientBooking.query.get_or_404(booking_id)
+    data = request.get_json() or {}
+    confirmed_amount = data.get('confirmed_amount')
+
+    if confirmed_amount is None or not isinstance(confirmed_amount, (int, float)) or int(confirmed_amount) <= 0:
+        return jsonify({'error': 'confirmed_amount must be a positive number'}), 400
+
+    from shizuverse.utils.payment_rules import get_payment_tier, get_deposit_amount, get_cancellation_policy
+    from datetime import datetime as _dt
+    amt = int(confirmed_amount)
+    prior = ClientBooking.query.filter_by(client_phone=b.client_phone).count()
+    tier = get_payment_tier(amt, prior)
+    deposit = get_deposit_amount(amt, tier)
+    hours = (b.appointment_date - _dt.utcnow()).total_seconds() / 3600 if b.appointment_date else 999
+    policy = get_cancellation_policy(tier, hours)
+
+    b.amount_xof = amt
+    b.payment_tier = tier
+    b.deposit_amount = deposit
+    b.cancellation_policy = policy
+    b.amount_locked = True
+    b.amount_locked_at = _dt.utcnow()
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'amount_xof': b.amount_xof,
+        'payment_tier': b.payment_tier,
+        'deposit_amount': b.deposit_amount,
+        'cancellation_policy': b.cancellation_policy,
+        'amount_locked': b.amount_locked,
+    })
+
+
+@admin_bp.route('/bookings/<int:booking_id>/confirm-payment', methods=['POST'])
+@admin_required
+def confirm_payment(booking_id):
+    """Admin confirms client payment received — activates the booking."""
+    b = ClientBooking.query.get_or_404(booking_id)
+    prev_status = b.status
+    b.payment_status = 'paid'
+    b.status = 'confirmed'
+
+    event = BookingEvent(
+        booking_id=b.id,
+        event_type='payment_confirmed',
+        from_status=prev_status,
+        to_status='confirmed',
+        note='Paiement confirmé par admin',
+    )
+    db.session.add(event)
+    db.session.commit()
+
+    try:
+        from shizuverse.utils.notifications import notify_booking_confirmed_client
+        apt = b.appointment_date
+        notify_booking_confirmed_client(
+            client_name=b.client_name,
+            client_phone=b.client_phone,
+            booking_ref=str(b.id),
+            provider_name=b.provider_name or 'Shizu',
+            date=apt.strftime('%d/%m/%Y') if apt else '',
+            time=apt.strftime('%Hh%M') if apt else '',
+        )
+    except Exception:
+        pass
+
+    return jsonify({'success': True, 'status': b.status, 'payment_status': b.payment_status})
+
+
+@admin_bp.route('/bookings/<int:booking_id>/dispute', methods=['POST'])
+@admin_required
+def open_dispute(booking_id):
+    """Flag a booking as disputed."""
+    b = ClientBooking.query.get_or_404(booking_id)
+    data = request.get_json() or {}
+    reason = (data.get('reason') or '').strip()
+    if not reason:
+        return jsonify({'error': 'reason is required'}), 400
+
+    b.dispute_flag = True
+    b.dispute_reason = reason
+    b.dispute_opened_at = datetime.utcnow()
+
+    event = BookingEvent(
+        booking_id=b.id,
+        event_type='dispute_opened',
+        from_status=b.status,
+        to_status=b.status,
+        note=reason,
+    )
+    db.session.add(event)
+    db.session.commit()
+
+    return jsonify({'success': True, 'dispute_flag': True, 'dispute_reason': b.dispute_reason})
+
+
+@admin_bp.route('/bookings/<int:booking_id>/resolve-dispute', methods=['POST'])
+@admin_required
+def resolve_dispute_new(booking_id):
+    """Resolve a disputed booking."""
+    b = ClientBooking.query.get_or_404(booking_id)
+    if not b.dispute_flag:
+        return jsonify({'error': 'No active dispute on this booking'}), 400
+
+    data = request.get_json() or {}
+    resolution = (data.get('resolution') or '').strip()
+    valid = ('refund_client', 'release_provider', 'split')
+    if resolution not in valid:
+        return jsonify({'error': f'resolution must be one of {list(valid)}'}), 400
+
+    b.dispute_resolution = resolution
+    b.dispute_resolved_at = datetime.utcnow()
+
+    if resolution == 'refund_client':
+        b.payment_status = 'refunded'
+    elif resolution == 'release_provider':
+        b.payout_status = 'due'
+
+    event = BookingEvent(
+        booking_id=b.id,
+        event_type='dispute_resolved',
+        from_status=b.status,
+        to_status=b.status,
+        note=f'Resolution: {resolution}',
+    )
+    db.session.add(event)
+    db.session.commit()
+
+    return jsonify({'success': True, 'dispute_resolution': b.dispute_resolution})
+
+
+# ── Admin Config (payment numbers) ────────────────────────────
+
+@admin_bp.route('/config', methods=['GET'])
+@admin_required
+def get_admin_config():
+    """Return payment/contact numbers so admin can verify env vars are set."""
+    import os
+    return jsonify({
+        'wave_number':   os.environ.get('SHIZU_WAVE_NUMBER', ''),
+        'orange_number': os.environ.get('SHIZU_ORANGE_NUMBER', ''),
+        'mtn_number':    os.environ.get('SHIZU_MTN_NUMBER', ''),
+        'whatsapp':      os.environ.get('NEXT_PUBLIC_SHIZU_WHATSAPP', ''),
+        'twilio_enabled': bool(
+            os.environ.get('TWILIO_ACCOUNT_SID') and
+            os.environ.get('TWILIO_AUTH_TOKEN') and
+            os.environ.get('TWILIO_WHATSAPP_FROM')
+        ),
     })
 
 
