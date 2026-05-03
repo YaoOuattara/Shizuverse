@@ -220,11 +220,19 @@ export default function AdminPayments() {
   const handleRecordPayment = async (bookingId: string) => {
     setIsUpdating(true);
     try {
-      await adminApi.portalUpdateFinance(bookingId, { payment_status: 'paid' });
+      const amt = selectedBooking?.price ?? 0;
+      const commission = selectedBooking?.platformFeeAmount ?? Math.round(amt * 0.15);
+      const payout = selectedBooking?.providerPayoutAmount ?? (amt - commission);
+      await adminApi.portalUpdateFinance(bookingId, {
+        payment_status: 'paid',
+        ...(amt > 0 ? { final_amount: amt } : {}),
+      });
       updateLocalBooking(bookingId, {
         paymentStatus: 'paid',
         paidAt: new Date().toISOString().split('T')[0],
         paymentMethod,
+        platformFeeAmount: commission,
+        providerPayoutAmount: payout,
       });
       toast({
         title: isFr ? "Paiement enregistré" : "Payment Recorded",
