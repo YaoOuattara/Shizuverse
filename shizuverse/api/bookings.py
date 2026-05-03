@@ -115,6 +115,9 @@ def create_booking():
         service_slug=service_slug.strip(),
         appointment_date=apt_date,
         notes=data.get("notes", "").strip() or None,
+        urgency=(data.get("urgency") or "").strip() or None,
+        time_preference=(data.get("time_preference") or "").strip() or None,
+        time_slot=(data.get("time_slot") or "").strip() or None,
     )
     db.session.add(booking)
     db.session.commit()

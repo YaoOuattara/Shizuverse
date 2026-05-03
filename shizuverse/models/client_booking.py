@@ -20,6 +20,9 @@ class ClientBooking(db.Model):
     service_slug = db.Column(db.String(80),  nullable=True)   # e.g. "menage"
 
     appointment_date = db.Column(db.DateTime, nullable=False)
+    urgency          = db.Column(db.String(20), nullable=True)   # urgent_2h | same_day | under_24h | normal
+    time_preference  = db.Column(db.String(20), nullable=True)   # morning | afternoon | evening | anytime
+    time_slot        = db.Column(db.String(20), nullable=True)   # morning | afternoon | evening
     status           = db.Column(db.String(20), default="requested", nullable=False)
     notes            = db.Column(db.Text, nullable=True)
     payment_status = db.Column(
@@ -53,6 +56,9 @@ class ClientBooking(db.Model):
             "service_name":         self.service_name,
             "service_slug":         self.service_slug,
             "appointment_date":     self.appointment_date.isoformat(),
+            "urgency":              self.urgency,
+            "time_preference":      self.time_preference,
+            "time_slot":            self.time_slot,
             "status":               self.status,
             "notes":                self.notes,
             "provider_name":        self.provider_name,
