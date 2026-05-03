@@ -152,6 +152,38 @@ def update_booking_status(booking_id):
     if new_status == 'under_review':
         booking.reviewed_by = 'admin'
     db.session.commit()
+
+    # WhatsApp: booking confirmed → notify client + provider
+    if new_status == 'confirmed':
+        try:
+            from shizuverse.utils.notifications import (
+                notify_booking_confirmed_client,
+                notify_booking_confirmed_provider,
+            )
+            apt = booking.appointment_date
+            date_str = apt.strftime('%d/%m/%Y') if apt else ''
+            time_str = apt.strftime('%Hh%M') if apt else ''
+            commune = (booking.client_location or '').split(',')[0].strip()
+            notify_booking_confirmed_client(
+                client_name=booking.client_name,
+                client_phone=booking.client_phone,
+                booking_ref=str(booking.id),
+                provider_name=booking.provider_name or 'Shizu',
+                date=date_str,
+                time=time_str,
+            )
+            if booking.provider_phone:
+                notify_booking_confirmed_provider(
+                    provider_phone=booking.provider_phone,
+                    client_name=booking.client_name,
+                    service=booking.service_name,
+                    date=date_str,
+                    time=time_str,
+                    commune=commune,
+                )
+        except Exception:
+            pass
+
     return jsonify({'id': booking.id, 'status': booking.status})
 
 @admin_bp.route('/providers', methods=['GET'])
@@ -593,6 +625,19 @@ def complete_provider_booking(booking_id):
     )
     db.session.add(event)
     db.session.commit()
+
+    # WhatsApp: notify client to leave a review
+    try:
+        from shizuverse.utils.notifications import notify_booking_completed
+        notify_booking_completed(
+            client_phone=booking.client_phone,
+            client_name=booking.client_name,
+            provider_name=booking.provider_name or 'votre prestataire',
+            booking_id=booking_id,
+        )
+    except Exception:
+        pass
+
     return jsonify({'success': True, 'status': 'completed'})
 
 
@@ -614,6 +659,22 @@ def accept_provider_booking(booking_id):
     booking.provider_phone = sp.phone_number if sp else None
     booking.reviewed_by = 'provider'
     db.session.commit()
+
+    # WhatsApp: confirm to client
+    try:
+        from shizuverse.utils.notifications import notify_booking_confirmed_client
+        apt = booking.appointment_date
+        notify_booking_confirmed_client(
+            client_name=booking.client_name,
+            client_phone=booking.client_phone,
+            booking_ref=str(booking.id),
+            provider_name=booking.provider_name or 'Shizu',
+            date=apt.strftime('%d/%m/%Y') if apt else '',
+            time=apt.strftime('%Hh%M') if apt else '',
+        )
+    except Exception:
+        pass
+
     return jsonify({'success': True, 'status': 'confirmed'})
 
 

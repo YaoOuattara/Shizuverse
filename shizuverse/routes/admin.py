@@ -114,6 +114,14 @@ def approve_provider(provider_id):
     db.session.add(notification)
     db.session.commit()
 
+    # WhatsApp: congratulate the provider
+    try:
+        from shizuverse.utils.notifications import notify_provider_approved
+        if p.phone_number:
+            notify_provider_approved(provider_phone=p.phone_number)
+    except Exception:
+        pass
+
     return jsonify({'message': 'Provider approved', 'provider_id': provider_id})
 
 
@@ -142,6 +150,17 @@ def reject_provider(provider_id):
     )
     db.session.add(notification)
     db.session.commit()
+
+    # WhatsApp: inform provider of rejection with reason
+    try:
+        from shizuverse.utils.notifications import notify_provider_rejected
+        if p.phone_number:
+            notify_provider_rejected(
+                provider_phone=p.phone_number,
+                reason=reason,
+            )
+    except Exception:
+        pass
 
     return jsonify({'message': 'Provider rejected', 'provider_id': provider_id})
 
@@ -464,6 +483,28 @@ def update_finance(booking_id):
         b.payout_status = payout
 
     db.session.commit()
+
+    # WhatsApp: payment recorded → notify provider; payout sent → notify provider
+    try:
+        from shizuverse.utils.notifications import notify_payment_recorded, notify_payout_sent
+        eff_payout = b.provider_payout or (
+            round((b.final_amount or b.amount_xof or 0) * 0.85)
+        )
+        booking_ref = str(b.id)
+        if payment == 'paid' and b.provider_phone and eff_payout:
+            notify_payment_recorded(
+                provider_phone=b.provider_phone,
+                booking_ref=booking_ref,
+                provider_payout=eff_payout,
+            )
+        if payout == 'sent' and b.provider_phone and eff_payout:
+            notify_payout_sent(
+                provider_phone=b.provider_phone,
+                provider_payout=eff_payout,
+            )
+    except Exception:
+        pass
+
     return jsonify({
         'message': 'Finance status updated',
         'payment_status': b.payment_status,
@@ -694,4 +735,26 @@ def finance_summary():
         'payouts_due_value_xof': int(payouts_due_value),
         'failed_payouts': failed_payouts,
         'unpaid_completed_bookings': unpaid_completed,
+    })
+
+
+# ── WhatsApp / Twilio test ────────────────────────────────────
+
+@admin_bp.route('/notifications/test', methods=['POST'])
+@admin_required
+def test_notification():
+    """Send a test WhatsApp to verify Twilio is wired up.
+    Body: { phone: '+2250700000000', message?: 'Custom text' }
+    """
+    from shizuverse.utils.notifications import send_whatsapp, is_twilio_enabled
+    data = request.get_json() or {}
+    phone = (data.get('phone') or '').strip()
+    if not phone:
+        return jsonify({'error': 'phone is required'}), 400
+    message = data.get('message') or 'Test Shizu WhatsApp ✅ — Twilio is configured correctly.'
+    sent = send_whatsapp(phone, message)
+    return jsonify({
+        'sent': sent,
+        'twilio_enabled': is_twilio_enabled(),
+        'to': phone,
     })

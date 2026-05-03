@@ -121,6 +121,19 @@ def create_booking():
     )
     db.session.add(booking)
     db.session.commit()
+
+    # WhatsApp: notify client their request was received
+    try:
+        from shizuverse.utils.notifications import notify_booking_created
+        booking_ref = f"SHZ-{booking.created_at.year if booking.created_at else ''}-{booking.id}"
+        notify_booking_created(
+            client_name=booking.client_name,
+            client_phone=booking.client_phone,
+            booking_ref=str(booking.id),
+        )
+    except Exception:
+        pass  # never block the response
+
     return jsonify(booking.to_dict()), 201
 
 
