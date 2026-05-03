@@ -235,6 +235,41 @@ def notify_registration_submitted(*, provider_name: str, provider_phone: str) ->
     return send_whatsapp(provider_phone, msg)
 
 
+def notify_payment_instructions(
+    *, client_name: str, client_phone: str,
+    booking_ref: str, amount: int,
+) -> bool:
+    """Sent when admin sets a quote and requests payment from the client."""
+    amt_fmt = f"{amount:,}".replace(",", " ")
+    wave   = os.environ.get("SHIZU_WAVE_NUMBER", "").strip()
+    orange = os.environ.get("SHIZU_ORANGE_NUMBER", "").strip()
+    mtn    = os.environ.get("SHIZU_MTN_NUMBER", "").strip()
+    methods = []
+    if wave:   methods.append(f"Wave: {wave}")
+    if orange: methods.append(f"Orange Money: {orange}")
+    if mtn:    methods.append(f"MTN MoMo: {mtn}")
+    methods_str = " | ".join(methods) if methods else "contactez Shizu"
+    msg = (
+        f"💳 {client_name}, votre devis pour la réservation #{booking_ref} est de {amt_fmt} FCFA. "
+        f"Réglez via Mobile Money ({methods_str}) puis envoyez la capture à Shizu. "
+        f"Merci !"
+    )
+    return send_whatsapp(client_phone, msg)
+
+
+def notify_payment_confirmed(
+    *, client_name: str, client_phone: str, booking_ref: str, amount: int,
+) -> bool:
+    """Sent when admin records payment as confirmed/paid."""
+    amt_fmt = f"{amount:,}".replace(",", " ")
+    msg = (
+        f"✅ Paiement de {amt_fmt} FCFA reçu pour la réservation #{booking_ref}. "
+        f"Merci {client_name} ! Votre prestataire Shizu est confirmé. "
+        f"Bonne mission !"
+    )
+    return send_whatsapp(client_phone, msg)
+
+
 def notify_new_booking_request(
     *, provider_phone: str, service_type: str,
     commune: str, date: str, time_preference: str,
