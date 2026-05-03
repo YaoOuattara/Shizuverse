@@ -161,3 +161,93 @@ def notify_payout_sent(*, provider_phone: str, provider_payout: int) -> bool:
         f"Merci pour votre travail avec Shizu !"
     )
     return send_whatsapp(provider_phone, msg)
+
+
+def notify_provider_assigned(
+    *, client_name: str, client_phone: str,
+    booking_ref: str, provider_name: str,
+    date: str, commune: str,
+) -> bool:
+    msg = (
+        f"🔍 Bonne nouvelle {client_name} ! Un prestataire a été trouvé pour votre mission #{booking_ref}. "
+        f"{provider_name} interviendra le {date} à {commune}. "
+        f"Nous vous confirmons les détails sous peu."
+    )
+    return send_whatsapp(client_phone, msg)
+
+
+def notify_provider_started(
+    *, client_name: str, client_phone: str, provider_name: str,
+) -> bool:
+    shizu_wa = os.environ.get("NEXT_PUBLIC_SHIZU_WHATSAPP", "").replace("+", "").strip()
+    wa_link = f"wa.me/{shizu_wa}" if shizu_wa else "wa.me/2250700000000"
+    msg = (
+        f"🔧 {provider_name} a démarré votre mission ! "
+        f"En cas de problème, contactez Shizu immédiatement: {wa_link}. "
+        f"Nous restons disponibles pour vous."
+    )
+    return send_whatsapp(client_phone, msg)
+
+
+def notify_review_received(
+    *, provider_phone: str, client_name: str,
+    rating: int, comment_preview: str,
+) -> bool:
+    preview = comment_preview[:80].rstrip() + ("…" if len(comment_preview) > 80 else "")
+    msg = (
+        f"⭐ Nouvel avis ! {client_name} vous a donné {rating}/5 : '{preview}'. "
+        f"Merci pour votre excellent travail avec Shizu !"
+    )
+    return send_whatsapp(provider_phone, msg)
+
+
+def notify_booking_cancelled_client(
+    *, client_name: str, client_phone: str,
+    booking_ref: str, reason: str,
+) -> bool:
+    shizu_wa = os.environ.get("NEXT_PUBLIC_SHIZU_WHATSAPP", "").replace("+", "").strip()
+    wa_link = f"wa.me/{shizu_wa}" if shizu_wa else "wa.me/2250700000000"
+    display_reason = reason.strip() or "Non précisée"
+    msg = (
+        f"❌ Votre réservation #{booking_ref} a été annulée. "
+        f"Raison: {display_reason}. "
+        f"Pour toute question contactez-nous: {wa_link}"
+    )
+    return send_whatsapp(client_phone, msg)
+
+
+def notify_booking_cancelled_provider(
+    *, provider_phone: str, booking_ref: str, date: str,
+) -> bool:
+    msg = (
+        f"❌ La mission #{booking_ref} du {date} a été annulée par le client. "
+        f"Votre tableau de bord a été mis à jour: www.shizu.pro/fr/provider"
+    )
+    return send_whatsapp(provider_phone, msg)
+
+
+def notify_registration_submitted(*, provider_name: str, provider_phone: str) -> bool:
+    msg = (
+        f"👋 Bonjour {provider_name} ! Nous avons bien reçu votre candidature Shizu. "
+        f"Notre équipe vérifie votre profil sous 48h et vous contactera sur ce numéro. "
+        f"En attendant, complétez votre profil: www.shizu.pro/fr/provider/profile"
+    )
+    return send_whatsapp(provider_phone, msg)
+
+
+def notify_new_booking_request(
+    *, provider_phone: str, service_type: str,
+    commune: str, date: str, time_preference: str,
+) -> bool:
+    pref_map = {
+        "morning": "matin 8h–12h",
+        "afternoon": "après-midi 12h–17h",
+        "evening": "soirée 17h–20h",
+        "anytime": "flexible",
+    }
+    pref_label = pref_map.get(time_preference, time_preference or "flexible")
+    msg = (
+        f"🔔 Nouvelle demande ! {service_type} à {commune} le {date} ({pref_label}). "
+        f"Connectez-vous pour accepter: www.shizu.pro/fr/provider"
+    )
+    return send_whatsapp(provider_phone, msg)

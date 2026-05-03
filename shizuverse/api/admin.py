@@ -132,6 +132,23 @@ def assign_booking(booking_id):
     booking.provider_phone = provider_phone
     booking.status = 'assigned'
     db.session.commit()
+
+    # WhatsApp: tell client a provider has been found
+    try:
+        from shizuverse.utils.notifications import notify_provider_assigned
+        apt = booking.appointment_date
+        commune = (booking.client_location or '').split(',')[0].strip()
+        notify_provider_assigned(
+            client_name=booking.client_name,
+            client_phone=booking.client_phone,
+            booking_ref=str(booking.id),
+            provider_name=provider_name,
+            date=apt.strftime('%d/%m/%Y') if apt else '',
+            commune=commune,
+        )
+    except Exception:
+        pass
+
     return jsonify({
         'id': booking.id,
         'status': booking.status,
@@ -512,6 +529,16 @@ def provider_register():
 
     db.session.commit()
 
+    # WhatsApp: confirm registration received
+    try:
+        from shizuverse.utils.notifications import notify_registration_submitted
+        notify_registration_submitted(
+            provider_name=display_name,
+            provider_phone=phone,
+        )
+    except Exception:
+        pass
+
     return jsonify({
         'success': True,
         'message': 'Registration received. Our team will review your profile.',
@@ -596,6 +623,18 @@ def start_provider_booking(booking_id):
     )
     db.session.add(event)
     db.session.commit()
+
+    # WhatsApp: tell client provider has started
+    try:
+        from shizuverse.utils.notifications import notify_provider_started
+        notify_provider_started(
+            client_name=booking.client_name,
+            client_phone=booking.client_phone,
+            provider_name=booking.provider_name or (sp.company_name if sp else 'Le prestataire'),
+        )
+    except Exception:
+        pass
+
     return jsonify({'success': True, 'status': 'in_progress'})
 
 

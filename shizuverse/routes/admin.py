@@ -447,6 +447,28 @@ def cancel_booking(booking_id):
     db.session.add(event)
     db.session.commit()
 
+    # WhatsApp: notify client + provider (if assigned) of cancellation
+    try:
+        from shizuverse.utils.notifications import (
+            notify_booking_cancelled_client,
+            notify_booking_cancelled_provider,
+        )
+        notify_booking_cancelled_client(
+            client_name=b.client_name,
+            client_phone=b.client_phone,
+            booking_ref=str(b.id),
+            reason=reason or '',
+        )
+        if b.provider_phone:
+            apt = b.appointment_date
+            notify_booking_cancelled_provider(
+                provider_phone=b.provider_phone,
+                booking_ref=str(b.id),
+                date=apt.strftime('%d/%m/%Y') if apt else '',
+            )
+    except Exception:
+        pass
+
     return jsonify({'message': 'Booking cancelled', 'booking_id': booking_id})
 
 

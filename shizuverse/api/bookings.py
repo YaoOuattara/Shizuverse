@@ -125,14 +125,49 @@ def create_booking():
     # WhatsApp: notify client their request was received
     try:
         from shizuverse.utils.notifications import notify_booking_created
-        booking_ref = f"SHZ-{booking.created_at.year if booking.created_at else ''}-{booking.id}"
         notify_booking_created(
             client_name=booking.client_name,
             client_phone=booking.client_phone,
             booking_ref=str(booking.id),
         )
     except Exception:
-        pass  # never block the response
+        pass
+
+    # WhatsApp: ping approved active providers in the matching commune
+    try:
+        from shizuverse.utils.notifications import notify_new_booking_request
+        from shizuverse.models.service_provider import ServiceProvider
+        commune = (booking.client_location or '').split(',')[0].strip()
+        apt = booking.appointment_date
+        date_str = apt.strftime('%d/%m/%Y') if apt else ''
+
+        candidates = ServiceProvider.query.filter(
+            ServiceProvider.verification_status == 'approved',
+            ServiceProvider.provider_status == 'active',
+        ).all()
+
+        seen_users: set = set()
+        zone_matched = []
+        all_active = []
+        for sp in candidates:
+            if sp.user_id in seen_users or not sp.phone_number:
+                continue
+            seen_users.add(sp.user_id)
+            if commune and sp.address and commune.lower() in sp.address.lower():
+                zone_matched.append(sp)
+            else:
+                all_active.append(sp)
+
+        for sp in (zone_matched or all_active):
+            notify_new_booking_request(
+                provider_phone=sp.phone_number,
+                service_type=booking.service_name,
+                commune=commune,
+                date=date_str,
+                time_preference=booking.time_preference or '',
+            )
+    except Exception:
+        pass
 
     return jsonify(booking.to_dict()), 201
 

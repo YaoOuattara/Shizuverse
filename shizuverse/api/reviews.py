@@ -52,4 +52,20 @@ def submit_review():
     )
     db.session.add(review)
     db.session.commit()
+
+    # WhatsApp: tell provider they received a review
+    try:
+        from shizuverse.utils.notifications import notify_review_received
+        if provider_id:
+            sp_for_notify = ServiceProvider.query.get(provider_id)
+            if sp_for_notify and sp_for_notify.phone_number:
+                notify_review_received(
+                    provider_phone=sp_for_notify.phone_number,
+                    client_name=booking.client_name,
+                    rating=rating,
+                    comment_preview=(data.get("comment") or ""),
+                )
+    except Exception:
+        pass
+
     return jsonify({"success": True, "id": review.id}), 200
