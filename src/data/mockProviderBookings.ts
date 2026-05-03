@@ -19,6 +19,8 @@ export interface ProviderBooking {
   status: ProviderBookingStatus;
   notes?: string;
   requestedAt: string;
+  urgency?: string;          // urgent_2h | same_day | under_24h | normal
+  time_preference?: string;  // morning | afternoon | evening | anytime
 }
 
 // todo: remove mock functionality - replace with API data

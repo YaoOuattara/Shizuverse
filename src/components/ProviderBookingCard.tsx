@@ -41,6 +41,7 @@ import {
   Clock3,
   MapPin,
   Flag,
+  Zap,
 } from "lucide-react";
 import { useState } from "react";
 import type { ProviderBooking, ProviderBookingStatus } from "@/data/mockProviderBookings";
@@ -236,6 +237,45 @@ export default function ProviderBookingCard({
                 </span>
               </div>
             </div>
+
+            {/* Urgency + time preference chips */}
+            {(booking.urgency || booking.time_preference) && (
+              <div className="flex flex-wrap gap-1.5 pt-2 border-t">
+                {booking.urgency === 'urgent_2h' && (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-2 py-0.5 rounded-full">
+                    <Zap className="h-3 w-3" />
+                    Urgence — 2h
+                  </span>
+                )}
+                {booking.urgency === 'same_day' && (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                    <Clock className="h-3 w-3" />
+                    Aujourd&apos;hui
+                  </span>
+                )}
+                {booking.urgency === 'under_24h' && (
+                  <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                    <Clock className="h-3 w-3" />
+                    Moins de 24h
+                  </span>
+                )}
+                {booking.time_preference === 'morning' && (
+                  <span className="inline-flex items-center gap-1 text-xs bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded-full">
+                    🌅 Matin · 8h–12h
+                  </span>
+                )}
+                {booking.time_preference === 'afternoon' && (
+                  <span className="inline-flex items-center gap-1 text-xs bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded-full">
+                    ☀️ Après-midi · 12h–17h
+                  </span>
+                )}
+                {booking.time_preference === 'evening' && (
+                  <span className="inline-flex items-center gap-1 text-xs bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded-full">
+                    🌆 Soirée · 17h–20h
+                  </span>
+                )}
+              </div>
+            )}
 
             {booking.notes && (
               <div className="flex items-start gap-2 text-muted-foreground pt-2 border-t">

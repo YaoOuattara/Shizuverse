@@ -341,6 +341,8 @@ export default function AdminBookings() {
     baseAmount: b.final_amount ?? b.amount_xof ?? 0,
     platformFeeAmount: b.shizu_commission ?? 0,
     providerPayoutAmount: b.provider_payout ?? 0,
+    urgency: b.urgency as import("@/utils/pricingEngine").UrgencyLevel | undefined,
+    timePreference: b.time_preference as import("@/utils/pricingEngine").TimePreference | undefined,
     paymentStatus: (b.payment_status as AdminBooking["paymentStatus"]) || "unpaid",
     payoutStatus: (b.payout_status as AdminBooking["payoutStatus"]) || "not_due",
     address: b.client_location || "",
@@ -1067,11 +1069,37 @@ export default function AdminBookings() {
               <div className="space-y-3">
                 <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Horaire & Lieu" : "Schedule & Location"}</h4>
                 <div className="space-y-2">
+                  {/* Urgency badge */}
+                  {urgencyMap[selectedBooking.id] && (
+                    <div className="flex items-center gap-2">
+                      {urgencyMap[selectedBooking.id] === 'urgent_2h' ? (
+                        <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 gap-1">
+                          <CalendarClock className="h-3 w-3" />
+                          {isFr ? "⚡ Urgence — 2h" : "⚡ Urgent — 2h"}
+                        </Badge>
+                      ) : urgencyMap[selectedBooking.id] === 'same_day' ? (
+                        <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                          {isFr ? "Aujourd'hui" : "Same Day"}
+                        </Badge>
+                      ) : urgencyMap[selectedBooking.id] === 'under_24h' ? (
+                        <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                          {isFr ? "Moins de 24h" : "Under 24h"}
+                        </Badge>
+                      ) : null}
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span>{formatDate(selectedBooking.date, isFr ? 'fr' : 'en', true)}</span>
                   </div>
-                  {selectedBooking.time && (
+                  {/* Time preference */}
+                  {selectedBooking.timePreference && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span>{TIME_PREF_LABELS[selectedBooking.timePreference]?.[isFr ? 'fr' : 'en'] ?? selectedBooking.timePreference}</span>
+                    </div>
+                  )}
+                  {selectedBooking.time && !selectedBooking.timePreference && (
                     <div className="flex items-center gap-2 text-sm">
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       <span>{selectedBooking.time}</span>
