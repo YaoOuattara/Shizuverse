@@ -40,14 +40,10 @@ import {
 } from "@/components/ui/select";
 import {
   Search,
-  Filter,
   Calendar,
-  Clock,
   User,
-  Mail,
   Phone,
   CheckCircle2,
-  XCircle,
   Loader2,
   AlertCircle,
   ArrowUpRight,
@@ -59,7 +55,7 @@ import {
   Building2,
   FileText,
 } from "lucide-react";
-import { useAdminBookings, useAdminFinanceSummary, type ApiBooking } from "@/hooks/useAdminApi";
+import { useAdminBookings, useAdminOverview, type ApiBooking } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
@@ -91,8 +87,10 @@ interface PaymentBooking {
 }
 
 function toPaymentBooking(b: ApiBooking): PaymentBooking {
-  const amount = b.amount_xof ?? 0;
-  const platformFee = Math.round(amount * 0.15);
+  // Use final_amount when available (set after payment confirmed); fall back to amount_xof (quoted price)
+  const finalAmt   = b.final_amount   ?? b.amount_xof ?? 0;
+  const commission = b.shizu_commission != null ? b.shizu_commission : Math.round(finalAmt * 0.15);
+  const payout     = b.provider_payout  != null ? b.provider_payout  : finalAmt - commission;
   const d = b.appointment_date ? new Date(b.appointment_date) : null;
   return {
     id: String(b.id),
@@ -104,10 +102,10 @@ function toPaymentBooking(b: ApiBooking): PaymentBooking {
     status: b.status,
     paymentStatus: b.payment_status,
     payoutStatus: b.payout_status,
-    price: amount,
-    baseAmount: amount,
-    platformFeeAmount: platformFee,
-    providerPayoutAmount: amount - platformFee,
+    price: finalAmt,
+    baseAmount: finalAmt,
+    platformFeeAmount: commission,
+    providerPayoutAmount: payout,
     currency: 'XOF',
     date: d ? d.toLocaleDateString('fr-FR') : '',
     time: d ? d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '',
@@ -146,7 +144,7 @@ export default function AdminPayments() {
   const { toast } = useToast();
   const params = useParams();
   const isFr = (params?.locale as string) === "fr";
-  const { summary, isLoading: summaryLoading } = useAdminFinanceSummary();
+  const { overview, loading: overviewLoading } = useAdminOverview();
   const { bookings: apiBookings } = useAdminBookings();
 
   const [bookings, setBookings] = useState<PaymentBooking[]>([]);
@@ -300,95 +298,88 @@ export default function AdminPayments() {
   return (
     <AdminLayout title={isFr ? "Paiements" : "Payments"}>
       <div className="space-y-4">
-        {/* Live Finance Summary */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          <Card>
+        {/* Finance Summary — same source as Overview GMV */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Card className="border-l-4 border-l-emerald-500">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                <span className="text-xs">{isFr ? "Réservations complétées" : "Completed bookings"}</span>
-              </div>
-              {summaryLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              ) : (
-                <p className="text-lg font-bold" data-testid="live-stat-completed">
-                  {summary?.completed_bookings ?? "—"}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
                 <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
-                <span className="text-xs">{isFr ? "Total encaissé (XOF)" : "Total paid (XOF)"}</span>
+                <span className="text-xs font-medium">{isFr ? "Total encaissé" : "Total Collected"}</span>
               </div>
-              {summaryLoading ? (
+              {overviewLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               ) : (
-                <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400" data-testid="live-stat-paid">
-                  {formatMoney(summary?.total_paid_xof ?? 0)}
-                </p>
+                <>
+                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400" data-testid="live-stat-paid">
+                    {new Intl.NumberFormat('fr-FR').format(overview?.gmv_total ?? 0)} FCFA
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {isFr ? "Montant final payé" : "Final amount paid"}
+                  </p>
+                </>
               )}
             </CardContent>
           </Card>
-          <Card>
+
+          <Card className="border-l-4 border-l-violet-500">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                <Receipt className="h-4 w-4 text-violet-500" />
+                <span className="text-xs font-medium">{isFr ? "Revenus Shizu" : "Shizu Revenue"}</span>
+              </div>
+              {overviewLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <p className="text-lg font-bold text-violet-600 dark:text-violet-400" data-testid="live-stat-revenue-shizu">
+                    {new Intl.NumberFormat('fr-FR').format(overview?.revenue_shizu ?? 0)} FCFA
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {isFr ? "Commission 15%" : "15% commission"}
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-amber-500">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
                 <ArrowUpRight className="h-4 w-4 text-amber-500" />
-                <span className="text-xs">{isFr ? "Paiements dus (nb)" : "Payouts due (count)"}</span>
+                <span className="text-xs font-medium">{isFr ? "Versements dus" : "Payouts Due"}</span>
               </div>
-              {summaryLoading ? (
+              {overviewLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               ) : (
-                <p className="text-lg font-bold text-amber-600 dark:text-amber-400" data-testid="live-stat-payouts-due-count">
-                  {summary?.payouts_due_count ?? "—"}
-                </p>
+                <>
+                  <p className="text-lg font-bold text-amber-600 dark:text-amber-400" data-testid="live-stat-payouts-due">
+                    {new Intl.NumberFormat('fr-FR').format(overview?.payouts_due ?? 0)} FCFA
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {isFr ? "Provider payout non envoyé" : "Provider payout not sent"}
+                  </p>
+                </>
               )}
             </CardContent>
           </Card>
-          <Card>
+
+          <Card className="border-l-4 border-l-blue-400">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <Banknote className="h-4 w-4 text-amber-500" />
-                <span className="text-xs">{isFr ? "Valeur paiements dus" : "Payouts due value"}</span>
+              <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                <CheckCircle2 className="h-4 w-4 text-blue-400" />
+                <span className="text-xs font-medium">{isFr ? "Total versé" : "Total Paid Out"}</span>
               </div>
-              {summaryLoading ? (
+              {overviewLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               ) : (
-                <p className="text-lg font-bold text-amber-600 dark:text-amber-400" data-testid="live-stat-payouts-due-value">
-                  {formatMoney(summary?.payouts_due_value_xof ?? 0)}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <XCircle className="h-4 w-4 text-red-500" />
-                <span className="text-xs">{isFr ? "Paiements échoués" : "Failed payouts"}</span>
-              </div>
-              {summaryLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              ) : (
-                <p className="text-lg font-bold text-red-600 dark:text-red-400" data-testid="live-stat-failed-payouts">
-                  {summary?.failed_payouts ?? "—"}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <Clock className="h-4 w-4 text-amber-500" />
-                <span className="text-xs">{isFr ? "Complétées non payées" : "Unpaid completed"}</span>
-              </div>
-              {summaryLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              ) : (
-                <p className="text-lg font-bold text-amber-600 dark:text-amber-400" data-testid="live-stat-unpaid-completed">
-                  {summary?.unpaid_completed_bookings ?? "—"}
-                </p>
+                <>
+                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400" data-testid="live-stat-payouts-sent">
+                    {new Intl.NumberFormat('fr-FR').format(overview?.payouts_sent ?? 0)} FCFA
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {isFr ? "Versé aux prestataires" : "Sent to providers"}
+                  </p>
+                </>
               )}
             </CardContent>
           </Card>
