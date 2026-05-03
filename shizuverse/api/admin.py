@@ -119,6 +119,17 @@ def get_bookings():
         })
     return jsonify({'bookings': result, 'count': len(result)})
 
+@admin_bp.route('/bookings/<int:booking_id>/recommendations', methods=['GET'])
+@require_admin_token
+def get_booking_recommendations(booking_id):
+    from shizuverse.utils.ai_matcher import get_provider_recommendations
+    try:
+        recs = get_provider_recommendations(booking_id)
+        return jsonify({'recommendations': recs})
+    except Exception as e:
+        return jsonify({'error': str(e), 'recommendations': []}), 500
+
+
 @admin_bp.route('/bookings/<int:booking_id>/assign', methods=['PUT'])
 @require_admin_token
 def assign_booking(booking_id):
