@@ -313,3 +313,32 @@ api.ts: added portalGetReviews, portalModerateReview
 
 NEXT: Part 3 (provider category/zone filters, quote stored on booking)
       CLAUDE.md Step 6/7 pending, Tailwind production styling fix
+
+---
+2026-05-02 — Session: 3 admin builds + backend columns
+
+### Build 1 — Payment Final Amount Modal (AdminBookings.tsx)
+- Replaced direct "mark paid" with a payment confirmation modal
+- Modal: quoted price (read-only), editable final_amount, live 15%/85% breakdown
+- On confirm: sends final_amount to PATCH /admin/bookings/{id}/finance
+- Backend: final_amount, shizu_commission, provider_payout columns added to ClientBooking
+- finance endpoint now computes breakdown (15%/85%) when final_amount is provided
+- Migration: add_final_amount_to_bookings.py (idempotent, checks existing columns)
+- Detail sheet fee breakdown shows actual commission/payout once payment recorded
+
+### Build 2 — Beauty Provider Gate (AdminProviders.tsx)
+- Provider list cards: amber "Vérif. renforcée" badge for beauty providers without id_document_url
+- Detail sheet: amber warning box + Approuver button disabled if beauty + no id_document_url
+- Same gate on re-approve (rejected → approved path)
+- Backend: GET /admin/providers now exposes id_document_url in list response
+- Backend: approve_provider returns 422 if beauty service + no id_document_url
+- Frontend handles 422 with descriptive toast
+
+### Build 3 — Admin Bilingual Strings Final Pass
+- AdminClients.tsx: full isFr ternary pass (was entirely French)
+- AdminWaitlist.tsx: full isFr ternary pass (was entirely French)
+- AdminProviders.tsx: fixed 2 hardcoded English error toasts (reject/suspend handlers)
+
+Commits:
+- Frontend: 1f7479c (frontend branch)
+- Backend: 20ed727 (staging branch)

@@ -580,20 +580,44 @@ def moderate_review(review_id):
 @admin_bp.route('/overview', methods=['GET'])
 @admin_required
 def get_overview():
-    """Single endpoint for all dashboard KPIs."""
+    """Single endpoint for all dashboard KPIs.
+
+    For bookings paid before the final_amount column existed, falls back to
+    amount_xof (the quoted price) so legacy paid bookings are counted in GMV.
+    Commission and payout are similarly computed from amount_xof when the
+    stored columns are null.
+    """
     from sqlalchemy import func
     from datetime import datetime
 
     now = datetime.utcnow()
     first_of_month = datetime(now.year, now.month, 1)
 
-    # ── GMV (sum of final_amount for paid bookings) ────────────
+    # Effective per-row amount: prefer final_amount, fall back to amount_xof.
+    # All columns are Integer so arithmetic stays integer (no ROUND/NUMERIC needed).
+    eff_amt = func.coalesce(
+        ClientBooking.final_amount,
+        ClientBooking.amount_xof,
+        0
+    )
+    # 15% commission using integer arithmetic (truncates, fine for FCFA integers)
+    eff_commission = func.coalesce(
+        ClientBooking.shizu_commission,
+        eff_amt * 15 / 100
+    )
+    # 85% payout = amount − 15% commission
+    eff_payout = func.coalesce(
+        ClientBooking.provider_payout,
+        eff_amt - eff_amt * 15 / 100
+    )
+
+    # ── GMV ───────────────────────────────────────────────────
     gmv_total = db.session.query(
-        func.coalesce(func.sum(ClientBooking.final_amount), 0)
+        func.coalesce(func.sum(eff_amt), 0)
     ).filter(ClientBooking.payment_status == 'paid').scalar()
 
     gmv_month = db.session.query(
-        func.coalesce(func.sum(ClientBooking.final_amount), 0)
+        func.coalesce(func.sum(eff_amt), 0)
     ).filter(
         ClientBooking.payment_status == 'paid',
         ClientBooking.created_at >= first_of_month
@@ -601,19 +625,19 @@ def get_overview():
 
     # ── Revenue Shizu (15% commission) ────────────────────────
     revenue_shizu = db.session.query(
-        func.coalesce(func.sum(ClientBooking.shizu_commission), 0)
+        func.coalesce(func.sum(eff_commission), 0)
     ).filter(ClientBooking.payment_status == 'paid').scalar()
 
     # ── Provider payouts ──────────────────────────────────────
     payouts_due = db.session.query(
-        func.coalesce(func.sum(ClientBooking.provider_payout), 0)
+        func.coalesce(func.sum(eff_payout), 0)
     ).filter(
         ClientBooking.payment_status == 'paid',
         ClientBooking.payout_status != 'sent'
     ).scalar()
 
     payouts_sent = db.session.query(
-        func.coalesce(func.sum(ClientBooking.provider_payout), 0)
+        func.coalesce(func.sum(eff_payout), 0)
     ).filter(ClientBooking.payout_status == 'sent').scalar()
 
     # ── Booking counts ────────────────────────────────────────
@@ -655,10 +679,11 @@ def get_overview():
 @admin_required
 def finance_summary():
     from sqlalchemy import func
-    completed = db.session.query(func.count(ClientBooking.id)).filter_by(status='completed').scalar()
-    total_paid = db.session.query(func.coalesce(func.sum(ClientBooking.amount_xof), 0)).filter_by(payment_status='paid').scalar()
+    eff_amt = func.coalesce(ClientBooking.final_amount, ClientBooking.amount_xof, 0)
+    completed   = db.session.query(func.count(ClientBooking.id)).filter_by(status='completed').scalar()
+    total_paid  = db.session.query(func.coalesce(func.sum(eff_amt), 0)).filter(ClientBooking.payment_status == 'paid').scalar()
     payouts_due_count = db.session.query(func.count(ClientBooking.id)).filter_by(payout_status='due').scalar()
-    payouts_due_value = db.session.query(func.coalesce(func.sum(ClientBooking.amount_xof), 0)).filter_by(payout_status='due').scalar()
+    payouts_due_value = db.session.query(func.coalesce(func.sum(eff_amt), 0)).filter(ClientBooking.payout_status == 'due').scalar()
     failed_payouts = db.session.query(func.count(ClientBooking.id)).filter_by(payout_status='failed').scalar()
     unpaid_completed = db.session.query(func.count(ClientBooking.id)).filter_by(status='completed', payment_status='unpaid').scalar()
 
