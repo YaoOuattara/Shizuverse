@@ -16,6 +16,8 @@ interface ApiBooking {
   provider_phone: string | null;
   provider_id: number | null;
   amount_xof: number | null;
+  final_amount: number | null;
+  payment_status: string;
   created_at: string | null;
   notes: string | null;
   client_location: string | null;
@@ -420,12 +422,18 @@ export default function ClientDashboard() {
                   </div>
 
                   {/* Provider + amount */}
-                  {(b.provider_name || b.amount_xof != null) && (
+                  {(b.provider_name || b.final_amount != null || b.amount_xof != null) && (
                     <div className="flex items-center gap-3 text-xs text-gray-500">
                       {b.provider_name && <span className="font-medium text-gray-700">{b.provider_name}</span>}
-                      {b.amount_xof != null && (
-                        <span>{new Intl.NumberFormat("fr-CI").format(b.amount_xof)} FCFA</span>
-                      )}
+                      {(() => {
+                        const effectiveAmt = b.final_amount ?? b.amount_xof;
+                        if (effectiveAmt == null) return null;
+                        const fmt = new Intl.NumberFormat("fr-FR").format(effectiveAmt) + " FCFA";
+                        if (b.payment_status === "paid") {
+                          return <span className="text-green-600 font-semibold">Réglé · {fmt}</span>;
+                        }
+                        return <span className="text-gray-500">Devis · {fmt}</span>;
+                      })()}
                     </div>
                   )}
 

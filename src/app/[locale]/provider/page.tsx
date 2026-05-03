@@ -44,21 +44,33 @@ import { useTranslations } from "next-intl";
 
 // Compute 4-state earnings from provider bookings
 function computeEarnings(bookings: ProviderBooking[]) {
-  type R = ProviderBooking & { payment_status?: string; payout_status?: string; amount_xof?: number };
+  type R = ProviderBooking & {
+    payment_status?: string;
+    payout_status?: string;
+    amount_xof?: number | null;
+    final_amount?: number | null;
+    provider_payout?: number | null;
+  };
   const rich = bookings as R[];
 
-  let gagne = 0;     // all completed
-  let verse = 0;     // completed + paid out
-  let enAttente = 0; // confirmed, awaiting payment
+  let gagne = 0;     // completed + paid → provider_payout (85% of final)
+  let verse = 0;     // payout_status=sent
+  let enAttente = 0; // confirmed/accepted, not yet paid (full expected amount)
 
   for (const b of rich) {
-    const amount = b.amount_xof ?? (typeof b.price === "number" ? b.price : 0);
-    if (!amount) continue;
-    if (b.status === "completed") {
-      gagne += amount;
-      if (b.payout_status === "sent" || b.payment_status === "paid") verse += amount;
-    } else if (b.status === "confirmed" && b.payment_status !== "paid") {
-      enAttente += amount;
+    // Effective payout: stored provider_payout, else 85% of final_amount or amount_xof
+    const base = b.final_amount ?? b.amount_xof ?? (typeof b.price === "number" ? b.price : 0);
+    const effPayout = b.provider_payout != null ? b.provider_payout : Math.round(base * 0.85);
+    if (!base) continue;
+
+    if (b.status === "completed" && b.payment_status === "paid") {
+      gagne += effPayout;
+    }
+    if (b.payout_status === "sent") {
+      verse += effPayout;
+    }
+    if (["confirmed", "accepted", "assigned"].includes(b.status as string) && b.payment_status !== "paid") {
+      enAttente += base; // full amount — payment not collected yet
     }
   }
 

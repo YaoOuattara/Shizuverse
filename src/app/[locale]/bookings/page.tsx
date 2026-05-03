@@ -25,6 +25,8 @@ interface ApiBooking {
   provider_name: string | null;
   provider_phone: string | null;
   amount_xof: number | null;
+  final_amount: number | null;
+  payment_status: string;
   created_at: string | null;
   notes: string | null;
 }
@@ -464,14 +466,19 @@ export default function BookingsPage() {
                   )}
 
                   {/* Amount */}
-                  {b.amount_xof != null && (
-                    <p className="text-sm text-muted-foreground">
-                      {isFr ? "Montant :" : "Amount:"}{" "}
-                      <span className="font-semibold text-foreground">
-                        {new Intl.NumberFormat("fr-CI").format(b.amount_xof)} FCFA
-                      </span>
-                    </p>
-                  )}
+                  {(b.final_amount != null || b.amount_xof != null) && (() => {
+                    const effectiveAmt = b.final_amount ?? b.amount_xof!;
+                    const fmt = new Intl.NumberFormat("fr-FR").format(effectiveAmt) + " FCFA";
+                    const isPaid = b.payment_status === "paid";
+                    return (
+                      <p className="text-sm text-muted-foreground">
+                        {isPaid
+                          ? <>{isFr ? "Montant réglé" : "Amount paid"}{" : "}<span className="font-semibold text-green-600">{fmt}</span></>
+                          : <>{isFr ? "Devis" : "Quote"}{" : "}<span className="font-semibold text-foreground">{fmt}</span></>
+                        }
+                      </p>
+                    );
+                  })()}
 
                   {/* Action buttons */}
                   <div className="flex flex-wrap gap-2 pt-1">
