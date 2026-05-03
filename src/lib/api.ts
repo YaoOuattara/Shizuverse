@@ -110,6 +110,15 @@ export const adminApi = {
   },
   portalModerateReview: (id: number, status: string, reason?: string) =>
     adminFetch(`/admin/reviews/${id}/moderate`, { method: "POST", body: JSON.stringify({ status, reason: reason || "" }) }),
+  portalLockAmount: (bookingId: number, confirmed_amount: number) =>
+    adminFetch(`/admin/bookings/${bookingId}/lock-amount`, { method: "POST", body: JSON.stringify({ confirmed_amount }) }),
+  portalConfirmPayment: (bookingId: number) =>
+    adminFetch(`/admin/bookings/${bookingId}/confirm-payment`, { method: "POST", body: JSON.stringify({}) }),
+  portalOpenDispute: (bookingId: number, reason: string) =>
+    adminFetch(`/admin/bookings/${bookingId}/dispute`, { method: "POST", body: JSON.stringify({ reason }) }),
+  portalResolveDispute: (bookingId: number, resolution: string) =>
+    adminFetch(`/admin/bookings/${bookingId}/resolve-dispute`, { method: "POST", body: JSON.stringify({ resolution }) }),
+  portalGetConfig: () => adminFetch("/admin/config"),
 };
 
 export default apiFetch;

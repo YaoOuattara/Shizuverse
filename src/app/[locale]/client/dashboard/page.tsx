@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { CalendarDays, Plus, MessageCircle, Star, Loader2, ChevronRight, KeyRound, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { CalendarDays, Plus, MessageCircle, Star, Loader2, ChevronRight, KeyRound, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -21,6 +21,8 @@ interface ApiBooking {
   created_at: string | null;
   notes: string | null;
   client_location: string | null;
+  payment_tier?: string | null;
+  deposit_amount?: number | null;
 }
 
 interface ClientInfo {
@@ -98,17 +100,19 @@ interface StatusBadge { label: string; bg: string; text: string; dot: string }
 
 function statusBadge(status: string, provider: string | null): StatusBadge {
   if (status === "completed")
-    return { label: "Terminée",      bg: "bg-green-50", text: "text-green-700", dot: "bg-green-500" };
+    return { label: "Terminée",          bg: "bg-green-50",  text: "text-green-700",  dot: "bg-green-500"  };
   if (status === "cancelled" || status === "declined" || status === "disputed")
-    return { label: "Annulée",       bg: "bg-red-50",   text: "text-red-700",   dot: "bg-red-500"   };
+    return { label: "Annulée",           bg: "bg-red-50",    text: "text-red-700",    dot: "bg-red-500"    };
+  if (status === "pending_payment")
+    return { label: "Paiement en attente", bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500"  };
   if (status === "accepted" || status === "in_progress")
-    return { label: "En cours",      bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" };
+    return { label: "En cours",          bg: "bg-amber-50",  text: "text-amber-700",  dot: "bg-amber-500"  };
   if (provider)
-    return { label: "Assignée",      bg: "bg-blue-50",  text: "text-blue-700",  dot: "bg-blue-500"  };
-  return   { label: "Demande reçue", bg: "bg-gray-100", text: "text-gray-600",  dot: "bg-gray-400"  };
+    return { label: "Assignée",          bg: "bg-blue-50",   text: "text-blue-700",   dot: "bg-blue-500"   };
+  return   { label: "Demande reçue",     bg: "bg-gray-100",  text: "text-gray-600",   dot: "bg-gray-400"   };
 }
 
-const ACTIVE_STATUSES = new Set(["requested", "pending", "accepted", "in_progress"]);
+const ACTIVE_STATUSES = new Set(["requested", "pending", "accepted", "in_progress", "pending_payment"]);
 const CANCELLED_STATUSES = new Set(["cancelled", "declined", "disputed"]);
 
 function waShizuHref(b: ApiBooking): string {
@@ -143,10 +147,12 @@ export default function ClientDashboard() {
   const [pwSaving, setPwSaving]       = useState(false);
   const [pwDone, setPwDone]           = useState(false);
   const [pwError, setPwError]         = useState<string | null>(null);
-  const [bookings, setBookings]       = useState<ApiBooking[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [filter, setFilter]           = useState<Filter>("all");
-  const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
+  const [bookings, setBookings]             = useState<ApiBooking[]>([]);
+  const [loading, setLoading]               = useState(true);
+  const [filter, setFilter]                 = useState<Filter>("all");
+  const [reviewedIds, setReviewedIds]       = useState<Set<string>>(new Set());
+  const [paymentDeclaredIds, setPaymentDeclaredIds] = useState<Set<number>>(new Set());
+  const [declaringPayment, setDeclaringPayment]     = useState<number | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("client_token");
@@ -190,7 +196,12 @@ export default function ClientDashboard() {
   }, []);
 
   const activeBooking = useMemo(
-    () => bookings.find(b => ACTIVE_STATUSES.has(b.status)) ?? null,
+    () => bookings.find(b => ACTIVE_STATUSES.has(b.status) && b.status !== "pending_payment") ?? null,
+    [bookings]
+  );
+
+  const pendingPaymentBookings = useMemo(
+    () => bookings.filter(b => b.status === "pending_payment"),
     [bookings]
   );
 
@@ -232,6 +243,20 @@ export default function ClientDashboard() {
     localStorage.removeItem("client_token");
     localStorage.removeItem("client_info");
     router.push(`/${locale}`);
+  }
+
+  async function handleDeclarePayment(bookingId: number) {
+    setDeclaringPayment(bookingId);
+    try {
+      const token = localStorage.getItem("client_token");
+      await fetch(`${FLASK_API}/api/bookings/${bookingId}/payment-declared`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      setPaymentDeclaredIds(prev => new Set([...prev, bookingId]));
+    } catch { /* silent */ } finally {
+      setDeclaringPayment(null);
+    }
   }
 
   if (loading) {
@@ -356,6 +381,55 @@ export default function ClientDashboard() {
             )}
           </div>
         )}
+
+        {/* ── Pending payment cards ────────────────────────────────────── */}
+        {pendingPaymentBookings.map(b => {
+          const alreadyDeclared = paymentDeclaredIds.has(b.id);
+          const amt = b.final_amount ?? b.amount_xof;
+          const fmtAmt = amt != null ? new Intl.NumberFormat("fr-FR").format(amt) + " FCFA" : null;
+          const waMsg = `Bonjour Shizu, je dois effectuer le paiement pour ma réservation ${bookingRef(b)}${fmtAmt ? ` (${fmtAmt})` : ""}. Pouvez-vous m'envoyer les coordonnées de paiement ?`;
+          return (
+            <div key={b.id} className="rounded-2xl bg-amber-50 border-2 border-amber-200 p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Paiement en attente</p>
+                  <p className="font-bold text-gray-900 mt-0.5">{translateService(b.service_name)}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{bookingRef(b)}</p>
+                </div>
+                {fmtAmt && (
+                  <span className="ml-auto shrink-0 font-bold text-amber-800">{fmtAmt}</span>
+                )}
+              </div>
+              {alreadyDeclared ? (
+                <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-xl px-3 py-2.5">
+                  <CheckCircle className="h-4 w-4 shrink-0" />
+                  <span className="text-xs font-medium">Paiement déclaré — en attente de confirmation Shizu</span>
+                </div>
+              ) : (
+                <div className="flex gap-2 flex-wrap">
+                  {SHIZU_WA && (
+                    <a href={`https://wa.me/${SHIZU_WA}?text=${encodeURIComponent(waMsg)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 border border-amber-300 bg-white text-amber-700 hover:bg-amber-50 text-xs font-semibold px-3 py-2.5 rounded-xl transition-colors">
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      Obtenir instructions
+                    </a>
+                  )}
+                  <button
+                    disabled={declaringPayment === b.id}
+                    onClick={() => handleDeclarePayment(b.id)}
+                    className="flex-1 flex items-center justify-center gap-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white text-xs font-semibold px-3 py-2.5 rounded-xl transition-colors">
+                    {declaringPayment === b.id
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <CheckCircle className="h-3.5 w-3.5" />}
+                    J&apos;ai effectué le paiement
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {/* ── Filter chips ─────────────────────────────────────────────── */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 no-scrollbar">

@@ -55,6 +55,10 @@ import {
   CalendarClock,
   MessageSquare,
   AlertCircle,
+  Lock,
+  LockOpen,
+  Copy,
+  Send,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useAdminStore, type AdminBooking, type StatusHistoryEntry } from "@/data/adminStore";
@@ -136,6 +140,19 @@ const TIME_PREF_LABELS: Record<string, { fr: string; en: string }> = {
   morning:   { fr: 'Matin (8h–12h)',          en: 'Morning (8am–12pm)' },
   afternoon: { fr: 'Après-midi (12h–17h)',    en: 'Afternoon (12pm–5pm)' },
   evening:   { fr: 'Soir (17h–21h, +10%)',   en: 'Evening (5pm–9pm, +10%)' },
+};
+
+const TIER_LABELS: Record<string, string> = {
+  after_service: 'Paiement après service',
+  deposit_30:    'Acompte 30%',
+  deposit_40:    'Acompte 40%',
+  full_prepay:   'Prépaiement intégral',
+};
+
+const CANCELLATION_LABELS: Record<string, string> = {
+  full_refund:           'Remboursement intégral',
+  provider_compensation: 'Acompte dû au prestataire',
+  no_refund:             'Aucun remboursement',
 };
 
 const paymentColors: Record<string, string> = {
@@ -404,6 +421,20 @@ export default function AdminBookings() {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [finalAmountInput, setFinalAmountInput] = useState("");
 
+  // Amount lock state
+  const [lockAmountInput, setLockAmountInput] = useState("");
+  const [lockAmountSaving, setLockAmountSaving] = useState(false);
+  const [amountLockedOverrides, setAmountLockedOverrides] = useState<Record<string, boolean>>({});
+
+  // Dispute state
+  const [disputeModalOpen, setDisputeModalOpen] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
+  const [disputeFlagOverrides, setDisputeFlagOverrides] = useState<Record<string, boolean>>({});
+
+  // Payment instructions modal
+  const [paymentInstructionsOpen, setPaymentInstructionsOpen] = useState(false);
+  const [adminConfig, setAdminConfig] = useState<{ wave_number?: string; orange_number?: string; mtn_number?: string; whatsapp?: string } | null>(null);
+
   const eligibleProviders = useMemo(() => {
     return liveProviders.filter((p: ApiProvider) =>
       p.verification_status === 'approved' && p.provider_status === 'active'
@@ -416,6 +447,20 @@ export default function AdminBookings() {
     apiBookings.forEach(b => { if (b.urgency) m[String(b.id)] = b.urgency; });
     return m;
   }, [apiBookings]);
+
+  // Map booking id → amount_locked (merge API data with optimistic overrides)
+  const amountLockedMap = useMemo(() => {
+    const m: Record<string, boolean> = {};
+    apiBookings.forEach(b => { m[String(b.id)] = b.amount_locked ?? false; });
+    return { ...m, ...amountLockedOverrides };
+  }, [apiBookings, amountLockedOverrides]);
+
+  // Load admin config (payment numbers) once on mount
+  useEffect(() => {
+    adminApi.portalGetConfig()
+      .then((data) => setAdminConfig(data))
+      .catch(() => {});
+  }, []);
 
   const filteredBookings = useMemo(() => {
     const filtered = bookings.filter((booking) => {
@@ -705,6 +750,64 @@ export default function AdminBookings() {
     setQuoteModalOpen(true);
   };
 
+  const handleLockAmount = async () => {
+    if (!selectedBooking || !lockAmountInput || Number(lockAmountInput) <= 0) return;
+    setLockAmountSaving(true);
+    try {
+      await adminApi.portalLockAmount(Number(selectedBooking.id), Number(lockAmountInput));
+      setAmountLockedOverrides(prev => ({ ...prev, [selectedBooking.id]: true }));
+      updateLocalBooking(selectedBooking.id, { baseAmount: Number(lockAmountInput), price: Number(lockAmountInput) });
+      setLockAmountInput("");
+      toast({ title: isFr ? "Montant verrouillé" : "Amount Locked", description: `${Number(lockAmountInput).toLocaleString('fr-FR')} FCFA confirmé.` });
+    } catch {
+      toast({ title: "Erreur", description: "Impossible de verrouiller le montant.", variant: "destructive" });
+    } finally {
+      setLockAmountSaving(false);
+    }
+  };
+
+  const handleOpenDispute = async () => {
+    if (!selectedBooking || !disputeReason.trim()) return;
+    setIsUpdating(true);
+    try {
+      await adminApi.portalOpenDispute(Number(selectedBooking.id), disputeReason);
+      setDisputeFlagOverrides(prev => ({ ...prev, [selectedBooking.id]: true }));
+      updateLocalBooking(selectedBooking.id, { status: 'cancelled' }); // mark as non-actionable locally
+      setDisputeModalOpen(false);
+      setDisputeReason("");
+      toast({ title: isFr ? "Litige ouvert" : "Dispute Opened", variant: "destructive" });
+    } catch {
+      toast({ title: "Erreur", description: "Impossible d'ouvrir le litige.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleResolveDispute = async (resolution: string) => {
+    if (!selectedBooking) return;
+    setIsUpdating(true);
+    try {
+      await adminApi.portalResolveDispute(Number(selectedBooking.id), resolution);
+      setDisputeFlagOverrides(prev => ({ ...prev, [selectedBooking.id]: false }));
+      toast({ title: isFr ? "Litige résolu" : "Dispute Resolved" });
+    } catch {
+      toast({ title: "Erreur", description: "Impossible de résoudre le litige.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleSendPaymentInstructions = async () => {
+    if (!selectedBooking) return;
+    try {
+      await adminApi.portalConfirmPayment(Number(selectedBooking.id));
+      setPaymentInstructionsOpen(false);
+      toast({ title: isFr ? "Instructions envoyées" : "Instructions Sent" });
+    } catch {
+      toast({ title: "Erreur", description: "Impossible d'envoyer les instructions.", variant: "destructive" });
+    }
+  };
+
   const handleQuoteInputChange = (field: 'zone' | 'urgency' | 'timePreference', value: string) => {
     const newZone = field === 'zone' ? value : quoteZone;
     const newUrgency = field === 'urgency' ? value as UrgencyLevel : quoteUrgency;
@@ -879,7 +982,12 @@ export default function AdminBookings() {
                       )}
                       {booking.status === 'under_review' && (
                         <>
-                          {assigningBookingId === booking.id ? (
+                          {!amountLockedMap[booking.id] ? (
+                            <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded flex items-center gap-1">
+                              <LockOpen className="h-3 w-3" />
+                              {isFr ? "Confirmez le montant avant d'assigner" : "Confirm amount before assigning"}
+                            </span>
+                          ) : assigningBookingId === booking.id ? (
                             <div className="flex flex-wrap gap-1 items-center">
                               <Select
                                 value={inlineSelectedProviderId}
@@ -1018,6 +1126,132 @@ export default function AdminBookings() {
                   )}
                 </div>
               </div>
+
+              {/* Montant & Paiement */}
+              {(() => {
+                const rawBooking = apiBookings.find(b => String(b.id) === selectedBooking.id);
+                const isLocked = amountLockedMap[selectedBooking.id] ?? false;
+                const hasDispute = disputeFlagOverrides[selectedBooking.id] ?? rawBooking?.dispute_flag ?? false;
+                const isClosed = ['cancelled', 'completed'].includes(selectedBooking.status);
+                return (
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
+                      {isLocked ? <Lock className="h-3.5 w-3.5 text-emerald-600" /> : <LockOpen className="h-3.5 w-3.5 text-amber-500" />}
+                      {isFr ? "Montant & Paiement" : "Amount & Payment"}
+                    </h4>
+
+                    {/* Dispute banner */}
+                    {hasDispute && (
+                      <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
+                        <p className="text-sm font-semibold text-red-700 flex items-center gap-1">
+                          <AlertCircle className="h-4 w-4" />
+                          ⚠ {isFr ? "Litige ouvert" : "Dispute Open"}
+                        </p>
+                        {rawBooking?.dispute_reason && (
+                          <p className="text-xs text-red-600">{rawBooking.dispute_reason}</p>
+                        )}
+                        {!rawBooking?.dispute_resolution && (
+                          <div className="flex gap-2 flex-wrap">
+                            <Button size="sm" variant="outline" className="text-xs h-7 border-red-300 text-red-700"
+                              disabled={isUpdating}
+                              onClick={() => handleResolveDispute('refund_client')}>
+                              {isFr ? "Rembourser client" : "Refund client"}
+                            </Button>
+                            <Button size="sm" variant="outline" className="text-xs h-7 border-red-300 text-red-700"
+                              disabled={isUpdating}
+                              onClick={() => handleResolveDispute('release_provider')}>
+                              {isFr ? "Libérer prestataire" : "Release provider"}
+                            </Button>
+                            <Button size="sm" variant="outline" className="text-xs h-7 border-red-300 text-red-700"
+                              disabled={isUpdating}
+                              onClick={() => handleResolveDispute('split')}>
+                              {isFr ? "Partager" : "Split"}
+                            </Button>
+                          </div>
+                        )}
+                        {rawBooking?.dispute_resolution && (
+                          <p className="text-xs text-muted-foreground">
+                            {isFr ? "Résolution :" : "Resolution:"} {rawBooking.dispute_resolution}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Amount lock — show input if not yet locked */}
+                    {!isLocked && !isClosed && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-md p-3 space-y-2">
+                        <p className="text-xs text-amber-700 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {isFr
+                            ? "Le montant doit être confirmé avant d'assigner un prestataire"
+                            : "Amount must be confirmed before assigning a provider"}
+                        </p>
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            placeholder={isFr ? "Montant en FCFA" : "Amount in FCFA"}
+                            value={lockAmountInput}
+                            onChange={e => setLockAmountInput(e.target.value)}
+                            className="flex-1 h-8 text-sm"
+                          />
+                          <Button size="sm" onClick={handleLockAmount}
+                            disabled={!lockAmountInput || Number(lockAmountInput) <= 0 || lockAmountSaving}>
+                            {lockAmountSaving
+                              ? <Loader2 className="h-3 w-3 animate-spin" />
+                              : <Lock className="h-3 w-3" />}
+                            {isFr ? "Verrouiller" : "Lock"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Locked state — badges */}
+                    {isLocked && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge className="bg-emerald-100 text-emerald-800 gap-1">
+                          <Lock className="h-3 w-3" />
+                          {isFr ? "Montant confirmé" : "Amount confirmed"}
+                        </Badge>
+                        {rawBooking?.payment_tier && (
+                          <Badge variant="outline" className="text-xs">
+                            {TIER_LABELS[rawBooking.payment_tier] ?? rawBooking.payment_tier}
+                          </Badge>
+                        )}
+                        {rawBooking?.cancellation_policy && (
+                          <Badge variant="outline" className="text-xs">
+                            {CANCELLATION_LABELS[rawBooking.cancellation_policy] ?? rawBooking.cancellation_policy}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                    {isLocked && rawBooking?.deposit_amount != null && rawBooking.deposit_amount > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {isFr ? "Acompte dû :" : "Deposit due:"}{" "}
+                        {new Intl.NumberFormat('fr-FR').format(rawBooking.deposit_amount)} FCFA
+                      </p>
+                    )}
+
+                    {/* Payment instructions button */}
+                    {isLocked && selectedBooking.paymentStatus !== 'paid' && !isClosed && (
+                      <Button variant="outline" size="sm" className="w-full"
+                        onClick={() => setPaymentInstructionsOpen(true)}>
+                        <Send className="h-3.5 w-3.5 mr-2" />
+                        {isFr ? "Envoyer instructions de paiement" : "Send payment instructions"}
+                      </Button>
+                    )}
+
+                    {/* Open dispute button */}
+                    {!hasDispute && ['confirmed', 'in_progress', 'completed'].includes(selectedBooking.status) && (
+                      <Button variant="outline" size="sm"
+                        className="w-full border-red-200 text-red-700 hover:bg-red-50"
+                        onClick={() => { setDisputeReason(""); setDisputeModalOpen(true); }}>
+                        <AlertCircle className="h-3.5 w-3.5 mr-2" />
+                        {isFr ? "Ouvrir un litige" : "Open dispute"}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Client Info */}
               <div className="space-y-3">
@@ -1336,6 +1570,12 @@ export default function AdminBookings() {
                 {/* Under Review Actions */}
                 {selectedBooking.status === "under_review" && (
                   <div className="space-y-3">
+                    {!amountLockedMap[selectedBooking.id] && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-xs text-amber-700 flex items-center gap-1">
+                        <LockOpen className="h-3 w-3 shrink-0" />
+                        {isFr ? "Confirmez le montant avant d'assigner un prestataire" : "Confirm the amount before assigning a provider"}
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label>{isFr ? "Choisir un prestataire" : "Select Provider"}</Label>
                       <Select
@@ -1372,7 +1612,7 @@ export default function AdminBookings() {
                     )}
                     <Button
                       className="w-full"
-                      disabled={!inlineProviderName.trim() || isUpdating}
+                      disabled={!inlineProviderName.trim() || isUpdating || !amountLockedMap[selectedBooking.id]}
                       onClick={() => handleStatusChange(selectedBooking.id, 'assigned', { provider_name: inlineProviderName, provider_phone: inlineProviderPhone })}
                     >
                       <User className="h-4 w-4 mr-2" />
@@ -1577,6 +1817,12 @@ export default function AdminBookings() {
               {isFr ? "Sélectionnez un prestataire pour cette réservation." : "Select a provider to assign to this booking."}
             </DialogDescription>
           </DialogHeader>
+          {selectedBooking && !amountLockedMap[selectedBooking.id] && (
+            <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-xs text-amber-700 flex items-center gap-1">
+              <LockOpen className="h-3 w-3 shrink-0" />
+              {isFr ? "Confirmez le montant avant d'assigner un prestataire" : "Confirm the amount before assigning a provider"}
+            </div>
+          )}
           {(() => {
             const commune = (selectedBooking?.address || "").split(",")[0].trim();
             const zoneMatched = commune
@@ -1651,7 +1897,7 @@ export default function AdminBookings() {
             </Button>
             <Button
               onClick={handleAssignProvider}
-              disabled={!selectedProviderId || isUpdating}
+              disabled={!selectedProviderId || isUpdating || (selectedBooking ? !amountLockedMap[selectedBooking.id] : true)}
               data-testid="button-confirm-assign"
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -1878,6 +2124,118 @@ export default function AdminBookings() {
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Banknote className="h-4 w-4 mr-2" />}
               {isFr ? "Envoyer le devis" : "Send Quote"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Instructions Modal */}
+      <Dialog open={paymentInstructionsOpen} onOpenChange={setPaymentInstructionsOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5 text-blue-600" />
+              {isFr ? "Instructions de paiement" : "Payment Instructions"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedBooking && (
+                <>
+                  {isFr ? "Client :" : "Client:"} {selectedBooking.clientName}
+                  {(selectedBooking.baseAmount ?? 0) > 0 && ` · ${new Intl.NumberFormat('fr-FR').format(selectedBooking.baseAmount)} FCFA`}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {!adminConfig?.wave_number && !adminConfig?.orange_number && !adminConfig?.mtn_number && (
+              <p className="text-sm text-muted-foreground italic">
+                {isFr ? "Aucun numéro de paiement configuré." : "No payment numbers configured."}
+              </p>
+            )}
+            {adminConfig?.wave_number && (
+              <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                <div>
+                  <p className="text-sm font-semibold text-blue-800">Wave</p>
+                  <p className="text-sm font-mono text-blue-700">{adminConfig.wave_number}</p>
+                </div>
+                <Button size="sm" variant="outline" className="h-8"
+                  onClick={() => navigator.clipboard.writeText(adminConfig.wave_number!)}>
+                  <Copy className="h-3.5 w-3.5 mr-1" />
+                  {isFr ? "Copier" : "Copy"}
+                </Button>
+              </div>
+            )}
+            {adminConfig?.orange_number && (
+              <div className="flex items-center justify-between p-3 bg-orange-50 border border-orange-100 rounded-lg">
+                <div>
+                  <p className="text-sm font-semibold text-orange-800">Orange Money</p>
+                  <p className="text-sm font-mono text-orange-700">{adminConfig.orange_number}</p>
+                </div>
+                <Button size="sm" variant="outline" className="h-8"
+                  onClick={() => navigator.clipboard.writeText(adminConfig.orange_number!)}>
+                  <Copy className="h-3.5 w-3.5 mr-1" />
+                  {isFr ? "Copier" : "Copy"}
+                </Button>
+              </div>
+            )}
+            {adminConfig?.mtn_number && (
+              <div className="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-100 rounded-lg">
+                <div>
+                  <p className="text-sm font-semibold text-yellow-800">MTN MoMo</p>
+                  <p className="text-sm font-mono text-yellow-700">{adminConfig.mtn_number}</p>
+                </div>
+                <Button size="sm" variant="outline" className="h-8"
+                  onClick={() => navigator.clipboard.writeText(adminConfig.mtn_number!)}>
+                  <Copy className="h-3.5 w-3.5 mr-1" />
+                  {isFr ? "Copier" : "Copy"}
+                </Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentInstructionsOpen(false)}>
+              {isFr ? "Fermer" : "Close"}
+            </Button>
+            <Button onClick={handleSendPaymentInstructions} disabled={isUpdating}>
+              <Send className="h-4 w-4 mr-2" />
+              {isFr ? "Envoyer via WhatsApp" : "Send via WhatsApp"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Open Dispute Modal */}
+      <Dialog open={disputeModalOpen} onOpenChange={setDisputeModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <AlertCircle className="h-5 w-5" />
+              {isFr ? "Ouvrir un litige" : "Open Dispute"}
+            </DialogTitle>
+            <DialogDescription>
+              {isFr
+                ? "Décrivez le problème. Le statut passera en 'litige'."
+                : "Describe the issue. Status will move to 'disputed'."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label>{isFr ? "Raison du litige *" : "Dispute reason *"}</Label>
+            <Textarea
+              value={disputeReason}
+              onChange={e => setDisputeReason(e.target.value)}
+              placeholder={isFr ? "Décrivez le litige…" : "Describe the dispute..."}
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDisputeModalOpen(false)}>
+              {isFr ? "Annuler" : "Cancel"}
+            </Button>
+            <Button variant="destructive"
+              disabled={!disputeReason.trim() || isUpdating}
+              onClick={handleOpenDispute}>
+              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {isFr ? "Ouvrir le litige" : "Open Dispute"}
             </Button>
           </DialogFooter>
         </DialogContent>

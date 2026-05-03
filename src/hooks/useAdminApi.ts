@@ -34,6 +34,16 @@ export interface ApiBooking {
   final_amount?: number | null;
   shizu_commission?: number | null;
   provider_payout?: number | null;
+  payment_tier?: string | null;
+  deposit_amount?: number | null;
+  cancellation_policy?: string | null;
+  amount_locked?: boolean;
+  amount_locked_at?: string | null;
+  dispute_flag?: boolean;
+  dispute_reason?: string | null;
+  dispute_opened_at?: string | null;
+  dispute_resolution?: string | null;
+  dispute_resolved_at?: string | null;
 }
 
 export interface ApiProvider {
