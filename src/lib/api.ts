@@ -59,6 +59,8 @@ export const adminApi = {
     adminFetch(`/api/admin/bookings/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) }),
   assignBooking: (id: number, provider_name: string, provider_phone: string) =>
     adminFetch(`/api/admin/bookings/${id}/assign`, { method: "PUT", body: JSON.stringify({ provider_name, provider_phone }) }),
+  getRecommendations: (bookingId: number) =>
+    adminFetch(`/api/admin/bookings/${bookingId}/recommendations`),
   getProviders: (status?: string) => adminFetch(`/api/admin/providers${status ? `?status=${status}` : ""}`),
   verifyProvider: (id: number) =>
     adminFetch(`/api/admin/providers/${id}/verify`, { method: "PATCH" }),

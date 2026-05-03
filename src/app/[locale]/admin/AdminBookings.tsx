@@ -59,6 +59,7 @@ import {
   LockOpen,
   Copy,
   Send,
+  Star,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useAdminStore, type AdminBooking, type StatusHistoryEntry } from "@/data/adminStore";
@@ -76,6 +77,17 @@ import {
   type UrgencyLevel,
   type TimePreference,
 } from "@/utils/pricingEngine";
+
+interface AIRecommendation {
+  provider_id: number;
+  name: string;
+  score: number;
+  ai_recommendation: string;
+  rating: number;
+  zones: string[];
+  phone: string;
+  profile_photo_url: string;
+}
 
 const statusColors: Record<string, string> = {
   requested:    "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
@@ -392,7 +404,10 @@ export default function AdminBookings() {
   const [rescheduleTime, setRescheduleTime] = useState("");
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState("");
-  
+  const [aiRecommendations, setAiRecommendations] = useState<AIRecommendation[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [showAllProviders, setShowAllProviders] = useState(false);
+
   // Inline assign state (for under_review rows)
   const [assigningBookingId, setAssigningBookingId] = useState<string | null>(null);
   const [inlineProviderName, setInlineProviderName] = useState("");
@@ -609,6 +624,34 @@ export default function AdminBookings() {
     }
   };
 
+  const handleAssignFromRec = async (rec: AIRecommendation) => {
+    if (!selectedBooking) return;
+    setIsUpdating(true);
+    const prevStatus = selectedBooking.status;
+    const prevProviderName = selectedBooking.providerName;
+    updateLocalBooking(selectedBooking.id, {
+      providerId: String(rec.provider_id),
+      providerName: rec.name,
+      status: 'assigned',
+    });
+    setAssignModalOpen(false);
+    try {
+      await adminApi.assignBooking(Number(selectedBooking.id), rec.name, rec.phone);
+      toast({
+        title: isFr ? "Prestataire assigné" : "Provider Assigned",
+        description: isFr
+          ? `${rec.name} a été assigné à cette réservation.`
+          : `${rec.name} has been assigned to this booking.`,
+      });
+    } catch (err) {
+      updateLocalBooking(selectedBooking.id, { status: prevStatus, providerName: prevProviderName });
+      console.error("Failed to assign provider:", err);
+      toast({ title: "Erreur", description: "Impossible d'assigner le prestataire.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const handleAddNote = async () => {
     if (!selectedBooking || !adminNote.trim()) return;
     
@@ -724,7 +767,17 @@ export default function AdminBookings() {
 
   const openAssignModal = () => {
     setSelectedProviderId(selectedBooking?.providerId || "");
+    setShowAllProviders(false);
+    setAiRecommendations([]);
     setAssignModalOpen(true);
+    if (selectedBooking) {
+      setAiLoading(true);
+      adminApi.getRecommendations(Number(selectedBooking.id))
+        .then((data: { recommendations: AIRecommendation[] }) =>
+          setAiRecommendations(data?.recommendations ?? []))
+        .catch(() => setAiRecommendations([]))
+        .finally(() => setAiLoading(false));
+    }
   };
 
   const openQuoteModal = () => {
@@ -1810,7 +1863,7 @@ export default function AdminBookings() {
 
       {/* Assign Provider Modal */}
       <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[560px]">
           <DialogHeader>
             <DialogTitle>{isFr ? "Assigner un prestataire" : "Assign Provider"}</DialogTitle>
             <DialogDescription>
@@ -1823,86 +1876,183 @@ export default function AdminBookings() {
               {isFr ? "Confirmez le montant avant d'assigner un prestataire" : "Confirm the amount before assigning a provider"}
             </div>
           )}
-          {(() => {
-            const commune = (selectedBooking?.address || "").split(",")[0].trim();
-            const zoneMatched = commune
-              ? eligibleProviders.filter((p: ApiProvider) =>
-                  p.zones?.some((z) => z.toLowerCase() === commune.toLowerCase())
-                )
-              : [];
-            const hasZoneMatch = zoneMatched.length > 0;
-            const displayProviders = hasZoneMatch ? zoneMatched : eligibleProviders;
-            return (
-              <div className="space-y-4">
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            {/* ⚡ AI Recommendations */}
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">⚡ Recommandations IA</p>
+              {aiLoading ? (
                 <div className="space-y-2">
-                  <Label>
-                    {commune
-                      ? (isFr ? `Prestataires disponibles à ${commune}` : `Providers available in ${commune}`)
-                      : (isFr ? "Choisir un prestataire" : "Select Provider")}
-                  </Label>
-                  {commune && !hasZoneMatch && eligibleProviders.length > 0 && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3 shrink-0" />
-                      {isFr
-                        ? `Aucun prestataire dans cette zone — tous les prestataires disponibles`
-                        : `No provider in this area — showing all available providers`}
-                    </p>
-                  )}
-                  <Select value={selectedProviderId} onValueChange={setSelectedProviderId}>
-                    <SelectTrigger data-testid="select-assign-provider">
-                      <SelectValue placeholder={isFr ? "Choisir un prestataire…" : "Choose a provider…"} />
-                    </SelectTrigger>
-                    <SelectContent className="z-50">
-                      {displayProviders.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-muted-foreground">
-                          {isFr ? "Aucun prestataire approuvé et actif" : "No approved active providers"}
-                        </div>
-                      ) : displayProviders.map((p: ApiProvider) => (
-                        <SelectItem key={p.id} value={String(p.id)}>
-                          {p.company_name || p.name || `#${p.id}`}
-                          {p.phone_number ? ` · ${p.phone_number}` : ""}
-                          {p.zones?.length ? ` · ${p.zones.join(", ")}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="h-[88px] bg-muted animate-pulse rounded-lg" />
+                  ))}
                 </div>
-                {selectedProviderId && (() => {
-                  const p = eligibleProviders.find((p: ApiProvider) => String(p.id) === selectedProviderId);
-                  if (!p) return null;
-                  return (
-                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                      <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium">{p.company_name || p.name}</p>
-                        {p.phone_number && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
-                            {p.phone_number}
-                          </p>
+              ) : aiRecommendations.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-1">
+                  {isFr ? "Aucune recommandation disponible." : "No recommendations available."}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {aiRecommendations.map((rec) => (
+                    <div key={rec.provider_id} className="border rounded-lg p-3 space-y-2 bg-card">
+                      <div className="flex items-center gap-3">
+                        {rec.profile_photo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={rec.profile_photo_url}
+                            alt={rec.name}
+                            className="w-10 h-10 rounded-full object-cover shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-700 dark:text-purple-300 font-semibold text-sm shrink-0">
+                            {rec.name.charAt(0).toUpperCase()}
+                          </div>
                         )}
-                        {p.zones?.length ? (
-                          <p className="text-xs text-muted-foreground mt-0.5">{p.zones.join(", ")}</p>
-                        ) : null}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{rec.name}</p>
+                          <div className="flex items-center gap-0.5 mt-0.5">
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Star
+                                key={s}
+                                className={`h-3 w-3 ${
+                                  s <= Math.round(rec.rating)
+                                    ? "fill-amber-400 text-amber-400"
+                                    : "text-muted-foreground/30"
+                                }`}
+                              />
+                            ))}
+                            <span className="text-xs text-muted-foreground ml-1">
+                              {rec.rating > 0 ? rec.rating.toFixed(1) : "N/A"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                          <span className="text-xs font-bold text-green-700 dark:text-green-400">
+                            {rec.score}%
+                          </span>
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white text-xs h-7 px-3"
+                            disabled={isUpdating || (selectedBooking ? !amountLockedMap[selectedBooking.id] : true)}
+                            onClick={() => handleAssignFromRec(rec)}
+                          >
+                            Assigner
+                          </Button>
+                        </div>
                       </div>
+                      <div className="w-full bg-muted rounded-full h-1.5">
+                        <div
+                          className="bg-green-500 h-1.5 rounded-full"
+                          style={{ width: `${Math.min(rec.score, 100)}%` }}
+                        />
+                      </div>
+                      {rec.ai_recommendation && (
+                        <p className="text-xs text-muted-foreground italic leading-relaxed">
+                          {rec.ai_recommendation}
+                        </p>
+                      )}
                     </div>
-                  );
-                })()}
-              </div>
-            );
-          })()}
+                  ))}
+                </div>
+              )}
+              {!aiLoading && (
+                <p className="text-xs text-muted-foreground/60 text-right">Propulsé par IA</p>
+              )}
+            </div>
+
+            {/* Voir tous les prestataires toggle */}
+            <button
+              className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 py-0.5"
+              onClick={() => setShowAllProviders((v) => !v)}
+            >
+              {showAllProviders
+                ? (isFr ? "← Masquer les prestataires" : "← Hide providers")
+                : (isFr ? "Voir tous les prestataires →" : "See all providers →")}
+            </button>
+
+            {/* Full provider dropdown */}
+            {showAllProviders && (() => {
+              const commune = (selectedBooking?.address || "").split(",")[0].trim();
+              const zoneMatched = commune
+                ? eligibleProviders.filter((p: ApiProvider) =>
+                    p.zones?.some((z) => z.toLowerCase() === commune.toLowerCase())
+                  )
+                : [];
+              const hasZoneMatch = zoneMatched.length > 0;
+              const displayProviders = hasZoneMatch ? zoneMatched : eligibleProviders;
+              return (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>
+                      {commune
+                        ? (isFr ? `Prestataires disponibles à ${commune}` : `Providers available in ${commune}`)
+                        : (isFr ? "Choisir un prestataire" : "Select Provider")}
+                    </Label>
+                    {commune && !hasZoneMatch && eligibleProviders.length > 0 && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        {isFr
+                          ? `Aucun prestataire dans cette zone — tous les prestataires disponibles`
+                          : `No provider in this area — showing all available providers`}
+                      </p>
+                    )}
+                    <Select value={selectedProviderId} onValueChange={setSelectedProviderId}>
+                      <SelectTrigger data-testid="select-assign-provider">
+                        <SelectValue placeholder={isFr ? "Choisir un prestataire…" : "Choose a provider…"} />
+                      </SelectTrigger>
+                      <SelectContent className="z-50">
+                        {displayProviders.length === 0 ? (
+                          <div className="px-3 py-2 text-sm text-muted-foreground">
+                            {isFr ? "Aucun prestataire approuvé et actif" : "No approved active providers"}
+                          </div>
+                        ) : displayProviders.map((p: ApiProvider) => (
+                          <SelectItem key={p.id} value={String(p.id)}>
+                            {p.company_name || p.name || `#${p.id}`}
+                            {p.phone_number ? ` · ${p.phone_number}` : ""}
+                            {p.zones?.length ? ` · ${p.zones.join(", ")}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {selectedProviderId && (() => {
+                    const p = eligibleProviders.find((p: ApiProvider) => String(p.id) === selectedProviderId);
+                    if (!p) return null;
+                    return (
+                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                        <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium">{p.company_name || p.name}</p>
+                          {p.phone_number && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {p.phone_number}
+                            </p>
+                          )}
+                          {p.zones?.length ? (
+                            <p className="text-xs text-muted-foreground mt-0.5">{p.zones.join(", ")}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })()}
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignModalOpen(false)}>
               {isFr ? "Annuler" : "Cancel"}
             </Button>
-            <Button
-              onClick={handleAssignProvider}
-              disabled={!selectedProviderId || isUpdating || (selectedBooking ? !amountLockedMap[selectedBooking.id] : true)}
-              data-testid="button-confirm-assign"
-            >
-              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {isFr ? "Assigner" : "Assign Provider"}
-            </Button>
+            {showAllProviders && (
+              <Button
+                onClick={handleAssignProvider}
+                disabled={!selectedProviderId || isUpdating || (selectedBooking ? !amountLockedMap[selectedBooking.id] : true)}
+                data-testid="button-confirm-assign"
+              >
+                {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {isFr ? "Assigner" : "Assign Provider"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
