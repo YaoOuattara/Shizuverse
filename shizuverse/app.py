@@ -64,6 +64,24 @@ def create_app():
     except Exception as e:
         app.logger.error(f"Migration failed on startup: {e}")
         # App continues to start — existing schema still works
+
+    # One-time: normalize any malformed phone_number values left by old double-prefix bug
+    try:
+        with app.app_context():
+            from shizuverse.models.service_provider import ServiceProvider
+            from shizuverse.api.admin import normalize_phone
+            changed = 0
+            for sp in ServiceProvider.query.all():
+                if sp.phone_number:
+                    normed = normalize_phone(sp.phone_number)
+                    if normed != sp.phone_number:
+                        sp.phone_number = normed
+                        changed += 1
+            if changed:
+                db.session.commit()
+                app.logger.info(f"[startup] Normalized {changed} ServiceProvider phone_number(s)")
+    except Exception as e:
+        app.logger.warning(f"[startup] Phone normalization skipped: {e}")
     _extra = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
     ALLOWED_ORIGINS = [
         "https://shizu.pro",

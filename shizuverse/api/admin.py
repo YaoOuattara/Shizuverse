@@ -409,25 +409,21 @@ def provider_login():
         return jsonify({'error': 'phone and password required'}), 400
 
     canonical = normalize_phone(raw_phone)
-    # Try matching by phone_number stored on ServiceProvider (try both formats)
-    sp = ServiceProvider.query.filter_by(phone_number=canonical).first()
-    if not sp:
-        sp = ServiceProvider.query.filter_by(phone_number=canonical.replace('+', '')).first()
-    if not sp:
-        sp = ServiceProvider.query.filter_by(phone_number=raw_phone.replace(' ', '')).first()
-    if not sp:
-        # Fallback: try all synthetic email variants
-        for email in provider_email_variants(raw_phone):
-            user = User.query.filter_by(email=email, user_type='provider').first()
-            if user:
-                sp = ServiceProvider.query.filter_by(user_id=user.id).first()
-                if sp:
-                    break
+
+    # Normalize both sides so any stored format matches any incoming format.
+    sp = None
+    for candidate in ServiceProvider.query.all():
+        if normalize_phone(candidate.phone_number or '') == canonical:
+            sp = candidate
+            break
+
     if not sp:
         return jsonify({'error': 'Invalid credentials'}), 401
+
     user = User.query.get(sp.user_id)
     if not user or not user.check_password(password):
         return jsonify({'error': 'Invalid credentials'}), 401
+
     payload = {
         'sub': str(user.id),
         'type': 'provider',
@@ -441,8 +437,8 @@ def provider_login():
         'provider': {
             'id': sp.id,
             'user_id': user.id,
-            'name': sp.company_name or phone,
-            'phone': sp.phone_number or phone,
+            'name': sp.company_name or raw_phone,
+            'phone': sp.phone_number or raw_phone,
             'verification_status': sp.verification_status,
             'listed_status': sp.listed_status,
             'provider_status': sp.provider_status,
@@ -530,7 +526,7 @@ def provider_register():
             user_id=user.id,
             service_id=svc.id,
             company_name=display_name,
-            phone_number=phone,
+            phone_number=canonical_phone,
             bio=bio,
             address=zones_str or None,
             verified=False,
