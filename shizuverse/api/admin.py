@@ -17,6 +17,13 @@ admin_bp = Blueprint('admin', __name__)
 def normalize_phone(phone: str) -> str:
     """Normalize any CI phone format to +225XXXXXXXXX (E.164)."""
     p = phone.strip().replace(' ', '').replace('-', '')
+    # De-duplicate country code (frontend double-prefix bug: "+225+225..." or "+225225...")
+    if p.startswith('+225+225'):
+        p = '+225' + p[8:]
+    elif p.startswith('+225225'):
+        p = '+225' + p[7:]
+    elif p.startswith('225225'):
+        p = p[3:]
     if p.startswith('00225'):
         return '+225' + p[5:]
     if p.startswith('+225'):
@@ -919,6 +926,30 @@ def update_provider_availability():
     return jsonify({'success': True, 'available_today': sp.available_today})
 
 
+@provider_bp.route('/password', methods=['PATCH'])
+@require_provider_token
+def change_provider_password():
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header[7:]
+    payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+    user_id = payload.get('sub')
+    user = User.query.get(int(user_id)) if user_id else None
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    data             = request.get_json() or {}
+    current_password = data.get('current_password', '')
+    new_password     = (data.get('new_password') or '').strip()
+    if not current_password or not new_password:
+        return jsonify({'error': 'current_password and new_password are required'}), 400
+    if not user.check_password(current_password):
+        return jsonify({'error': 'Mot de passe actuel incorrect'}), 401
+    if len(new_password) < 6:
+        return jsonify({'error': 'Le nouveau mot de passe doit contenir au moins 6 caractères.'}), 400
+    user.set_password(new_password)
+    db.session.commit()
+    return jsonify({'message': 'Mot de passe mis à jour avec succès'})
+
+
 @admin_bp.route('/clients', methods=['GET'])
 @require_admin_token
 def get_clients():
@@ -957,6 +988,22 @@ def get_clients():
 @require_admin_token
 def reset_client_password(client_id):
     user = User.query.filter_by(id=client_id, user_type='client').first_or_404()
+    data = request.get_json() or {}
+    new_password = (data.get('new_password') or '').strip()
+    if not new_password or len(new_password) < 6:
+        return jsonify({'error': 'new_password must be at least 6 characters'}), 400
+    user.set_password(new_password)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@admin_bp.route('/providers/<int:provider_id>/reset-password', methods=['PATCH'])
+@require_admin_token
+def reset_provider_password(provider_id):
+    sp = ServiceProvider.query.get_or_404(provider_id)
+    user = User.query.get(sp.user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
     data = request.get_json() or {}
     new_password = (data.get('new_password') or '').strip()
     if not new_password or len(new_password) < 6:

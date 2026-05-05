@@ -23,6 +23,13 @@ def is_twilio_enabled() -> bool:
 def _normalize_phone(phone: str) -> str:
     """Best-effort E.164 normalization for CI numbers."""
     p = phone.strip().replace(" ", "").replace("-", "")
+    # De-duplicate country code (double-prefix bug)
+    if p.startswith("+225+225"):
+        p = "+225" + p[8:]
+    elif p.startswith("+225225"):
+        p = "+225" + p[7:]
+    elif p.startswith("225225"):
+        p = p[3:]
     if p.startswith("00225"):
         return "+" + p[2:]
     if p.startswith("+"):
