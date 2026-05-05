@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -139,6 +139,24 @@ export function AchievementBadges({
     return badges;
   }, [safeBookings, providerRating, reviewCount]);
 
+  const [scrollHintDismissed, setScrollHintDismissed] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("achievements_scrolled") === "1"
+  );
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || scrollHintDismissed) return;
+    const onScroll = () => {
+      if (el.scrollLeft > 20) {
+        setScrollHintDismissed(true);
+        localStorage.setItem("achievements_scrolled", "1");
+      }
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [scrollHintDismissed]);
+
   const unlockedCount = computedBadges.filter((b) => b.unlocked).length;
   const totalBadges = computedBadges.length;
   const completedMissions = safeBookings.filter((b) => b.status === "completed").length;
@@ -191,7 +209,7 @@ export function AchievementBadges({
 
       <CardContent>
         {/* Horizontal scroll on mobile, wrap on desktop */}
-        <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory sm:flex-wrap sm:overflow-visible">
+        <div ref={scrollRef} className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory sm:flex-wrap sm:overflow-visible">
           {computedBadges.map((badge, idx) => {
             const IconComponent = iconMap[badge.icon] || Shield;
             const isUnlocked = badge.unlocked;
@@ -279,6 +297,13 @@ export function AchievementBadges({
             );
           })}
         </div>
+
+        {/* Scroll hint — mobile only, fades after first scroll */}
+        {!scrollHintDismissed && (
+          <p className="sm:hidden text-center text-[11px] text-muted-foreground mt-1 select-none">
+            ← Faites défiler →
+          </p>
+        )}
 
         {/* Bottom motivational text */}
         {bottomText && (

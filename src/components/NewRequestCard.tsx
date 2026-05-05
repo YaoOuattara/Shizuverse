@@ -148,22 +148,20 @@ export default function NewRequestCard({
 
           {/* Action buttons */}
           {!showDeclineForm && (
-            <div className="flex gap-2 border-t pt-2.5">
+            <div className="flex max-[380px]:flex-col gap-2 border-t pt-2.5">
               <Button
-                size="sm"
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs"
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold min-h-[44px]"
                 onClick={handleAccept}
                 disabled={isAnyLoading}
               >
                 {isAccepting
-                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
                   : (isFr ? "Accepter" : "Accept")
                 }
               </Button>
               <Button
-                size="sm"
                 variant="outline"
-                className="flex-1 border-destructive text-destructive hover:bg-destructive/10 text-xs"
+                className="flex-1 border-destructive text-destructive hover:bg-destructive/10 text-sm font-semibold min-h-[44px]"
                 onClick={() => setShowDeclineForm(true)}
                 disabled={isAnyLoading}
               >

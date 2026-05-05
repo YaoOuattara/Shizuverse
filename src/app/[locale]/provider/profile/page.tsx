@@ -290,6 +290,7 @@ export default function ProviderProfilePage() {
   const [providerName, setProviderName] = useState('')
   const [services, setServices] = useState<string[]>([])
   const [profile, setProfile] = useState<ProfileState>(EMPTY)
+  const [savedProfile, setSavedProfile] = useState<ProfileState>(EMPTY)
   const [isSaving, setIsSaving] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isImproving, setIsImproving] = useState(false)
@@ -350,6 +351,7 @@ export default function ProviderProfilePage() {
           rejection_reason:      data.rejection_reason ?? '',
         }
         setProfile(fresh)
+        setSavedProfile(fresh)
         setProviderName(data.name ?? '')
         setServices(Array.isArray(data.services) ? data.services : [])
         // Keep localStorage in sync
@@ -408,7 +410,9 @@ export default function ProviderProfilePage() {
       if (res.ok) {
         // Update both React state and localStorage from the server response
         const newStatus: VerificationStatus = data?.provider?.verification_status ?? profile.verification_status
-        setProfile(prev => ({ ...prev, ...body, verification_status: newStatus }))
+        const updated = { ...profile, ...body, verification_status: newStatus }
+        setProfile(updated)
+        setSavedProfile(updated)
         patchLocalStorage({ ...body, verification_status: newStatus })
         toast({ title: isFr ? 'Sauvegardé' : 'Saved', description: isFr ? 'Modifications enregistrées.' : 'Changes saved.' })
       } else {
@@ -511,6 +515,8 @@ export default function ProviderProfilePage() {
       setPwSaving(false)
     }
   }
+
+  const isDirty = JSON.stringify(profile) !== JSON.stringify(savedProfile)
 
   const status = profile.verification_status
   const showStatusCard =
@@ -899,6 +905,24 @@ export default function ProviderProfilePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Sticky save bar — mobile only, shown when profile has unsaved changes */}
+      {isDirty && (
+        <div className="sm:hidden fixed bottom-0 inset-x-0 z-50 bg-background border-t border-border px-4 py-3 flex items-center gap-3 shadow-lg">
+          <p className="flex-1 text-sm text-muted-foreground">
+            {isFr ? 'Modifications non sauvegardées' : 'Unsaved changes'}
+          </p>
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="bg-green-600 hover:bg-green-700 text-white min-h-[44px] px-5"
+          >
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+            {isFr ? 'Sauvegarder' : 'Save'}
+          </Button>
+        </div>
+      )}
 
     </div>
   )
