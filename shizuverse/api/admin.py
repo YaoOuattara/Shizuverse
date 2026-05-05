@@ -476,16 +476,13 @@ def provider_register():
         return jsonify({'error': 'company_name is required for company accounts'}), 400
 
     canonical_phone = normalize_phone(phone)
-    synthetic_email = phone_to_email(phone, 'shizu.ci')
-    existing = None
-    for variant in provider_email_variants(phone):
-        existing = User.query.filter_by(email=variant).first()
-        if existing:
-            break
-    if existing:
-        return jsonify({'error': 'A provider with this phone number already exists'}), 409
 
-    user = User(email=synthetic_email, user_type='provider', preferred_language='fr')
+    # Duplicate check: does a ServiceProvider with this normalized phone already exist?
+    for candidate in ServiceProvider.query.all():
+        if normalize_phone(candidate.phone_number or '') == canonical_phone:
+            return jsonify({'error': 'A provider with this phone number already exists'}), 409
+
+    user = User(email=None, user_type='provider', preferred_language='fr')
     user.set_password(password)
     db.session.add(user)
     db.session.flush()  # get user.id before commit
@@ -560,7 +557,6 @@ def provider_register():
         'success': True,
         'message': 'Registration received. Our team will review your profile.',
         'provider_id': sp.id if sp else None,
-        'login_email': synthetic_email,
     }), 201
 
 
@@ -799,7 +795,7 @@ def get_provider_profile():
     return jsonify({
         'id': sp.id,
         'user_id': sp.user_id,
-        'name': sp.company_name or (user.email.split('@')[0] if user else ''),
+        'name': sp.company_name or (user.full_name if user else '') or sp.phone_number or '',
         'phone': sp.phone_number,
         'email': user.email if user else None,
         'bio': sp.bio,

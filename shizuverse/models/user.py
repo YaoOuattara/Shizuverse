@@ -9,7 +9,7 @@ class User(UserMixin, db.Model):
     __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=True)
     password_hash = db.Column(db.String(256), nullable=False)
     user_type = db.Column(db.String(20), nullable=False)  # 'client' or 'provider'
     preferred_language = db.Column(db.String(10), default='fr')

@@ -82,6 +82,23 @@ def create_app():
                 app.logger.info(f"[startup] Normalized {changed} ServiceProvider phone_number(s)")
     except Exception as e:
         app.logger.warning(f"[startup] Phone normalization skipped: {e}")
+
+    # One-time: remove synthetic @shizu.ci emails from provider User records
+    try:
+        with app.app_context():
+            cleaned = (
+                User.query
+                .filter(User.user_type == 'provider')
+                .filter(User.email.like('%@shizu.ci'))
+                .all()
+            )
+            for u in cleaned:
+                u.email = None
+            if cleaned:
+                db.session.commit()
+                app.logger.info(f"[startup] Cleared synthetic email from {len(cleaned)} provider User(s)")
+    except Exception as e:
+        app.logger.warning(f"[startup] Provider email cleanup skipped: {e}")
     _extra = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
     ALLOWED_ORIGINS = [
         "https://shizu.pro",
