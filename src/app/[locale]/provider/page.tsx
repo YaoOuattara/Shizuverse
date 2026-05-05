@@ -88,6 +88,7 @@ const STORAGE_KEYS = {
   BOOKINGS: "provider_cached_bookings",
   AVAILABILITY: "provider_available_today",
   COACHING_DISMISSED: "provider_coaching_dismissed",
+  WELCOME_DISMISSED: "provider_welcome_dismissed",
 };
 
 // Check if viewport is mobile width
@@ -119,6 +120,9 @@ export default function ProviderDashboard() {
   const [availableToday, setAvailableToday] = useState(false);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [coachingDismissed, setCoachingDismissed] = useState(false);
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+  const [providerName, setProviderName] = useState("");
+  const [guideOpen, setGuideOpen] = useState(false);
 
   // Stats visibility: default true (expanded); hydrated from localStorage on mount
   const [showStats, setShowStats] = useState(true);
@@ -152,6 +156,12 @@ export default function ProviderDashboard() {
       const savedAvailability = localStorage.getItem(STORAGE_KEYS.AVAILABILITY);
       if (savedAvailability !== null) setAvailableToday(JSON.parse(savedAvailability));
       if (localStorage.getItem(STORAGE_KEYS.COACHING_DISMISSED) === "1") setCoachingDismissed(true);
+      if (localStorage.getItem(STORAGE_KEYS.WELCOME_DISMISSED) === "1") setWelcomeDismissed(true);
+      if (info) {
+        setProviderName(info.name ?? info.full_name ?? info.company_name ?? "");
+      }
+      const savedGuide = localStorage.getItem("provider_guide_open");
+      if (savedGuide !== null) setGuideOpen(JSON.parse(savedGuide));
     } catch {
       // keep defaults
     }
@@ -742,6 +752,44 @@ export default function ProviderDashboard() {
           return null;
         })() : null}
 
+        {/* 1.5 — Welcome banner (approved + 0 completed missions + not dismissed) */}
+        {!welcomeDismissed && providerInfo.verificationStatus === 'approved' && statusCounts.completed === 0 && (
+          <div className="mb-4 rounded-2xl border border-green-200 bg-[#f0fdf4] px-5 py-4">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <p className="text-sm font-semibold text-green-800">
+                🎉 Bienvenue{providerName ? ` ${providerName.split(" ")[0]}` : ""} ! Voici comment démarrer :
+              </p>
+              <button
+                onClick={() => { setWelcomeDismissed(true); localStorage.setItem(STORAGE_KEYS.WELCOME_DISMISSED, "1"); }}
+                aria-label="Fermer"
+                className="text-green-400 hover:text-green-700 transition-colors shrink-0"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => document.getElementById("availability-toggle")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                className="flex items-center gap-1.5 rounded-full border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50 transition-colors"
+              >
+                <Zap className="h-3 w-3" />
+                1. Activez votre disponibilité →
+              </button>
+              <button
+                onClick={() => providerInfo.id && window.open(`/${locale}/provider/${providerInfo.id}`, "_blank")}
+                className="flex items-center gap-1.5 rounded-full border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50 transition-colors"
+              >
+                <Share2 className="h-3 w-3" />
+                2. Partagez votre profil →
+              </button>
+              <span className="flex items-center gap-1.5 rounded-full border border-green-200 bg-green-100/60 px-3 py-1.5 text-xs font-medium text-green-600">
+                <Bell className="h-3 w-3" />
+                3. Attendez vos premières demandes ✓
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* 2 — Profile completion tip */}
         {hasToken && statusCounts.completed < 3 && !isLoading && (
           <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -765,6 +813,7 @@ export default function ProviderDashboard() {
 
         {/* 3 — Availability toggle */}
         <div
+          id="availability-toggle"
           className={`mb-6 flex items-center justify-between gap-4 rounded-2xl border px-5 py-4 transition-colors ${
             availableToday ? "border-green-200 bg-green-50" : "border-gray-200 bg-gray-50"
           }`}
@@ -861,6 +910,39 @@ export default function ProviderDashboard() {
             </div>
           </div>
         )}
+
+        {/* 3.6 — Collapsible guide card */}
+        <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => {
+              const next = !guideOpen;
+              setGuideOpen(next);
+              localStorage.setItem("provider_guide_open", JSON.stringify(next));
+            }}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-blue-900 hover:bg-blue-100/60 transition-colors"
+          >
+            <span>💡 {locale === "fr" ? "Comment utiliser votre tableau de bord ?" : "How to use your dashboard?"}</span>
+            <ChevronDown className={`h-4 w-4 text-blue-400 transition-transform duration-200 ${guideOpen ? "rotate-180" : ""}`} />
+          </button>
+          {guideOpen && (
+            <div className="px-4 pb-4 space-y-2 border-t border-blue-100 pt-3">
+              {[
+                { icon: "⚡", text: locale === "fr" ? "Disponibilité — Activez-la pour recevoir des demandes" : "Availability — Enable it to receive requests" },
+                { icon: "🔔", text: locale === "fr" ? "Nouvelles demandes — Acceptez ou déclinez chaque mission" : "New requests — Accept or decline each mission" },
+                { icon: "📅", text: locale === "fr" ? "Planning — Vos missions confirmées à venir" : "Schedule — Your upcoming confirmed missions" },
+                { icon: "💰", text: locale === "fr" ? "Revenus — Vos gains en temps réel" : "Earnings — Your real-time income" },
+                { icon: "🌟", text: locale === "fr" ? "Performances — Votre note et statistiques" : "Performance — Your rating and stats" },
+                { icon: "📤", text: locale === "fr" ? "Partager — Envoyez votre fiche à vos contacts" : "Share — Send your profile to your contacts" },
+              ].map(({ icon, text }) => (
+                <div key={text} className="flex items-start gap-2 text-sm text-blue-800">
+                  <span className="shrink-0 leading-5">{icon}</span>
+                  <span>{text}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* 4 — Earnings module */}
         {(() => {
