@@ -99,7 +99,16 @@ export default function PhoneInput({
   }
 
   function handleLocalChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const l = e.target.value;
+    let l = e.target.value;
+    const codeDigits = effectiveCode.replace(/^\+/, "");
+    const raw = l.replace(/\s+/g, "");
+    if (raw.startsWith("+" + codeDigits)) {
+      l = raw.slice(1 + codeDigits.length);
+    } else if (raw.startsWith("00" + codeDigits)) {
+      l = raw.slice(2 + codeDigits.length);
+    } else if (raw.startsWith(codeDigits)) {
+      l = raw.slice(codeDigits.length);
+    }
     setLocal(l);
     emit(effectiveCode, l);
   }

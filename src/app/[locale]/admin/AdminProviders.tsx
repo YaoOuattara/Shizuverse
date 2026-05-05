@@ -67,6 +67,8 @@ import {
   Pencil,
   X,
   Plus,
+  Lock,
+  ChevronDown,
 } from "lucide-react";
 import { type AdminProvider, type VerificationStatus } from "@/data/adminStore";
 import { COMMUNES } from "@/components/CommuneAutocomplete";
@@ -198,6 +200,12 @@ export default function AdminProviders() {
   // Preserves the provider ID when a Dialog opens on top of the Sheet
   // (the Sheet's onOpenChange fires and clears selectedProvider)
   const [pendingActionProviderId, setPendingActionProviderId] = useState<string | null>(null);
+
+  // Reset password state
+  const [resetPwOpen, setResetPwOpen] = useState(false);
+  const [resetPwNew, setResetPwNew] = useState('');
+  const [resetPwSaving, setResetPwSaving] = useState(false);
+  const [resetPwMsg, setResetPwMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const tabCounts = useMemo(() => {
     return {
@@ -534,6 +542,32 @@ export default function AdminProviders() {
       toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de mettre à jour les zones." : "Failed to update zones.", variant: "destructive" });
     } finally {
       setIsSavingZones(false);
+    }
+  };
+
+  const handleResetProviderPassword = async () => {
+    if (!selectedProvider || resetPwSaving) return;
+    setResetPwSaving(true);
+    setResetPwMsg(null);
+    const base = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
+    const token = typeof window !== "undefined" ? localStorage.getItem("shizu_admin_token") : null;
+    try {
+      const res = await fetch(`${base}/api/admin/providers/${selectedProvider.id}/reset-password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ new_password: resetPwNew }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        setResetPwMsg({ type: 'success', text: isFr ? 'Mot de passe réinitialisé.' : 'Password reset successfully.' });
+        setResetPwNew('');
+      } else {
+        setResetPwMsg({ type: 'error', text: data?.error ?? (isFr ? 'Erreur.' : 'Error.') });
+      }
+    } catch {
+      setResetPwMsg({ type: 'error', text: isFr ? 'Erreur réseau.' : 'Network error.' });
+    } finally {
+      setResetPwSaving(false);
     }
   };
 
@@ -1323,6 +1357,47 @@ export default function AdminProviders() {
                   </Button>
                 </div>
               )}
+              {/* Reset Password */}
+              <div className="rounded-xl border pt-0 mt-4">
+                <button
+                  type="button"
+                  onClick={() => { setResetPwOpen(o => !o); setResetPwMsg(null); }}
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-foreground hover:bg-muted/30 transition-colors rounded-xl"
+                >
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <Lock className="h-4 w-4" />
+                    {isFr ? 'Réinitialiser le mot de passe' : 'Reset password'}
+                  </span>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${resetPwOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {resetPwOpen && (
+                  <div className="px-4 pb-4 space-y-3 border-t pt-3">
+                    <input
+                      type="password"
+                      value={resetPwNew}
+                      onChange={e => setResetPwNew(e.target.value)}
+                      placeholder={isFr ? 'Nouveau mot de passe (min. 6 car.)' : 'New password (min. 6 chars)'}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    {resetPwMsg && (
+                      <p className={`text-xs font-medium ${resetPwMsg.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {resetPwMsg.type === 'success' ? '✓ ' : '✗ '}{resetPwMsg.text}
+                      </p>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full border-amber-300 text-amber-700 hover:bg-amber-50"
+                      onClick={handleResetProviderPassword}
+                      disabled={resetPwSaving || resetPwNew.length < 6}
+                    >
+                      {resetPwSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Lock className="h-4 w-4 mr-2" />}
+                      {isFr ? 'Réinitialiser' : 'Reset'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
             </div>
           )}
         </SheetContent>

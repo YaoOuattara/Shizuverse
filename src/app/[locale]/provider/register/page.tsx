@@ -300,12 +300,18 @@ export default function ProviderRegisterPage() {
           </a>
 
           <Button
-            variant="outline"
-            onClick={() => router.push(`/${locale}`)}
-            className="w-full"
+            onClick={() => router.push(`/${locale}/provider`)}
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
           >
-            {isFr ? "Retour à l'accueil" : "Back to Home"}
+            {isFr ? "Accéder à mon tableau de bord" : "Go to my dashboard"}
           </Button>
+          <button
+            type="button"
+            onClick={() => router.push(`/${locale}`)}
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors mt-2 block w-full text-center"
+          >
+            {isFr ? "Retour à l'accueil" : "Back to home"}
+          </button>
         </div>
       </div>
     );

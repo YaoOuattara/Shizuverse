@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Loader2, Sparkles, Save, CheckCircle2, XCircle,
-  ShieldCheck, ShieldAlert, ShieldX, Clock, Upload, Eye, Star,
+  ShieldCheck, ShieldAlert, ShieldX, Clock, Upload, Eye, Star, Lock, ChevronDown,
 } from 'lucide-react'
 import PhoneInput from '@/components/PhoneInput'
 import { Button } from '@/components/ui/button'
@@ -296,6 +296,14 @@ export default function ProviderProfilePage() {
   const [forceForm, setForceForm] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
 
+  // Password change state
+  const [pwOpen, setPwOpen] = useState(false)
+  const [pwCurrent, setPwCurrent] = useState('')
+  const [pwNew, setPwNew] = useState('')
+  const [pwConfirm, setPwConfirm] = useState('')
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwMsg, setPwMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   useEffect(() => {
     // 1. Show localStorage immediately (no flicker)
     try {
@@ -476,6 +484,31 @@ export default function ProviderProfilePage() {
       console.error('[improve-bio]', err)
     } finally {
       setIsImproving(false)
+    }
+  }
+
+  const handlePasswordChange = async () => {
+    if (pwSaving) return
+    setPwSaving(true)
+    setPwMsg(null)
+    try {
+      const token = localStorage.getItem('provider_token')
+      const res = await fetch(`${FLASK_API}/api/provider/password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ current_password: pwCurrent, new_password: pwNew }),
+      })
+      const data = await res.json().catch(() => null)
+      if (res.ok) {
+        setPwMsg({ type: 'success', text: isFr ? 'Mot de passe mis à jour avec succès.' : 'Password updated successfully.' })
+        setPwCurrent(''); setPwNew(''); setPwConfirm('')
+      } else {
+        setPwMsg({ type: 'error', text: data?.error ?? (isFr ? 'Erreur lors de la mise à jour.' : 'Update failed.') })
+      }
+    } catch {
+      setPwMsg({ type: 'error', text: isFr ? 'Erreur réseau.' : 'Network error.' })
+    } finally {
+      setPwSaving(false)
     }
   }
 
@@ -728,6 +761,65 @@ export default function ProviderProfilePage() {
           {isFr ? 'Sauvegarder les modifications' : 'Save changes'}
         </Button>
       )}
+
+      {/* ── Change password ───────────────────────────────────────────────── */}
+      <div className="rounded-xl border bg-card mb-4">
+        <button
+          type="button"
+          onClick={() => { setPwOpen(o => !o); setPwMsg(null) }}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-foreground hover:bg-muted/30 transition-colors rounded-xl"
+        >
+          <span className="flex items-center gap-2">
+            <Lock className="h-4 w-4 text-muted-foreground" />
+            {isFr ? 'Changer mon mot de passe' : 'Change my password'}
+          </span>
+          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${pwOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {pwOpen && (
+          <div className="px-4 pb-4 space-y-3 border-t pt-3">
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1">
+                {isFr ? 'Mot de passe actuel' : 'Current password'}
+              </label>
+              <input type="password" value={pwCurrent} onChange={e => setPwCurrent(e.target.value)}
+                className={inputCls} placeholder="••••••••" />
+            </div>
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1">
+                {isFr ? 'Nouveau mot de passe' : 'New password'}
+              </label>
+              <input type="password" value={pwNew} onChange={e => setPwNew(e.target.value)}
+                className={inputCls} placeholder="••••••••" />
+            </div>
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1">
+                {isFr ? 'Confirmer le nouveau mot de passe' : 'Confirm new password'}
+              </label>
+              <input type="password" value={pwConfirm} onChange={e => setPwConfirm(e.target.value)}
+                className={inputCls} placeholder="••••••••" />
+              {pwConfirm.length > 0 && pwNew !== pwConfirm && (
+                <p className="text-xs text-red-500 mt-1">
+                  {isFr ? 'Les mots de passe ne correspondent pas.' : 'Passwords do not match.'}
+                </p>
+              )}
+            </div>
+            {pwMsg && (
+              <p className={`text-xs font-medium ${pwMsg.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                {pwMsg.type === 'success' ? '✓ ' : '✗ '}{pwMsg.text}
+              </p>
+            )}
+            <Button
+              size="sm"
+              onClick={handlePasswordChange}
+              disabled={pwSaving || !pwCurrent || !pwNew || pwNew !== pwConfirm || pwNew.length < 6}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {pwSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {isFr ? 'Mettre à jour' : 'Update password'}
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* ── Profile preview modal ─────────────────────────────────────────── */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
