@@ -87,6 +87,13 @@ interface AIRecommendation {
   zones: string[];
   phone: string;
   profile_photo_url: string;
+  zero_reason: string | null;
+  score_breakdown: {
+    zone: boolean;
+    service: boolean;
+    rating_bonus: number;
+    urgency: boolean;
+  };
 }
 
 const statusColors: Record<string, string> = {
@@ -1945,11 +1952,34 @@ export default function AdminBookings() {
                           style={{ width: `${Math.min(rec.score, 100)}%` }}
                         />
                       </div>
-                      {rec.ai_recommendation && (
+                      {/* Score breakdown */}
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                        <span className={rec.score_breakdown?.zone ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/50 line-through"}>
+                          Zone{rec.score_breakdown?.zone ? " ✓ +40" : " ✗"}
+                        </span>
+                        <span className="text-muted-foreground/30">·</span>
+                        <span className={rec.score_breakdown?.service ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/50 line-through"}>
+                          Service{rec.score_breakdown?.service ? " ✓ +30" : " ✗"}
+                        </span>
+                        <span className="text-muted-foreground/30">·</span>
+                        <span className={(rec.score_breakdown?.rating_bonus ?? 0) > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/50"}>
+                          Note {rec.rating > 0 ? `${rec.rating} +${Math.round(rec.score_breakdown?.rating_bonus ?? 0)}` : "N/A"}
+                        </span>
+                        {rec.score_breakdown?.urgency && (
+                          <>
+                            <span className="text-muted-foreground/30">·</span>
+                            <span className="text-emerald-600 dark:text-emerald-400">Urgence ✓ +10</span>
+                          </>
+                        )}
+                      </div>
+                      {/* AI sentence or zero-reason label */}
+                      {rec.zero_reason ? (
+                        <p className="text-xs text-muted-foreground/60">{rec.zero_reason}</p>
+                      ) : rec.ai_recommendation ? (
                         <p className="text-xs text-muted-foreground italic leading-relaxed">
                           {rec.ai_recommendation}
                         </p>
-                      )}
+                      ) : null}
                     </div>
                   ))}
                 </div>
