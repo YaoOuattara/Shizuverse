@@ -45,32 +45,42 @@ def get_provider_recommendations(booking_id: int) -> list:
         review_count = len(reviews)
         avg_rating = round(sum(r.rating for r in reviews) / review_count, 1) if review_count > 0 else 0.0
 
-        score = 0.0
         zones = [z.strip().lower() for z in (sp.address or '').split(',') if z.strip()]
 
-        # Zone match +40
-        if commune and any(commune in z or z in commune for z in zones):
-            score += 40
+        # ── Score components (tracked individually for breakdown) ─────
+        zone_match    = bool(commune and any(commune in z or z in commune for z in zones))
+        service_match = bool(service_name and any(service_name in s or s in service_name for s in services))
+        rating_bonus  = round((avg_rating / 5.0) * 20, 1) if avg_rating else 0.0
+        urgency_bonus = urgency == 'urgent_2h'
 
-        # Service match +30
-        if service_name and any(service_name in s or s in service_name for s in services):
-            score += 30
+        score = 0.0
+        if zone_match:    score += 40
+        if service_match: score += 30
+        score += rating_bonus
+        if urgency_bonus: score += 10
 
-        # Rating bonus max +20
-        if avg_rating:
-            score += (avg_rating / 5.0) * 20
-
-        # Response bonus +10 for urgent bookings
-        if urgency == 'urgent_2h':
-            score += 10
+        # Zero-reason label: explain why a provider has no real match
+        no_match = not zone_match and not service_match
+        if no_match:
+            reasons = []
+            if not zone_match:    reasons.append('Hors zone')
+            if not service_match: reasons.append('Service non proposé')
+            zero_reason = ' · '.join(reasons)
+        else:
+            zero_reason = None
 
         scored.append({
-            'sp': sp,
-            'services': services,
-            'avg_rating': avg_rating,
+            'sp':           sp,
+            'services':     services,
+            'avg_rating':   avg_rating,
             'review_count': review_count,
-            'score': round(score),
-            'zones': zones,
+            'score':        round(score),
+            'zones':        zones,
+            'zone_match':   zone_match,
+            'service_match': service_match,
+            'rating_bonus': rating_bonus,
+            'urgency_bonus': urgency_bonus,
+            'zero_reason':  zero_reason,
         })
 
     scored.sort(key=lambda x: x['score'], reverse=True)
@@ -84,57 +94,79 @@ def get_provider_recommendations(booking_id: int) -> list:
         for item in top3:
             sp = item['sp']
             name = sp.company_name or f"Prestataire #{sp.id}"
-            try:
-                msg = client.messages.create(
-                    model='claude-haiku-4-5-20251001',
-                    max_tokens=100,
-                    system=(
-                        "Tu es l'assistant de matching de Shizu. En une phrase courte et précise "
-                        "en français, explique pourquoi ce prestataire est recommandé pour cette "
-                        "mission. Sois opérationnel et spécifique."
-                    ),
-                    messages=[{
-                        'role': 'user',
-                        'content': (
-                            f"Mission: {booking.service_name} à {booking.client_location} "
-                            f"(urgence: {booking.urgency or 'normale'}, "
-                            f"préférence: {booking.time_preference or 'flexible'}, "
-                            f"budget: {booking.amount_xof or '?'} FCFA).\n"
-                            f"Prestataire: {name}, note: {item['avg_rating']}/5 "
-                            f"({item['review_count']} avis), "
-                            f"zones: {', '.join(item['zones']) or 'non renseignées'}, "
-                            f"services: {', '.join(item['services']) or 'non renseignés'}, "
-                            f"score: {item['score']}/100."
+
+            # Skip AI call for providers with no zone/service match — use zero_reason label instead
+            if item['zero_reason']:
+                ai_recommendation = ''
+            else:
+                try:
+                    msg = client.messages.create(
+                        model='claude-haiku-4-5-20251001',
+                        max_tokens=120,
+                        system=(
+                            "Tu es l'assistant de matching Shizu. En une phrase, explique pourquoi "
+                            "ce prestataire est ou n'est pas idéal pour cette mission. "
+                            "Mentionne la zone, le service, ou la disponibilité. "
+                            "Sois direct et utile pour l'admin."
                         ),
-                    }],
-                )
-                ai_recommendation = msg.content[0].text.strip()
-            except Exception:
-                ai_recommendation = f"{name} est disponible pour cette mission."
+                        messages=[{
+                            'role': 'user',
+                            'content': (
+                                f"Mission: {booking.service_name} à {booking.client_location} "
+                                f"(urgence: {booking.urgency or 'normale'}, "
+                                f"préférence: {booking.time_preference or 'flexible'}, "
+                                f"budget: {booking.amount_xof or '?'} FCFA).\n"
+                                f"Prestataire: {name}, "
+                                f"note: {item['avg_rating']}/5 ({item['review_count']} avis), "
+                                f"zones: {', '.join(item['zones']) or 'non renseignées'}, "
+                                f"services: {', '.join(item['services']) or 'non renseignés'}, "
+                                f"zone match: {'oui' if item['zone_match'] else 'non'}, "
+                                f"service match: {'oui' if item['service_match'] else 'non'}, "
+                                f"score: {item['score']}/100."
+                            ),
+                        }],
+                    )
+                    ai_recommendation = msg.content[0].text.strip()
+                except Exception:
+                    ai_recommendation = f"{name} est disponible pour cette mission."
 
             results.append({
-                'provider_id': sp.id,
-                'name': name,
-                'score': item['score'],
+                'provider_id':      sp.id,
+                'name':             name,
+                'score':            item['score'],
                 'ai_recommendation': ai_recommendation,
-                'rating': item['avg_rating'],
-                'zones': item['zones'],
-                'phone': sp.phone_number or '',
+                'rating':           item['avg_rating'],
+                'zones':            item['zones'],
+                'phone':            sp.phone_number or '',
                 'profile_photo_url': sp.profile_photo_url or '',
+                'zero_reason':      item['zero_reason'],
+                'score_breakdown': {
+                    'zone':         item['zone_match'],
+                    'service':      item['service_match'],
+                    'rating_bonus': item['rating_bonus'],
+                    'urgency':      item['urgency_bonus'],
+                },
             })
     except Exception:
         for item in top3:
             sp = item['sp']
             name = sp.company_name or f"Prestataire #{sp.id}"
             results.append({
-                'provider_id': sp.id,
-                'name': name,
-                'score': item['score'],
+                'provider_id':      sp.id,
+                'name':             name,
+                'score':            item['score'],
                 'ai_recommendation': '',
-                'rating': item['avg_rating'],
-                'zones': item['zones'],
-                'phone': sp.phone_number or '',
+                'rating':           item['avg_rating'],
+                'zones':            item['zones'],
+                'phone':            sp.phone_number or '',
                 'profile_photo_url': sp.profile_photo_url or '',
+                'zero_reason':      item['zero_reason'],
+                'score_breakdown': {
+                    'zone':         item['zone_match'],
+                    'service':      item['service_match'],
+                    'rating_bonus': item['rating_bonus'],
+                    'urgency':      item['urgency_bonus'],
+                },
             })
 
     return results
