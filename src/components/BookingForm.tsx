@@ -518,9 +518,10 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
       {/* AI assistant */}
       <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-4 space-y-3">
-        <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide flex items-center gap-1.5">
-          <Sparkles className="h-3.5 w-3.5" />
-          {isFr ? "Assistant IA — pré-remplissage automatique" : "AI Assistant — auto-fill"}
+        <p className="text-xs font-semibold text-purple-700 flex items-center gap-1.5">
+          {isFr
+            ? "✨ Décrivez votre besoin — l'IA Shizu pré-remplit le formulaire pour vous"
+            : "✨ Describe your need — Shizu AI pre-fills the form for you"}
         </p>
         <div className="flex gap-2">
           <input type="text" value={aiInput} onChange={(e) => setAiInput(e.target.value)}

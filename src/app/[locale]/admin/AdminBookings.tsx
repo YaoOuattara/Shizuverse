@@ -1985,7 +1985,7 @@ export default function AdminBookings() {
                 </div>
               )}
               {!aiLoading && (
-                <p className="text-xs text-muted-foreground/60 text-right">Propulsé par IA</p>
+                <p className="text-xs text-muted-foreground/60 text-right">⚡ Classement calculé par l&apos;IA Shizu — supervisé par l&apos;équipe</p>
               )}
             </div>
 

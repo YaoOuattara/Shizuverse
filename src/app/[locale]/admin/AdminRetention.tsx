@@ -217,6 +217,13 @@ export default function AdminRetention() {
   return (
     <AdminLayout title={isFr ? "Réengagement IA" : "AI Re-engagement"}>
 
+      {/* ── AI context label ──────────────────────────────────────────────── */}
+      <p className="text-xs text-muted-foreground bg-muted/60 px-3 py-1.5 rounded-full inline-block mb-4">
+        {isFr
+          ? "Messages personnalisés par l'IA · Envoi supervisé par l'admin"
+          : "AI-personalised messages · Sending supervised by admin"}
+      </p>
+
       {/* ── Top Stats ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="rounded-xl border bg-card p-4">

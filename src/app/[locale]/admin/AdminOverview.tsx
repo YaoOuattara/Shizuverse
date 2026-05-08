@@ -303,6 +303,7 @@ export default function AdminOverview() {
             <span className="text-sm">{isFr ? "Chargement des stats…" : "Loading stats…"}</span>
           </div>
         ) : (
+          <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4" data-testid="grid-kpis">
             {/* Row 1 — Financial */}
             <Card className="border-l-4 border-l-emerald-500">
@@ -469,6 +470,12 @@ export default function AdminOverview() {
               </CardContent>
             </Card>
           </div>
+          <p className="text-xs text-muted-foreground/60 mt-2 text-right">
+            {isFr
+              ? "Matching · Réengagement · Surveillance — opérés par l'IA Shizu"
+              : "Matching · Re-engagement · Monitoring — powered by Shizu AI"}
+          </p>
+          </>
         )}
 
         {/* Platform Health */}
