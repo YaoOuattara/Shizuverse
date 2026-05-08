@@ -6,7 +6,7 @@ import AdminLayout from "../AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Activity, AlertCircle, AlertTriangle, CheckCircle2, RefreshCw, Send } from "lucide-react";
+import { Loader2, Activity, AlertCircle, AlertTriangle, CheckCircle2, RefreshCw, Send, ChevronDown, ChevronUp, Clock, Phone, CreditCard, Scale, TrendingDown, Target } from "lucide-react";
 import { adminApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -64,6 +64,7 @@ export default function AnomaliesPage() {
   const [running, setRunning] = useState(false);
   const [liveResults, setLiveResults] = useState<AnomalyEntry[] | null>(null);
   const [resolving, setResolving] = useState<number | null>(null);
+  const [checksOpen, setChecksOpen] = useState(false);
 
   const loadLog = useCallback(async () => {
     setLogLoading(true);
@@ -235,6 +236,95 @@ export default function AnomaliesPage() {
             <RefreshCw className={`h-4 w-4 ${logLoading ? "animate-spin" : ""}`} />
           </Button>
         </div>
+
+        {/* Collapsible: what the detector monitors */}
+        {(() => {
+          const checks = [
+            {
+              icon: <Clock className="h-4 w-4 text-amber-500 shrink-0" />,
+              name: isFr ? "Réservations en attente" : "Pending bookings",
+              desc: isFr
+                ? "Réservations sans prestataire depuis plus de 3h"
+                : "Bookings with no provider assigned for more than 3h",
+              threshold: isFr ? "Seuil : 3h (critique : 6h)" : "Threshold: 3h (critical: 6h)",
+            },
+            {
+              icon: <Phone className="h-4 w-4 text-orange-500 shrink-0" />,
+              name: isFr ? "Réponse prestataire" : "Provider response",
+              desc: isFr
+                ? "Prestataire assigné mais n'a pas accepté depuis plus de 1h"
+                : "Provider assigned but hasn't accepted for more than 1h",
+              threshold: isFr ? "Seuil : 1h" : "Threshold: 1h",
+            },
+            {
+              icon: <CreditCard className="h-4 w-4 text-blue-500 shrink-0" />,
+              name: isFr ? "Paiement non confirmé" : "Payment unconfirmed",
+              desc: isFr
+                ? "Client a déclaré payer mais l'admin n'a pas confirmé depuis plus de 24h"
+                : "Client declared payment but admin hasn't confirmed for more than 24h",
+              threshold: isFr ? "Seuil : 24h" : "Threshold: 24h",
+            },
+            {
+              icon: <Scale className="h-4 w-4 text-red-500 shrink-0" />,
+              name: isFr ? "Litige ouvert" : "Open dispute",
+              desc: isFr
+                ? "Litige ouvert sans résolution depuis plus de 48h"
+                : "Dispute open without resolution for more than 48h",
+              threshold: isFr ? "Seuil : 48h (toujours critique)" : "Threshold: 48h (always critical)",
+            },
+            {
+              icon: <TrendingDown className="h-4 w-4 text-purple-500 shrink-0" />,
+              name: isFr ? "Taux d'acceptation" : "Acceptance rate",
+              desc: isFr
+                ? "Prestataire avec taux d'acceptation < 50% sur les 7 derniers jours (min 3 réservations)"
+                : "Provider with acceptance rate < 50% over the last 7 days (min 3 bookings)",
+              threshold: isFr ? "Seuil : 50%" : "Threshold: 50%",
+            },
+            {
+              icon: <Target className="h-4 w-4 text-emerald-500 shrink-0" />,
+              name: isFr ? "Taux de complétion" : "Completion rate",
+              desc: isFr
+                ? "Taux de complétion de la plateforme < 70% cette semaine (min 5 réservations)"
+                : "Platform completion rate < 70% this week (min 5 bookings)",
+              threshold: isFr ? "Seuil : 70%" : "Threshold: 70%",
+            },
+          ];
+          return (
+            <div className="rounded-lg border border-border bg-muted/40">
+              <button
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setChecksOpen(o => !o)}
+              >
+                <span className="flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  {isFr ? "Vérifications effectuées" : "What the detector monitors"}
+                  <span className="text-xs font-normal opacity-60">
+                    ({isFr ? "6 contrôles" : "6 checks"})
+                  </span>
+                </span>
+                {checksOpen
+                  ? <ChevronUp className="h-4 w-4" />
+                  : <ChevronDown className="h-4 w-4" />}
+              </button>
+              {checksOpen && (
+                <div className="border-t border-border divide-y divide-border">
+                  {checks.map((c, i) => (
+                    <div key={i} className="flex items-start gap-3 px-4 py-3">
+                      <div className="mt-0.5">{c.icon}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">{c.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{c.desc}</p>
+                      </div>
+                      <span className="text-xs text-muted-foreground/70 shrink-0 mt-0.5 whitespace-nowrap">
+                        {c.threshold}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Live check results */}
         {liveResults !== null && (
