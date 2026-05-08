@@ -924,3 +924,49 @@ def test_notification():
         'twilio_enabled': is_twilio_enabled(),
         'to': phone,
     })
+
+
+# ── Anomaly Detection ─────────────────────────────────────────
+
+@admin_bp.route('/anomalies/check', methods=['GET'])
+@admin_required
+def anomaly_check():
+    """Detect anomalies only — no alert sent, nothing written to DB."""
+    from shizuverse.utils.anomaly_detector import detect_anomalies
+    anomalies = detect_anomalies()
+    return jsonify({'detected': len(anomalies), 'anomalies': anomalies})
+
+
+@admin_bp.route('/anomalies/run', methods=['POST'])
+@admin_required
+def anomaly_run():
+    """Full cycle: detect → Claude Haiku alert → WhatsApp → persist to anomaly_log."""
+    from shizuverse.utils.anomaly_detector import run_anomaly_check
+    result = run_anomaly_check()
+    return jsonify(result)
+
+
+@admin_bp.route('/anomalies/<int:anomaly_id>/resolve', methods=['POST'])
+@admin_required
+def anomaly_resolve(anomaly_id):
+    """Mark an anomaly as resolved."""
+    from shizuverse.models.anomaly_log import AnomalyLog
+    entry = AnomalyLog.query.get_or_404(anomaly_id)
+    if entry.resolved_at:
+        return jsonify({'error': 'Anomaly is already resolved'}), 400
+
+    data = request.get_json() or {}
+    entry.resolved_at = datetime.utcnow()
+    entry.resolved_by = (data.get('resolved_by') or 'admin').strip()[:100]
+    db.session.commit()
+
+    return jsonify({'success': True, 'id': entry.id, 'resolved_at': entry.resolved_at.isoformat()})
+
+
+@admin_bp.route('/anomalies/log', methods=['GET'])
+@admin_required
+def anomaly_log():
+    """Last 20 anomaly events (resolved + unresolved)."""
+    from shizuverse.models.anomaly_log import AnomalyLog
+    entries = AnomalyLog.query.order_by(AnomalyLog.detected_at.desc()).limit(20).all()
+    return jsonify([e.to_dict() for e in entries])
