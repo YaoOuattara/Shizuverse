@@ -438,12 +438,25 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   );
 
   // ── Step 1: Service confirmé ──────────────────────────────────────────────
+  const isRebook = searchParams?.get("rebook") === "true";
+
   const step1 = (
     <div className="space-y-4">
       <div>
         <h2 className="text-xl font-bold text-gray-900">{isFr ? "Service confirmé" : "Service confirmed"}</h2>
         <p className="text-gray-500 text-sm mt-1">{isFr ? "Voici le service que vous souhaitez réserver." : "Here is the service you want to book."}</p>
       </div>
+
+      {isRebook && (
+        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 flex items-start gap-2.5">
+          <CheckCircle className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-green-800">
+            {isFr
+              ? "Vous réservez à nouveau ce service. Vos informations ont été pré-remplies."
+              : "You are re-booking this service. Your details have been pre-filled."}
+          </p>
+        </div>
+      )}
 
       <div className="rounded-xl border border-[#0F3A7A]/10 bg-[#0F3A7A]/5 p-4">
         {categoryName && (

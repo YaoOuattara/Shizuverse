@@ -150,6 +150,8 @@ export interface AdminProvider {
   hasWorkPhoto: boolean;
   hasReference: boolean;
   idDocumentUrl?: string;
+  profilePhotoUrl?: string;
+  experiencePhotoUrl?: string;
 }
 
 export interface AdminService {

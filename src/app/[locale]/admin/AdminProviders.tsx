@@ -171,10 +171,12 @@ export default function AdminProviders() {
         submittedAt: p.submitted_at || undefined,
         reviewedAt: p.reviewed_at || undefined,
         rejectionReason: p.rejection_reason || undefined,
-        hasIdProof: false,
-        hasWorkPhoto: false,
+        hasIdProof: !!p.id_document_url,
+        hasWorkPhoto: !!p.experience_photo_url,
         hasReference: false,
         idDocumentUrl: p.id_document_url || undefined,
+        profilePhotoUrl: p.profile_photo_url || undefined,
+        experiencePhotoUrl: p.experience_photo_url || undefined,
       }))
     );
   }, [apiProviders]);
@@ -801,45 +803,111 @@ export default function AdminProviders() {
                 </div>
               )}
 
-              {/* Verification Checklist */}
-              <div className="space-y-3">
-                <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Documents de vérification" : "Verification Documents"}</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    {selectedProvider.hasIdProof ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className={selectedProvider.hasIdProof ? "" : "text-muted-foreground"}>
-                      {isFr ? "Pièce d'identité" : "ID Proof"}
+              {/* Documents soumis */}
+              {(() => {
+                const hasProfile    = !!selectedProvider.profilePhotoUrl;
+                const hasId         = !!selectedProvider.idDocumentUrl;
+                const hasExperience = !!selectedProvider.experiencePhotoUrl;
+                const docCount      = [hasProfile, hasId, hasExperience].filter(Boolean).length;
+                const isBeautyProvider = selectedProvider.services.some(s => /beaut/i.test(s));
+
+                const MissingBadge = ({ required }: { required?: boolean }) =>
+                  required ? (
+                    <span className="text-xs text-red-600 font-medium">
+                      🔴 {isFr ? "Requis — non soumis" : "Required — not submitted"}
                     </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    {selectedProvider.hasWorkPhoto ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <Camera className="h-4 w-4 text-muted-foreground" />
-                    <span className={selectedProvider.hasWorkPhoto ? "" : "text-muted-foreground"}>
-                      {isFr ? "Photos de travail" : "Work Photos"}
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                      ⚠ {isFr ? "Manquant" : "Missing"}
                     </span>
+                  );
+
+                const isPdf = (url: string) => url.toLowerCase().includes(".pdf");
+
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-sm text-muted-foreground">
+                        {isFr ? "Documents soumis" : "Submitted Documents"}
+                      </h4>
+                      <span className="text-xs text-muted-foreground">
+                        {docCount}/3 {isFr ? "fournis" : "provided"}
+                      </span>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Profile photo */}
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          📷 {isFr ? "Photo de profil" : "Profile photo"}
+                        </p>
+                        {hasProfile ? (
+                          <img
+                            src={selectedProvider.profilePhotoUrl}
+                            alt="Profile"
+                            className="w-20 h-20 rounded-full object-cover border border-border"
+                          />
+                        ) : (
+                          <div className="flex items-center gap-3">
+                            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center text-lg font-bold text-muted-foreground border border-border shrink-0">
+                              {selectedProvider.name.slice(0, 2).toUpperCase()}
+                            </div>
+                            <MissingBadge />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ID document */}
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          🪪 {isFr ? "Pièce d'identité" : "ID document"}
+                        </p>
+                        {hasId ? (
+                          isPdf(selectedProvider.idDocumentUrl!) ? (
+                            <a
+                              href={selectedProvider.idDocumentUrl!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-xs text-blue-600 hover:underline border border-border rounded-lg p-2 w-fit"
+                            >
+                              <FileText className="h-5 w-5 text-red-500" />
+                              {isFr ? "Voir le document" : "View document"}
+                            </a>
+                          ) : (
+                            <a href={selectedProvider.idDocumentUrl!} target="_blank" rel="noopener noreferrer">
+                              <img
+                                src={selectedProvider.idDocumentUrl!}
+                                alt="ID document"
+                                className="w-36 h-24 object-cover rounded-lg border border-border hover:opacity-80 transition-opacity cursor-pointer"
+                              />
+                            </a>
+                          )
+                        ) : (
+                          <MissingBadge required={isBeautyProvider} />
+                        )}
+                      </div>
+
+                      {/* Experience / work photos */}
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          🖼️ {isFr ? "Photos de travaux" : "Work photos"}
+                        </p>
+                        {hasExperience ? (
+                          <a href={selectedProvider.experiencePhotoUrl!} target="_blank" rel="noopener noreferrer">
+                            <img
+                              src={selectedProvider.experiencePhotoUrl!}
+                              alt="Work photos"
+                              className="w-36 h-24 object-cover rounded-lg border border-border hover:opacity-80 transition-opacity cursor-pointer"
+                            />
+                          </a>
+                        ) : (
+                          <MissingBadge />
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    {selectedProvider.hasReference ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className={selectedProvider.hasReference ? "" : "text-muted-foreground"}>
-                      {isFr ? "Références" : "References"}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Provider Info */}
               <div className="space-y-3">

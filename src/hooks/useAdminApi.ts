@@ -69,6 +69,8 @@ export interface ApiProvider {
   verified?: boolean;
   created_at?: string;
   id_document_url?: string | null;
+  profile_photo_url?: string | null;
+  experience_photo_url?: string | null;
 }
 
 export interface ApiReview {

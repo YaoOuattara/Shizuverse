@@ -7,6 +7,7 @@ import {
   Loader2,
   ArrowLeft,
   MessageCircle,
+  Plus,
   Star,
   RefreshCw,
   Hash,
@@ -29,10 +30,17 @@ interface ApiBooking {
   payment_status: string;
   created_at: string | null;
   notes: string | null;
+  client_location?: string | null;
+}
+
+interface ApiCategory {
+  id: number; name: string; name_fr: string; name_en: string;
+  subcategories: { service_id: number | null; name: string; name_fr: string; name_en: string }[];
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
+const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
 const SHIZU_WA  = (process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "").replace(/\D/g, "");
 const PHONE_KEY   = "shizu_client_phone";
 const REF_KEY     = "shizu_client_ref";
@@ -124,6 +132,38 @@ function providerWaHref(providerPhone: string, bookingId: number): string {
   return `https://wa.me/${p}?text=${encodeURIComponent(msg)}`;
 }
 
+// ── Rebook routing helpers ────────────────────────────────────────────────────
+
+function findServiceId(serviceName: string, categories: ApiCategory[]): number | null {
+  const lower = serviceName.toLowerCase();
+  for (const cat of categories) {
+    for (const sub of cat.subcategories) {
+      if (sub.service_id === null) continue;
+      const names = [sub.name_fr, sub.name_en, sub.name].map(s => s.toLowerCase());
+      if (names.some(n => n && (lower.includes(n) || n.includes(lower)))) return sub.service_id;
+    }
+    const catNames = [cat.name_fr, cat.name_en, cat.name].map(s => s.toLowerCase());
+    if (catNames.some(n => n && (lower.includes(n) || n.includes(lower)))) {
+      const first = cat.subcategories.find(s => s.service_id !== null);
+      if (first?.service_id) return first.service_id;
+    }
+  }
+  return null;
+}
+
+function rebookHref(b: ApiBooking, categories: ApiCategory[], locale: string): string {
+  const sid = findServiceId(b.service_name, categories);
+  if (!sid) return `/${locale}/services`;
+  const loc = b.client_location ?? "";
+  const commaIdx = loc.indexOf(",");
+  const commune = (commaIdx >= 0 ? loc.slice(0, commaIdx) : loc).trim();
+  const address  = commaIdx >= 0 ? loc.slice(commaIdx + 1).trim() : "";
+  const qs = new URLSearchParams({ rebook: "true" });
+  if (commune) qs.set("commune", commune);
+  if (address)  qs.set("address", address);
+  return `/${locale}/booking/${sid}?${qs.toString()}`;
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function BookingsPage() {
@@ -139,6 +179,14 @@ export default function BookingsPage() {
   const [bookings, setBookings]     = useState<ApiBooking[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
+
+  useEffect(() => {
+    fetch(`${FLASK_API}/api/services/categories`)
+      .then(r => r.json())
+      .then((data: ApiCategory[]) => setCategories(data))
+      .catch(() => {});
+  }, []);
 
   // If client is already logged in, send them straight to their dashboard
   useEffect(() => {
@@ -482,6 +530,15 @@ export default function BookingsPage() {
 
                   {/* Action buttons */}
                   <div className="flex flex-wrap gap-2 pt-1">
+                    {isCompleted && (
+                      <button
+                        onClick={() => router.push(rebookHref(b, categories, locale))}
+                        className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        {isFr ? "Réserver à nouveau" : "Book again"}
+                      </button>
+                    )}
                     {SHIZU_WA && (
                       <a
                         href={shizuWaHref(b.id, status.label)}
