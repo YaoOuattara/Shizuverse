@@ -24,6 +24,7 @@ import {
   LogOut,
   MapPin,
   UserSearch,
+  Sparkles,
 } from "lucide-react";
 import {useState, useEffect} from "react";
 
@@ -40,7 +41,8 @@ const getNavItems = (locale: string, isFr: boolean) => [
   { path: `/${locale}/admin/services`, label: isFr ? "Services" : "Services", icon: Wrench },
   { path: `/${locale}/admin/reviews`, label: isFr ? "Avis" : "Reviews", icon: MessageSquare },
   { path: `/${locale}/admin/waitlist`, label: isFr ? "Liste d'attente" : "Waitlist", icon: MapPin },
-  { path: `/${locale}/admin/clients`,  label: isFr ? "Clients" : "Clients",          icon: UserSearch },
+  { path: `/${locale}/admin/clients`,    label: isFr ? "Clients" : "Clients",          icon: UserSearch },
+  { path: `/${locale}/admin/retention`, label: isFr ? "Réengagement IA" : "AI Re-engagement", icon: Sparkles },
 ];
 
 export default function AdminLayout({ children, title }: AdminLayoutProps) {

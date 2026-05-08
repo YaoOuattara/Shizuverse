@@ -121,6 +121,13 @@ export const adminApi = {
   portalResolveDispute: (bookingId: number, resolution: string) =>
     adminFetch(`/admin/bookings/${bookingId}/resolve-dispute`, { method: "POST", body: JSON.stringify({ resolution }) }),
   portalGetConfig: () => adminFetch("/admin/config"),
+
+  // Retention / re-engagement
+  retentionCount:   () => adminFetch("/api/admin/retention/count"),
+  retentionPreview: () => adminFetch("/api/admin/retention/preview"),
+  retentionRun:     () => adminFetch("/api/admin/retention/run", { method: "POST", body: JSON.stringify({}) }),
+  retentionOptOut:  (phone: string) => adminFetch("/api/admin/retention/opt-out", { method: "POST", body: JSON.stringify({ phone }) }),
+  retentionHistory: () => adminFetch("/api/admin/retention/history"),
 };
 
 export default apiFetch;

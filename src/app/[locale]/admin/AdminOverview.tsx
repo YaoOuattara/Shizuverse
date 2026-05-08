@@ -38,6 +38,7 @@ import {
   TrendingUp,
   ArrowDownToLine,
   Send,
+  Sparkles,
 } from "lucide-react";
 
 function formatFCFA(amount: number): string {
@@ -47,12 +48,13 @@ function formatFCFA(amount: number): string {
     maximumFractionDigits: 0,
   }).format(amount) + ' FCFA';
 }
-import { useState, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useState, useMemo, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useAdminStats, useAdminBookings, useAdminProviders, useAdminReviews, useAdminOverview, type ApiBooking } from "@/hooks/useAdminApi";
 import { useAdminStore, type AdminProvider, type DateRangeOption, type VerificationStatus } from "@/data/adminStore";
 import { useToast } from "@/hooks/use-toast";
 import { formatMoney } from "@/lib/currency";
+import { adminApi } from "@/lib/api";
 
 const statusColors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
@@ -159,9 +161,17 @@ export default function AdminOverview() {
       .slice(0, 5);
   }, [liveBookings]);
 
+  const router = useRouter();
   const [selectedBooking, setSelectedBooking] = useState<ApiBooking | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<AdminProvider | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [retentionCount, setRetentionCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    adminApi.retentionCount()
+      .then((d: { count?: number }) => setRetentionCount(d.count ?? 0))
+      .catch(() => setRetentionCount(null));
+  }, []);
 
   const handleToggleProviderStatus = async (provider: AdminProvider) => {
     setIsUpdating(true);
@@ -411,6 +421,28 @@ export default function AdminOverview() {
                     )}
                   </div>
                   <Star className="h-7 w-7 text-amber-500/50 shrink-0 mt-0.5" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card
+              className="border-l-4 border-l-violet-400 cursor-pointer hover:bg-muted/30 transition-colors"
+              onClick={() => router.push(`/${(params?.locale as string) ?? 'fr'}/admin/retention`)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">
+                      {isFr ? "Clients à réengager" : "Clients to re-engage"}
+                    </p>
+                    <p className="text-2xl font-bold mt-0.5" data-testid="kpi-retention">
+                      {retentionCount === null ? "—" : retentionCount}
+                    </p>
+                    <p className="text-xs text-violet-600 mt-0.5 font-medium">
+                      {isFr ? "Voir la campagne →" : "View campaign →"}
+                    </p>
+                  </div>
+                  <Sparkles className="h-7 w-7 text-violet-400/60 shrink-0 mt-0.5" />
                 </div>
               </CardContent>
             </Card>
