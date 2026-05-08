@@ -243,6 +243,9 @@ def get_providers():
             'verified': sp.verified,
             'address': sp.address,
             'created_at': sp.created_at.isoformat() if sp.created_at else None,
+            'id_document_url': sp.id_document_url,
+            'profile_photo_url': sp.profile_photo_url,
+            'experience_photo_url': sp.experience_photo_url,
         })
     return jsonify(result)
 
