@@ -39,6 +39,9 @@ import {
   ArrowDownToLine,
   Send,
   Sparkles,
+  Activity,
+  AlertTriangle,
+  AlertCircle,
 } from "lucide-react";
 
 function formatFCFA(amount: number): string {
@@ -172,6 +175,25 @@ export default function AdminOverview() {
       .then((d: { count?: number }) => setRetentionCount(d.count ?? 0))
       .catch(() => setRetentionCount(null));
   }, []);
+
+  type AnomalyItem = {
+    type: string; severity: string; description: string;
+    booking_id: number | null; provider_id: number | null; action_required?: string;
+  };
+  const [anomalyResults, setAnomalyResults] = useState<AnomalyItem[] | null>(null);
+  const [anomalyChecking, setAnomalyChecking] = useState(false);
+
+  const handleAnomalyCheck = async () => {
+    setAnomalyChecking(true);
+    try {
+      const res = await adminApi.anomalyCheck();
+      setAnomalyResults(res.anomalies ?? []);
+    } catch {
+      toast({ title: isFr ? "Erreur de vérification" : "Check failed", variant: "destructive" });
+    } finally {
+      setAnomalyChecking(false);
+    }
+  };
 
   const handleToggleProviderStatus = async (provider: AdminProvider) => {
     setIsUpdating(true);
@@ -448,6 +470,106 @@ export default function AdminOverview() {
             </Card>
           </div>
         )}
+
+        {/* Platform Health */}
+        {(() => {
+          const hasCritical = anomalyResults?.some(a => a.severity === 'critical');
+          const hasAny = anomalyResults && anomalyResults.length > 0;
+          return (
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-muted-foreground" />
+                    <CardTitle className="text-base">
+                      {isFr ? "Santé de la plateforme" : "Platform Health"}
+                    </CardTitle>
+                    {anomalyResults === null ? (
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span className="w-2 h-2 rounded-full bg-gray-400" />
+                        {isFr ? "Non vérifié" : "Not checked"}
+                      </span>
+                    ) : hasCritical ? (
+                      <span className="flex items-center gap-1.5 text-xs text-red-600 font-medium">
+                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                        {isFr ? "Attention requise" : "Action required"}
+                      </span>
+                    ) : hasAny ? (
+                      <span className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                        {anomalyResults!.length} {isFr ? "alerte(s) active(s)" : "active alert(s)"}
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        {isFr ? "Tout fonctionne" : "All systems normal"}
+                      </span>
+                    )}
+                  </div>
+                  <Button size="sm" variant="outline" onClick={handleAnomalyCheck} disabled={anomalyChecking}>
+                    {anomalyChecking
+                      ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                      : <Activity className="h-4 w-4 mr-1.5" />}
+                    {isFr ? "Vérifier maintenant" : "Check now"}
+                  </Button>
+                </div>
+              </CardHeader>
+              {anomalyResults !== null && (
+                <CardContent className="pt-0">
+                  {anomalyResults.length === 0 ? (
+                    <p className="text-sm text-emerald-600 flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4" />
+                      {isFr ? "Aucune anomalie détectée." : "No anomalies detected."}
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {anomalyResults.map((a, i) => (
+                        <div
+                          key={i}
+                          className={`rounded-md border p-3 text-sm flex items-start gap-3 ${
+                            a.severity === 'critical'
+                              ? 'border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/30'
+                              : 'border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/30'
+                          }`}
+                        >
+                          {a.severity === 'critical'
+                            ? <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                            : <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />}
+                          <div className="min-w-0 flex-1">
+                            <p className={`font-medium ${a.severity === 'critical' ? 'text-red-800 dark:text-red-300' : 'text-amber-800 dark:text-amber-300'}`}>
+                              {a.description}
+                            </p>
+                            {a.action_required && (
+                              <p className="text-xs text-muted-foreground mt-0.5">→ {a.action_required}</p>
+                            )}
+                          </div>
+                          {a.booking_id && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="shrink-0 h-7 text-xs"
+                              onClick={() => router.push(`/${(params?.locale as string) ?? 'fr'}/admin/bookings`)}
+                            >
+                              #{a.booking_id}
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      <p className="text-xs text-muted-foreground text-right">
+                        <button
+                          className="underline hover:text-foreground"
+                          onClick={() => router.push(`/${(params?.locale as string) ?? 'fr'}/admin/anomalies`)}
+                        >
+                          {isFr ? "Voir toutes les anomalies →" : "View all anomalies →"}
+                        </button>
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              )}
+            </Card>
+          );
+        })()}
 
         {/* Recent Bookings & Top Providers */}
         <div className="grid lg:grid-cols-2 gap-6">

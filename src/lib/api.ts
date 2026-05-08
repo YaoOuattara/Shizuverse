@@ -122,6 +122,16 @@ export const adminApi = {
     adminFetch(`/admin/bookings/${bookingId}/resolve-dispute`, { method: "POST", body: JSON.stringify({ resolution }) }),
   portalGetConfig: () => adminFetch("/admin/config"),
 
+  // Anomaly detection
+  anomalyCheck: () => adminFetch("/admin/anomalies/check"),
+  anomalyRun: () => adminFetch("/admin/anomalies/run", { method: "POST", body: JSON.stringify({}) }),
+  anomalyResolve: (id: number, resolvedBy?: string) =>
+    adminFetch(`/admin/anomalies/${id}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({ resolved_by: resolvedBy || "admin" }),
+    }),
+  anomalyLog: () => adminFetch("/admin/anomalies/log"),
+
   // Retention / re-engagement
   retentionCount:   () => adminFetch("/api/admin/retention/count"),
   retentionPreview: () => adminFetch("/api/admin/retention/preview"),

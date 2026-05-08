@@ -25,6 +25,7 @@ import {
   MapPin,
   UserSearch,
   Sparkles,
+  Activity,
 } from "lucide-react";
 import {useState, useEffect} from "react";
 
@@ -42,7 +43,8 @@ const getNavItems = (locale: string, isFr: boolean) => [
   { path: `/${locale}/admin/reviews`, label: isFr ? "Avis" : "Reviews", icon: MessageSquare },
   { path: `/${locale}/admin/waitlist`, label: isFr ? "Liste d'attente" : "Waitlist", icon: MapPin },
   { path: `/${locale}/admin/clients`,    label: isFr ? "Clients" : "Clients",          icon: UserSearch },
-  { path: `/${locale}/admin/retention`, label: isFr ? "Réengagement IA" : "AI Re-engagement", icon: Sparkles },
+  { path: `/${locale}/admin/retention`,  label: isFr ? "Réengagement IA" : "AI Re-engagement", icon: Sparkles },
+  { path: `/${locale}/admin/anomalies`, label: isFr ? "Anomalies" : "Anomalies",             icon: Activity },
 ];
 
 export default function AdminLayout({ children, title }: AdminLayoutProps) {
