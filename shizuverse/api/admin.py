@@ -6,7 +6,7 @@ from shizuverse.models.client_booking import ClientBooking
 from shizuverse.models.service_provider import ServiceProvider
 from shizuverse.models.service_models import Service, ServiceCategory
 from shizuverse.models.waitlist import Waitlist
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from sqlalchemy import func
 import jwt
 import os
@@ -1071,6 +1071,83 @@ def get_stats():
         'cancelled': cancelled,
         'total_providers': providers,
     })
+
+
+# ── Retention / Re-engagement endpoints ───────────────────────────────────────
+
+@admin_bp.route('/retention/count', methods=['GET'])
+@require_admin_token
+def retention_count():
+    from shizuverse.utils.retention_agent import get_clients_to_reengage
+    try:
+        clients = get_clients_to_reengage()
+        return jsonify({'count': len(clients)})
+    except Exception as e:
+        return jsonify({'count': 0, 'error': str(e)})
+
+
+@admin_bp.route('/retention/preview', methods=['GET'])
+@require_admin_token
+def retention_preview():
+    from shizuverse.utils.retention_agent import preview_retention_campaign
+    try:
+        clients = preview_retention_campaign()
+        return jsonify({'clients': clients, 'count': len(clients)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/retention/run', methods=['POST'])
+@require_admin_token
+def retention_run():
+    from shizuverse.utils.retention_agent import run_retention_campaign
+    result = run_retention_campaign()
+    if 'error' in result:
+        status = 429 if result.get('ran_today') else 500
+        return jsonify(result), status
+    return jsonify(result)
+
+
+@admin_bp.route('/retention/opt-out', methods=['POST'])
+@require_admin_token
+def retention_opt_out():
+    from shizuverse.models.retention_campaign import RetentionCampaign
+    data = request.get_json() or {}
+    phone = (data.get('phone') or '').strip()
+    if not phone:
+        return jsonify({'error': 'phone required'}), 400
+    existing = RetentionCampaign.query.filter_by(client_phone=phone).first()
+    if existing:
+        db.session.query(RetentionCampaign).filter_by(client_phone=phone).update({'opted_out': True})
+    else:
+        db.session.add(RetentionCampaign(
+            client_phone=phone, message_sent=None,
+            campaign_date=date.today(), opted_out=True,
+        ))
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@admin_bp.route('/retention/history', methods=['GET'])
+@require_admin_token
+def retention_history():
+    from shizuverse.models.retention_campaign import RetentionCampaign
+    rows = (
+        db.session.query(
+            RetentionCampaign.campaign_date,
+            func.count(RetentionCampaign.id).label('total'),
+        )
+        .filter(RetentionCampaign.message_sent.isnot(None))
+        .filter(RetentionCampaign.opted_out == False)  # noqa: E712
+        .group_by(RetentionCampaign.campaign_date)
+        .order_by(RetentionCampaign.campaign_date.desc())
+        .limit(10)
+        .all()
+    )
+    return jsonify({'campaigns': [
+        {'campaign_date': str(r.campaign_date), 'sent': r.total, 'total': r.total}
+        for r in rows
+    ]})
 
 
 # ── Client Blueprint ───────────────────────────────────────────────────────────
