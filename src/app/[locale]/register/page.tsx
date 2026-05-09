@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, MessageCircle, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, ArrowRight, MessageCircle, Eye, EyeOff, Check } from "lucide-react";
 import PhoneInput from "@/components/PhoneInput";
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
@@ -10,15 +10,25 @@ const SHIZU_WA  = (process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "").replace(/\D/g, 
 
 function ProgressBar({ step }: { step: number }) {
   return (
-    <div className="flex gap-1.5 mb-8">
-      {[1, 2, 3].map((n) => (
-        <div
-          key={n}
-          className={`h-1.5 flex-1 rounded-full transition-colors ${
-            n <= step ? "bg-green-500" : "bg-gray-200"
-          }`}
-        />
-      ))}
+    <div className="flex items-center mb-8">
+      {[1, 2, 3].map((n, i) => {
+        const done    = n < step;
+        const current = n === step;
+        return (
+          <div key={n} className="flex items-center flex-1 last:flex-none">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm font-bold transition-colors ${
+              done    ? "bg-green-500 text-white" :
+              current ? "bg-green-600 text-white ring-4 ring-green-100" :
+                        "bg-gray-200 text-gray-400"
+            }`}>
+              {done ? <Check className="h-4 w-4" /> : n}
+            </div>
+            {i < 2 && (
+              <div className={`flex-1 h-0.5 mx-1 transition-colors ${done ? "bg-green-400" : "bg-gray-200"}`} />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -30,7 +40,8 @@ export default function RegisterPage() {
   const isFr   = locale === "fr";
 
   const [step, setStep]           = useState(1);
-  const [name, setName]           = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName]   = useState("");
   const [phone, setPhone]         = useState("");
   const [password, setPassword]   = useState("");
   const [confirm, setConfirm]     = useState("");
@@ -39,7 +50,7 @@ export default function RegisterPage() {
   const [error, setError]         = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const step1Valid = name.trim().length >= 2;
+  const step1Valid = firstName.trim().length >= 1 && lastName.trim().length >= 1;
   const step2Valid = phone.trim().length >= 8;
   const step3Valid =
     password.length >= 6 && password === confirm;
@@ -49,11 +60,12 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       const normalizedPhone = phone.replace(/\s+/g, "");
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
       const res = await fetch(`${FLASK_API}/api/client/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          full_name: name.trim(),
+          full_name: fullName,
           phone: normalizedPhone,
           password,
         }),
@@ -103,13 +115,20 @@ export default function RegisterPage() {
             <p className="text-sm text-gray-400 mb-6">
               {isFr ? "Étape 1 sur 3" : "Step 1 of 3"}
             </p>
-            <div className="space-y-4">
+            <div className="space-y-3">
               <input
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={isFr ? "Votre prénom et nom" : "Your full name"}
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder={isFr ? "Prénom — ex. Kouassi" : "First name — e.g. Kouassi"}
                 autoFocus
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 placeholder:text-gray-300"
+              />
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder={isFr ? "Nom — ex. Marie" : "Last name — e.g. Marie"}
                 onKeyDown={(e) => e.key === "Enter" && step1Valid && setStep(2)}
                 className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 placeholder:text-gray-300"
               />

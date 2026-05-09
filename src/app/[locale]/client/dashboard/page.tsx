@@ -191,6 +191,7 @@ export default function ClientDashboard() {
   const [reviewedIds, setReviewedIds]       = useState<Set<string>>(new Set());
   const [paymentDeclaredIds, setPaymentDeclaredIds] = useState<Set<number>>(new Set());
   const [declaringPayment, setDeclaringPayment]     = useState<number | null>(null);
+  const [expandedId, setExpandedId]                 = useState<number | null>(null);
 
   useEffect(() => {
     fetch(`${FLASK_API}/api/services/categories`)
@@ -505,17 +506,22 @@ export default function ClientDashboard() {
         ) : (
           <div className="space-y-3">
             {filtered.map(b => {
-              const badge      = statusBadge(b.status, b.provider_name);
+              const badge       = statusBadge(b.status, b.provider_name);
               const isCompleted = b.status === "completed";
               const isCancelled = CANCELLED_STATUSES.has(b.status);
               const isActive    = ACTIVE_STATUSES.has(b.status);
+              const isRequested = b.status === "requested" || b.status === "pending";
               const isReviewed  = reviewedIds.has(String(b.id));
+              const isExpanded  = expandedId === b.id;
               const commune     = b.client_location?.split(",")[0]?.trim() ?? null;
               const reviewQs    = new URLSearchParams({
                 service:  b.service_name,
                 provider: b.provider_name ?? "",
                 date:     formatDate(b.appointment_date),
               }).toString();
+              const waModifyMsg = encodeURIComponent(
+                `Bonjour Shizu, je souhaite modifier ma réservation ${bookingRef(b)} (${translateService(b.service_name)}).`
+              );
 
               return (
                 <div key={b.id}
@@ -542,23 +548,74 @@ export default function ClientDashboard() {
 
                   {/* Provider + amount */}
                   {(b.provider_name || b.final_amount != null || b.amount_xof != null) && (
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                    <p className="text-xs text-gray-500">
                       {b.provider_name && <span className="font-medium text-gray-700">{b.provider_name}</span>}
                       {(() => {
                         const effectiveAmt = b.final_amount ?? b.amount_xof;
                         if (effectiveAmt == null) return null;
                         const fmt = new Intl.NumberFormat("fr-FR").format(effectiveAmt) + " FCFA";
+                        const sep = b.provider_name ? " — " : "";
                         if (b.payment_status === "paid") {
-                          return <span className="text-green-600 font-semibold">Réglé · {fmt}</span>;
+                          return <span className="text-green-600 font-semibold">{sep}Réglé : {fmt}</span>;
                         }
-                        return <span className="text-gray-500">Devis · {fmt}</span>;
+                        return <span className="text-gray-500">{sep}Devis : {fmt}</span>;
                       })()}
+                    </p>
+                  )}
+
+                  {/* Expanded details */}
+                  {isExpanded && (
+                    <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-3 space-y-2 text-xs">
+                      {b.client_location && (
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-gray-400 shrink-0">Adresse</span>
+                          <span className="text-gray-700 text-right">{b.client_location}</span>
+                        </div>
+                      )}
+                      {b.notes && (
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-gray-400 shrink-0">Notes</span>
+                          <span className="text-gray-600 italic text-right">{b.notes}</span>
+                        </div>
+                      )}
+                      {b.provider_name && (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-gray-400 shrink-0">Prestataire</span>
+                          <span className="text-gray-700 font-medium">{b.provider_name}</span>
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {/* Actions */}
                   <div className="flex flex-wrap gap-2 pt-0.5">
-                    {/* Completed actions */}
+                    {/* Voir détails */}
+                    <button
+                      onClick={() => setExpandedId(isExpanded ? null : b.id)}
+                      className="flex items-center gap-1.5 border border-gray-200 text-gray-500 hover:text-gray-700 text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
+                      {isExpanded ? "Réduire" : "Voir détails"}
+                    </button>
+
+                    {/* Contacter Shizu */}
+                    {SHIZU_WA && (
+                      <a href={waShizuHref(b)} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 bg-[#25D366] hover:bg-[#1ebe5c] text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        💬 Contacter Shizu
+                      </a>
+                    )}
+
+                    {/* Modifier — requested/pending only */}
+                    {isRequested && SHIZU_WA && (
+                      <a
+                        href={`https://wa.me/${SHIZU_WA}?text=${waModifyMsg}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 border border-gray-200 text-gray-600 hover:bg-gray-50 text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
+                        Modifier
+                      </a>
+                    )}
+
+                    {/* Completed: rebook + review */}
                     {isCompleted && (
                       <button
                         onClick={() => router.push(rebookHref(b, categories, locale))}
@@ -582,7 +639,7 @@ export default function ClientDashboard() {
                       </span>
                     )}
 
-                    {/* Cancelled: only rebook */}
+                    {/* Cancelled: rebook */}
                     {isCancelled && (
                       <button
                         onClick={() => router.push(rebookHref(b, categories, locale))}
@@ -592,23 +649,8 @@ export default function ClientDashboard() {
                       </button>
                     )}
 
-                    {/* Active: contact Shizu */}
-                    {isActive && SHIZU_WA && (
-                      <a href={waShizuHref(b)} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
-                        <MessageCircle className="h-3.5 w-3.5" />
-                        Contacter Shizu
-                      </a>
-                    )}
-
-                    {/* All cards: WA outline (skip if already shown as primary) */}
-                    {!isActive && SHIZU_WA && (
-                      <a href={waShizuHref(b)} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 border border-gray-200 text-gray-500 hover:border-[#25D366] hover:text-[#25D366] text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
-                        <MessageCircle className="h-3.5 w-3.5" />
-                        Contacter Shizu
-                      </a>
-                    )}
+                    {/* Unused — kept for exhaustiveness */}
+                    {isActive && false && null}
                   </div>
                 </div>
               );

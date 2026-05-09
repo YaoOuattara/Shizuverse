@@ -180,6 +180,8 @@ export default function BookingsPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [showGuestForm, setShowGuestForm] = useState(false);
+  const [expandedId, setExpandedId]       = useState<number | null>(null);
 
   useEffect(() => {
     fetch(`${FLASK_API}/api/services/categories`)
@@ -254,7 +256,7 @@ export default function BookingsPage() {
 
   const canSubmit = phoneInput.replace(/\D/g, "").length >= 6 && refInput.trim().length > 0;
 
-  // ── Phone + ref lookup form ────────────────────────────────────────────────
+  // ── Lookup / login gate ────────────────────────────────────────────────────
 
   if (phase === "lookup") {
     return (
@@ -262,11 +264,13 @@ export default function BookingsPage() {
         <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
           <div className="mx-auto max-w-2xl px-4 py-4">
             <button
-              onClick={() => router.push(`/${locale}`)}
+              onClick={() => showGuestForm ? setShowGuestForm(false) : router.push(`/${locale}`)}
               className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors -ml-1"
             >
               <ArrowLeft className="h-4 w-4" />
-              {isFr ? "Retour à l'accueil" : "Back to home"}
+              {showGuestForm
+                ? (isFr ? "Se connecter à la place" : "Log in instead")
+                : (isFr ? "Retour à l'accueil" : "Back to home")}
             </button>
           </div>
         </header>
@@ -280,96 +284,80 @@ export default function BookingsPage() {
               <h1 className="text-2xl font-bold text-foreground">
                 {isFr ? "Mes réservations" : "My Bookings"}
               </h1>
-              <p className="text-sm text-muted-foreground mt-2">
-                {isFr
-                  ? "Entrez votre numéro WhatsApp et votre référence de réservation."
-                  : "Enter your WhatsApp number and booking reference."}
-              </p>
             </div>
 
-            <form onSubmit={handleLookup} className="space-y-4">
-              {/* Phone field */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  {isFr ? "Numéro WhatsApp" : "WhatsApp number"}
-                </label>
-                <PhoneInput
-                  defaultValue={phoneInput}
-                  onChange={setPhoneInput}
-                  autoFocus
-                  required
-                />
-              </div>
-
-              {/* Reference field */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  <Hash className="inline h-3.5 w-3.5 mr-1 mb-0.5" />
-                  {isFr ? "Numéro de réservation" : "Booking reference"}
-                </label>
-                <input
-                  type="text"
-                  value={refInput}
-                  onChange={(e) => setRefInput(e.target.value)}
-                  placeholder="#SHZ-2025-XXXX"
-                  required
-                  autoComplete="off"
-                  className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground placeholder:font-sans"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
+            {!showGuestForm ? (
+              /* ── Primary: login CTA ───────────────────────────────── */
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground text-center -mt-4 mb-2">
                   {isFr
-                    ? "Reçu sur WhatsApp après votre réservation"
-                    : "Received on WhatsApp after your booking"}
+                    ? "Connectez-vous pour accéder à toutes vos réservations."
+                    : "Log in to access all your bookings."}
+                </p>
+                <button
+                  onClick={() => router.push(`/${locale}/login`)}
+                  className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-3.5 rounded-xl transition-colors text-sm"
+                >
+                  <LogIn className="h-4 w-4" />
+                  {isFr ? "Se connecter pour voir mes réservations" : "Log in to view my bookings"}
+                </button>
+                <p className="text-center text-sm text-muted-foreground">
+                  {isFr ? "Première réservation ?" : "First booking?"}{" "}
+                  <button
+                    onClick={() => setShowGuestForm(true)}
+                    className="text-[#0F3A7A] font-medium hover:underline"
+                  >
+                    {isFr ? "Suivre sans compte →" : "Track without account →"}
+                  </button>
                 </p>
               </div>
+            ) : (
+              /* ── Guest form ───────────────────────────────────────── */
+              <form onSubmit={handleLookup} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    {isFr ? "Numéro WhatsApp" : "WhatsApp number"}
+                  </label>
+                  <PhoneInput
+                    defaultValue={phoneInput}
+                    onChange={setPhoneInput}
+                    autoFocus
+                    required
+                  />
+                </div>
 
-              {fetchError && (
-                <p className="text-sm text-destructive">{fetchError}</p>
-              )}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    <Hash className="inline h-3.5 w-3.5 mr-1 mb-0.5" />
+                    {isFr ? "Numéro de réservation" : "Booking reference"}
+                  </label>
+                  <input
+                    type="text"
+                    value={refInput}
+                    onChange={(e) => setRefInput(e.target.value)}
+                    placeholder="#SHZ-2026-XXXX"
+                    required
+                    autoComplete="off"
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground placeholder:font-sans"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {isFr
+                      ? "Reçu sur WhatsApp après votre réservation"
+                      : "Received on WhatsApp after your booking"}
+                  </p>
+                </div>
 
-              <button
-                type="submit"
-                disabled={!canSubmit}
-                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
-              >
-                {isFr ? "Voir mes réservations" : "View my bookings"}
-              </button>
-            </form>
+                {fetchError && <p className="text-sm text-destructive">{fetchError}</p>}
 
-            <p className="text-center mt-6 text-sm text-muted-foreground">
-              {isFr ? "Pas encore de réservation ?" : "No booking yet?"}{" "}
-              <button
-                onClick={() => router.push(`/${locale}/services`)}
-                className="text-[#0F3A7A] font-medium hover:underline"
-              >
-                {isFr ? "Réserver un service" : "Book a service"}
-              </button>
-            </p>
-
-            {/* Account login nudge */}
-            <div className="relative mt-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
-              </div>
-              <div className="relative flex justify-center">
-                <span className="bg-background px-3 text-xs text-muted-foreground">
-                  {isFr ? "ou" : "or"}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-              <p className="text-sm text-gray-600">
-                {isFr ? "Vous avez un compte Shizu ?" : "Have a Shizu account?"}
-              </p>
-              <button
-                onClick={() => router.push(`/${locale}/login`)}
-                className="flex items-center gap-1.5 shrink-0 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
-              >
-                <LogIn className="h-3.5 w-3.5" />
-                {isFr ? "Se connecter" : "Log in"}
-              </button>
-            </div>
+                <button
+                  type="submit"
+                  disabled={!canSubmit}
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+                >
+                  {isFr ? "Voir mes réservations" : "View my bookings"}
+                </button>
+              </form>
+            )}
           </div>
         </main>
       </div>
@@ -461,17 +449,22 @@ export default function BookingsPage() {
             </p>
 
             {bookings.map((b) => {
-              const status     = getStatusInfo(b.status, b.provider_name);
+              const status      = getStatusInfo(b.status, b.provider_name);
               const isCompleted = b.status === "completed";
+              const isRequested = b.status === "requested" || b.status === "pending";
               const isReviewed  = reviewedIds.has(String(b.id));
+              const isExpanded  = expandedId === b.id;
               const reviewQs    = new URLSearchParams({
                 service:  b.service_name,
                 provider: b.provider_name ?? "",
                 date:     formatDate(b.appointment_date),
               }).toString();
+              const waModifyMsg = encodeURIComponent(
+                `Bonjour Shizu, je souhaite modifier ma réservation ${formatRef(b.id)} (${translateService(b.service_name)}).`
+              );
 
               return (
-                <div key={b.id} className="rounded-2xl border border-border bg-card p-5 space-y-4">
+                <div key={b.id} className="rounded-2xl border border-border bg-card p-5 space-y-3">
                   {/* Top row: ref + status */}
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -490,29 +483,6 @@ export default function BookingsPage() {
                     <span>{formatDate(b.appointment_date)} à {formatTime(b.appointment_date)}</span>
                   </div>
 
-                  {/* Provider row */}
-                  {b.provider_name && (
-                    <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 px-3 py-2.5">
-                      <div>
-                        <p className="text-xs text-muted-foreground">
-                          {isFr ? "Prestataire assigné" : "Assigned provider"}
-                        </p>
-                        <p className="text-sm font-medium text-foreground">{b.provider_name}</p>
-                      </div>
-                      {b.provider_phone && (
-                        <a
-                          href={providerWaHref(b.provider_phone, b.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="shrink-0 flex items-center gap-1.5 bg-[#25D366] hover:bg-[#1ebe5c] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                        >
-                          <MessageCircle className="h-3.5 w-3.5" />
-                          {isFr ? "Contacter" : "Contact"}
-                        </a>
-                      )}
-                    </div>
-                  )}
-
                   {/* Amount */}
                   {(b.final_amount != null || b.amount_xof != null) && (() => {
                     const effectiveAmt = b.final_amount ?? b.amount_xof!;
@@ -528,8 +498,75 @@ export default function BookingsPage() {
                     );
                   })()}
 
+                  {/* Expanded details */}
+                  {isExpanded && (
+                    <div className="rounded-xl bg-muted/40 px-3 py-3 space-y-2 text-sm">
+                      {b.provider_name && (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground">{isFr ? "Prestataire" : "Provider"}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{b.provider_name}</span>
+                            {b.provider_phone && (
+                              <a href={providerWaHref(b.provider_phone, b.id)} target="_blank" rel="noopener noreferrer"
+                                className="flex items-center gap-1 bg-[#25D366] text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                <MessageCircle className="h-3 w-3" />
+                                WA
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {b.client_location && (
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-muted-foreground shrink-0">{isFr ? "Adresse" : "Address"}</span>
+                          <span className="text-right">{b.client_location}</span>
+                        </div>
+                      )}
+                      {b.notes && (
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-muted-foreground shrink-0">{isFr ? "Notes" : "Notes"}</span>
+                          <span className="text-right italic text-muted-foreground">{b.notes}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Action buttons */}
-                  <div className="flex flex-wrap gap-2 pt-1">
+                  <div className="flex flex-wrap gap-2 pt-0.5">
+                    {/* Voir détails toggle */}
+                    <button
+                      onClick={() => setExpandedId(isExpanded ? null : b.id)}
+                      className="flex items-center gap-1.5 border border-input text-muted-foreground hover:text-foreground hover:border-gray-300 text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
+                    >
+                      {isExpanded ? (isFr ? "Réduire" : "Collapse") : (isFr ? "Voir détails" : "View details")}
+                    </button>
+
+                    {/* Contacter Shizu */}
+                    {SHIZU_WA && (
+                      <a
+                        href={shizuWaHref(b.id, status.label)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 bg-[#25D366] hover:bg-[#1ebe5c] text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        💬 {isFr ? "Contacter Shizu" : "Contact Shizu"}
+                      </a>
+                    )}
+
+                    {/* Modifier — requested only */}
+                    {isRequested && SHIZU_WA && (
+                      <a
+                        href={`https://wa.me/${SHIZU_WA}?text=${waModifyMsg}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 border border-gray-200 text-gray-600 hover:bg-gray-50 text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
+                      >
+                        {isFr ? "Modifier" : "Edit"}
+                      </a>
+                    )}
+
+                    {/* Rebook — completed */}
                     {isCompleted && (
                       <button
                         onClick={() => router.push(rebookHref(b, categories, locale))}
@@ -539,18 +576,8 @@ export default function BookingsPage() {
                         {isFr ? "Réserver à nouveau" : "Book again"}
                       </button>
                     )}
-                    {SHIZU_WA && (
-                      <a
-                        href={shizuWaHref(b.id, status.label)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 border border-[#25D366] text-[#25D366] hover:bg-[#25D366] hover:text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
-                      >
-                        <MessageCircle className="h-3.5 w-3.5" />
-                        {isFr ? "Contacter Shizu" : "Contact Shizu"}
-                      </a>
-                    )}
 
+                    {/* Review — completed, not reviewed */}
                     {isCompleted && !isReviewed && (
                       <button
                         onClick={() => router.push(`/${locale}/review/${b.id}?${reviewQs}`)}
