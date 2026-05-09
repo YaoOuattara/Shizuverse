@@ -358,7 +358,7 @@ export default function ClientDashboard() {
             {[
               { value: String(totalCount),     label: "Réservations" },
               { value: String(completedCount), label: "Terminées" },
-              { value: "—",                    label: "Note moy." },
+              { value: "—", label: completedCount > 0 ? "Note moy." : "Pas encore noté" },
             ].map(({ value, label }) => (
               <div key={label} className="rounded-xl bg-white/10 px-3 py-2.5 text-center">
                 <p className="text-white font-bold text-lg leading-none">{value}</p>

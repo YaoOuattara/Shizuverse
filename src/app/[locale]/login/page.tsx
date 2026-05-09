@@ -107,7 +107,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={submitting || !phone.trim() || !password}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-200 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
           >
             {submitting ? (
               <span className="inline-block h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />

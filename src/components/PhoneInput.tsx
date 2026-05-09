@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ── Country codes ──────────────────────────────────────────────────────────────
@@ -121,18 +122,20 @@ export default function PhoneInput({
     emit(effectiveCode, formatted);
   }
 
-  // Base styles — shrink-0 on selector prevents it growing and crowding the number input
-  const baseSelect =
-    "h-10 w-[80px] shrink-0 border border-r-0 border-input bg-muted text-sm " +
-    "text-foreground rounded-l-xl px-2 box-border focus:outline-none focus:ring-2 focus:ring-ring";
   const baseInput =
     "flex-1 min-w-0 h-10 border border-input bg-background rounded-r-xl px-3 text-sm " +
     "box-border focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground";
+
+  // Shared border/background classes for the left side (selector or custom input)
+  const selectorBase =
+    "h-10 w-full border border-r-0 border-input bg-muted text-sm text-foreground " +
+    "rounded-l-xl box-border focus:outline-none focus:ring-2 focus:ring-ring";
 
   return (
     // w-full + overflow-hidden prevents horizontal overflow on mobile Safari
     <div className={cn("flex w-full max-w-full overflow-hidden", wrapperClassName)}>
       {isOther ? (
+        /* Custom code input (Autre) — no arrow needed */
         <input
           type="text"
           value={custom}
@@ -147,20 +150,24 @@ export default function PhoneInput({
           placeholder="+XXX"
           maxLength={5}
           aria-label="Code pays"
-          className={cn(baseSelect, "w-[70px] text-center", selectClassName)}
+          className={cn(selectorBase, "w-[70px] text-center appearance-none px-2", selectClassName)}
         />
       ) : (
-        <select
-          value={code}
-          onChange={handleCodeChange}
-          aria-label="Code pays"
-          className={cn(baseSelect, selectClassName)}
-        >
-          {CODES.map(c => (
-            <option key={c.value} value={c.value}>{c.label}</option>
-          ))}
-          <option value="other">Autre…</option>
-        </select>
+        /* Select wrapped in relative div so we can overlay a custom ChevronDown */
+        <div className="relative w-[80px] shrink-0">
+          <select
+            value={code}
+            onChange={handleCodeChange}
+            aria-label="Code pays"
+            className={cn(selectorBase, "appearance-none pl-2 pr-5 w-full cursor-pointer", selectClassName)}
+          >
+            {CODES.map(c => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+            <option value="other">Autre…</option>
+          </select>
+          <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+        </div>
       )}
       <input
         id={id}

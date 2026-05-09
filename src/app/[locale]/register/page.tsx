@@ -49,6 +49,7 @@ export default function RegisterPage() {
   const [showCf, setShowCf]       = useState(false);
   const [error, setError]         = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess]     = useState(false);
 
   const step1Valid = firstName.trim().length >= 1 && lastName.trim().length >= 1;
   const step2Valid = phone.trim().length >= 8;
@@ -77,9 +78,8 @@ export default function RegisterPage() {
       }
       localStorage.setItem("client_token", data.token);
       localStorage.setItem("client_info", JSON.stringify(data.client));
-      // Also store phone for booking lookup
       localStorage.setItem("shizu_client_phone", normalizedPhone);
-      router.push(`/${locale}/client/dashboard`);
+      setSuccess(true);
     } catch {
       setError(isFr ? "Erreur réseau. Veuillez réessayer." : "Network error. Please try again.");
     } finally {
@@ -90,6 +90,61 @@ export default function RegisterPage() {
   const waSupport = SHIZU_WA
     ? `https://wa.me/${SHIZU_WA}?text=${encodeURIComponent("Bonjour Shizu, j'ai besoin d'aide pour créer mon compte.")}`
     : "#";
+
+  // ── Success screen ──────────────────────────────────────────────────────────
+  if (success) {
+    const waWelcome = SHIZU_WA
+      ? `https://wa.me/${SHIZU_WA}?text=${encodeURIComponent(isFr ? "Bonjour Shizu, je viens de créer mon compte !" : "Hello Shizu, I just created my account!")}`
+      : "#";
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm">
+          <div className="text-center mb-7">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+              <Check className="h-8 w-8 text-green-600" />
+            </div>
+            <h1 className="text-xl font-bold text-gray-900">
+              {isFr ? `Bienvenue ${firstName} !` : `Welcome ${firstName}!`}
+            </h1>
+            <p className="text-sm font-semibold text-gray-800 mt-1">
+              {isFr ? "Votre compte Shizu est prêt." : "Your Shizu account is ready."}
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              {isFr
+                ? "Vous pouvez maintenant réserver des prestataires vérifiés à Abidjan."
+                : "You can now book verified providers in Abidjan."}
+            </p>
+          </div>
+          <div className="space-y-3">
+            <button
+              onClick={() => router.push(`/${locale}/services`)}
+              className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+            >
+              {isFr ? "Faire ma première réservation" : "Make my first booking"}
+              <ArrowRight className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => router.push(`/${locale}/client/dashboard`)}
+              className="w-full flex items-center justify-center gap-2 bg-[#0F3A7A] hover:bg-[#0d3068] text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+            >
+              {isFr ? "Voir mes réservations" : "View my bookings"}
+            </button>
+            {SHIZU_WA && (
+              <a
+                href={waWelcome}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1ebe5c] text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+              >
+                <MessageCircle className="h-4 w-4" />
+                💬 {isFr ? "Contacter Shizu" : "Contact Shizu"}
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
@@ -135,7 +190,7 @@ export default function RegisterPage() {
               <button
                 onClick={() => setStep(2)}
                 disabled={!step1Valid}
-                className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-green-200 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+                className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
               >
                 {isFr ? "Continuer" : "Continue"}
                 <ArrowRight className="h-4 w-4" />
@@ -172,7 +227,7 @@ export default function RegisterPage() {
               <button
                 onClick={() => setStep(3)}
                 disabled={!step2Valid}
-                className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-green-200 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+                className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
               >
                 {isFr ? "Continuer" : "Continue"}
                 <ArrowRight className="h-4 w-4" />
@@ -236,16 +291,17 @@ export default function RegisterPage() {
 
               {error && <p className="text-sm text-red-600">{error}</p>}
 
+              {confirm && password === confirm && password.length >= 6 && (
+                <p className="text-xs text-green-600 font-medium">✓ {isFr ? "Mots de passe identiques" : "Passwords match"}</p>
+              )}
               {confirm && password !== confirm && (
-                <p className="text-xs text-red-500">
-                  {isFr ? "Les mots de passe ne correspondent pas." : "Passwords do not match."}
-                </p>
+                <p className="text-xs text-red-500">✗ {isFr ? "Les mots de passe ne correspondent pas." : "Passwords do not match."}</p>
               )}
 
               <button
                 onClick={handleSubmit}
                 disabled={!step3Valid || submitting}
-                className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-green-200 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+                className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
               >
                 {submitting ? (
                   <span className="inline-block h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
