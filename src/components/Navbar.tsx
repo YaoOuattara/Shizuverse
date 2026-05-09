@@ -39,6 +39,7 @@ export default function Navbar() {
   }, [isHomePage]);
 
   const hideBookCta =
+    isProvider ||
     pathWithoutLocale.startsWith('/provider/register') ||
     pathWithoutLocale.startsWith('/booking/');
 
@@ -169,15 +170,17 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
-          <div className="pt-2 border-t border-gray-100">
-            <Link
-              href={`/${locale}/services`}
-              onClick={() => setMenuOpen(false)}
-              className="flex items-center justify-center w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl text-sm hover:bg-green-700 transition-colors"
-            >
-              {locale === 'fr' ? '+ Réserver un service' : '+ Book a service'}
-            </Link>
-          </div>
+          {!isProvider && (
+            <div className="pt-2 border-t border-gray-100">
+              <Link
+                href={`/${locale}/services`}
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center justify-center w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl text-sm hover:bg-green-700 transition-colors"
+              >
+                {locale === 'fr' ? '+ Réserver un service' : '+ Book a service'}
+              </Link>
+            </div>
+          )}
         </div>
       )}
     </nav>
