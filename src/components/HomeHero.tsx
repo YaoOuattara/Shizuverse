@@ -171,6 +171,22 @@ export default function HomeHero() {
           </Link>
         </p>
 
+        {/* ── Provider links ─────────────────────────────────────────── */}
+        <div className="mt-3 flex flex-col items-center gap-1">
+          <Link
+            href={`/${locale}/provider/register`}
+            className="text-white/50 hover:text-white/80 text-sm transition-colors"
+          >
+            {c.becomeProvider}
+          </Link>
+          <Link
+            href={`/${locale}/provider/login`}
+            className="text-white/35 hover:text-white/60 text-xs transition-colors"
+          >
+            {locale === "fr" ? "Déjà prestataire ? → Accéder à mon espace" : "Already a provider? → My account"}
+          </Link>
+        </div>
+
         {/* ── Trust chips ────────────────────────────────────────────── */}
         <div className="flex flex-wrap justify-center gap-3 mt-10">
           {c.trust.map((item) => (

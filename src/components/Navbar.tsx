@@ -17,7 +17,12 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen]         = useState(false);
 
   useEffect(() => {
-    setIsProvider(!!localStorage.getItem('provider_token'));
+    setIsProvider(!!(
+      localStorage.getItem('provider_token') ||
+      sessionStorage.getItem('provider_token') ||
+      localStorage.getItem('provider_info') ||
+      sessionStorage.getItem('provider_info')
+    ));
     setMounted(true);
   }, []);
 
@@ -38,10 +43,12 @@ export default function Navbar() {
     return () => observer.disconnect();
   }, [isHomePage]);
 
-  const hideBookCta =
-    isProvider ||
-    pathWithoutLocale.startsWith('/provider/register') ||
-    pathWithoutLocale.startsWith('/booking/');
+  // Only show booking CTAs after mount (prevents SSR flash) and never for providers
+  const showBookCta =
+    mounted &&
+    !isProvider &&
+    !pathWithoutLocale.startsWith('/provider/register') &&
+    !pathWithoutLocale.startsWith('/booking/');
 
   const providerHref  = isProvider ? `/${locale}/provider` : `/${locale}/provider/register`;
   const providerLabel = isProvider
@@ -111,7 +118,7 @@ export default function Navbar() {
           <LangPill />
 
           {/* Desktop: Réserver CTA */}
-          {!hideBookCta && (
+          {showBookCta && (
             <div className={`hidden md:block transition-all duration-300 ${
               isHomePage && isHeroVisible ? 'opacity-0 -translate-y-1 pointer-events-none' : 'opacity-100'
             }`}>
@@ -137,7 +144,7 @@ export default function Navbar() {
           )}
 
           {/* Mobile: Réserver pill */}
-          {!hideBookCta && (
+          {showBookCta && (
             <Link
               href={`/${locale}/services`}
               className="md:hidden bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-green-700 transition-colors"
@@ -170,7 +177,7 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
-          {!isProvider && (
+          {showBookCta && (
             <div className="pt-2 border-t border-gray-100">
               <Link
                 href={`/${locale}/services`}

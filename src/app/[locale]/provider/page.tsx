@@ -39,6 +39,8 @@ import {
 } from "@/data/mockProviderBookings";
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
+const getProviderToken = () => localStorage.getItem("provider_token") || sessionStorage.getItem("provider_token");
+const getProviderInfoStr = () => localStorage.getItem("provider_info") || sessionStorage.getItem("provider_info");
 import { useTranslations } from "next-intl";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -147,7 +149,7 @@ export default function ProviderDashboard() {
 
   useEffect(() => {
     try {
-      const info = JSON.parse(localStorage.getItem("provider_info") || "null");
+      const info = JSON.parse(getProviderInfoStr() || "null");
       if (info) {
         setProviderInfo({
           id: String(info.provider_id ?? info.id ?? ""),
@@ -182,7 +184,7 @@ export default function ProviderDashboard() {
   // ── Fetch bookings + profile ───────────────────────────────────────────────
 
   useEffect(() => {
-    const token = localStorage.getItem("provider_token");
+    const token = getProviderToken();
     if (!token) {
       setHasToken(false);
       setIsLoading(false);
@@ -201,7 +203,7 @@ export default function ProviderDashboard() {
 
     let providerId: string | null = null;
     try {
-      const info = JSON.parse(localStorage.getItem("provider_info") || "null");
+      const info = JSON.parse(getProviderInfoStr() || "null");
       providerId = info?.provider_id ?? info?.id ?? null;
     } catch { /* ignore */ }
 
@@ -266,7 +268,7 @@ export default function ProviderDashboard() {
     localStorage.setItem(STORAGE_KEYS.AVAILABILITY, JSON.stringify(next));
     setAvailabilityLoading(true);
     try {
-      const token = localStorage.getItem("provider_token");
+      const token = getProviderToken();
       await fetch(`${FLASK_API}/api/provider/availability`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -298,7 +300,7 @@ export default function ProviderDashboard() {
         toast({ title: t("conflictWarningTitle"), description: t("conflictWarningAcceptDesc", { warning: formatConflictWarning(conflict.conflictingBookings) }), variant: "destructive" });
       }
     }
-    const token = localStorage.getItem("provider_token");
+    const token = getProviderToken();
     const res = await fetch(`${FLASK_API}/api/provider/bookings/${bookingId}/accept`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -320,7 +322,7 @@ export default function ProviderDashboard() {
 
   const handleRejectBooking = async (bookingId: string, reason?: string): Promise<void> => {
     const booking = bookings.find(b => b.id === bookingId);
-    const token = localStorage.getItem("provider_token");
+    const token = getProviderToken();
     const res = await fetch(`${FLASK_API}/api/provider/bookings/${bookingId}/decline`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -339,7 +341,7 @@ export default function ProviderDashboard() {
   };
 
   const handleStartBooking = async (bookingId: string): Promise<void> => {
-    const token = localStorage.getItem("provider_token");
+    const token = getProviderToken();
     const res = await fetch(`${FLASK_API}/api/provider/bookings/${bookingId}/start`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -353,7 +355,7 @@ export default function ProviderDashboard() {
   };
 
   const handleCompleteBooking = async (bookingId: string): Promise<void> => {
-    const token = localStorage.getItem("provider_token");
+    const token = getProviderToken();
     const res = await fetch(`${FLASK_API}/api/provider/bookings/${bookingId}/complete`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

@@ -6,17 +6,17 @@ import { cn } from "@/lib/utils";
 // ── Country codes (sorted longest-first for correct prefix matching) ──────────
 
 const CODES = [
-  { value: "+225", label: "+225 🇨🇮 Côte d'Ivoire" },
-  { value: "+221", label: "+221 🇸🇳 Sénégal" },
-  { value: "+223", label: "+223 🇲🇱 Mali" },
-  { value: "+226", label: "+226 🇧🇫 Burkina Faso" },
-  { value: "+229", label: "+229 🇧🇯 Bénin" },
-  { value: "+237", label: "+237 🇨🇲 Cameroun" },
-  { value: "+212", label: "+212 🇲🇦 Maroc" },
-  { value: "+33",  label: "+33 🇫🇷 France" },
-  { value: "+32",  label: "+32 🇧🇪 Belgique" },
-  { value: "+44",  label: "+44 🇬🇧 UK" },
-  { value: "+1",   label: "+1 🇺🇸 USA/Canada" },
+  { value: "+225", label: "🇨🇮 +225" },
+  { value: "+221", label: "🇸🇳 +221" },
+  { value: "+223", label: "🇲🇱 +223" },
+  { value: "+226", label: "🇧🇫 +226" },
+  { value: "+229", label: "🇧🇯 +229" },
+  { value: "+237", label: "🇨🇲 +237" },
+  { value: "+212", label: "🇲🇦 +212" },
+  { value: "+33",  label: "🇫🇷 +33"  },
+  { value: "+32",  label: "🇧🇪 +32"  },
+  { value: "+44",  label: "🇬🇧 +44"  },
+  { value: "+1",   label: "🇺🇸 +1"   },
 ] as const;
 
 // Sorted by length desc to avoid "+1" matching "+12X..."
@@ -113,8 +113,8 @@ export default function PhoneInput({
     emit(effectiveCode, l);
   }
 
-  const baseSelect = "h-10 border border-r-0 border-input bg-muted text-sm text-foreground rounded-l-xl px-2 focus:outline-none focus:ring-2 focus:ring-ring";
-  const baseInput  = "flex-1 h-10 border border-input bg-background rounded-r-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground";
+  const baseSelect = "h-10 w-[82px] border border-r-0 border-input bg-muted text-sm text-foreground rounded-l-xl px-2 focus:outline-none focus:ring-2 focus:ring-ring shrink-0";
+  const baseInput  = "flex-1 min-w-0 h-10 border border-input bg-background rounded-r-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground";
 
   return (
     <div className={cn("flex", wrapperClassName)}>
@@ -133,7 +133,7 @@ export default function PhoneInput({
           placeholder="+XXX"
           maxLength={5}
           aria-label="Code pays"
-          className={cn(baseSelect, "w-[72px] text-center", selectClassName)}
+          className={cn(baseSelect, "w-[70px] text-center", selectClassName)}
         />
       ) : (
         <select

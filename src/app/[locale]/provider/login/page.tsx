@@ -20,6 +20,7 @@ export default function ProviderLoginPage() {
 
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -38,9 +39,10 @@ export default function ProviderLoginPage() {
         setError(res.status === 401 ? t('errorInvalid') : t('errorGeneral'))
         return
       }
-      localStorage.setItem('provider_token', data.token)
+      const store = rememberMe ? localStorage : sessionStorage
+      store.setItem('provider_token', data.token)
       if (data.provider) {
-        localStorage.setItem('provider_info', JSON.stringify(data.provider))
+        store.setItem('provider_info', JSON.stringify(data.provider))
       }
       router.push(`/${locale}/provider`)
     } catch {
@@ -82,6 +84,18 @@ export default function ProviderLoginPage() {
                 autoComplete="current-password"
               />
             </div>
+
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={e => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-input accent-primary cursor-pointer"
+              />
+              <span className="text-sm text-muted-foreground">
+                {locale === 'fr' ? 'Se souvenir de moi (30 jours)' : 'Remember me (30 days)'}
+              </span>
+            </label>
 
             {error && (
               <p className="text-sm text-destructive">{error}</p>
