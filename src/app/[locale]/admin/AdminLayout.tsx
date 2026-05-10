@@ -77,8 +77,11 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between pb-4 border-b mb-4">
         <div className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-primary" />
-          <span className="font-semibold">{isFr ? "Panneau Admin" : "Admin Panel"}</span>
+          <img
+            src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1778425045/shizu_logo_horizontal_dark_alfzxb.png"
+            alt="Shizu"
+            style={{ height: '28px', width: 'auto', objectFit: 'contain' }}
+          />
         </div>
         <div className="flex items-center bg-gray-100 rounded-full p-0.5 text-xs font-medium">
           {(["en", "fr"] as const).map((code) => (

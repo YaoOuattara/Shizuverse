@@ -1,6 +1,5 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Sparkles,
   Wrench,
@@ -201,12 +200,10 @@ function Footer({ locale }: { locale: string }) {
       <div className="max-w-5xl mx-auto">
         {/* Logo */}
         <div className="mb-8">
-          <Image
-            src={isFr ? "/FR Logo Shizu.PNG" : "/EN Logo Shizu.PNG"}
+          <img
+            src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1778425045/shizu_logo_horizontal_dark_alfzxb.png"
             alt="Shizu"
-            width={100}
-            height={100}
-            className="rounded-xl"
+            style={{ height: '36px', width: 'auto', objectFit: 'contain' }}
           />
         </div>
 

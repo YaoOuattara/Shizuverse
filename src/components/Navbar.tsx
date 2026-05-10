@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { useEffect, useState } from 'react';
@@ -86,17 +85,12 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
 
         {/* Logo */}
-        <Link href={`/${locale}`} className="flex items-center gap-2 shrink-0">
-          <Image
-            src={locale === 'fr' ? '/FR Logo Shizu.PNG' : '/EN Logo Shizu.PNG'}
+        <Link href={`/${locale}`} className="shrink-0 flex items-center">
+          <img
+            src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1778425045/shizu_logo_horizontal_dark_alfzxb.png"
             alt="Shizu"
-            width={40}
-            height={40}
-            className="rounded-lg"
+            style={{ height: '36px', width: 'auto', objectFit: 'contain' }}
           />
-          <span className="font-bold text-[#0F3A7A] tracking-widest text-base hidden sm:block">
-            SHIZU
-          </span>
         </Link>
 
         {/* Desktop nav links */}

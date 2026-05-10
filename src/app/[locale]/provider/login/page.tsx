@@ -57,6 +57,11 @@ export default function ProviderLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center space-y-1">
+          <img
+            src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1778425062/shizu_logo_transparent_blue_li9wwi.png"
+            alt="Shizu"
+            style={{ height: '48px', width: 'auto', objectFit: 'contain', margin: '0 auto 8px', display: 'block' }}
+          />
           <CardTitle className="text-2xl">{t('title')}</CardTitle>
           <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
         </CardHeader>

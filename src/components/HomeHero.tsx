@@ -87,6 +87,15 @@ export default function HomeHero() {
     >
       <div className="max-w-2xl mx-auto px-6 py-16 md:py-20 text-center">
 
+        {/* Brand logo */}
+        <div className="mb-8">
+          <img
+            src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1778425127/shizu_logo_dark_cnzoee.png"
+            alt="Shizu"
+            style={{ height: '56px', width: 'auto', objectFit: 'contain', margin: '0 auto' }}
+          />
+        </div>
+
         {/* Location badge */}
         <span className="inline-block rounded-full bg-white/10 text-white/80 text-xs px-3 py-1 mb-6">
           {c.badge}

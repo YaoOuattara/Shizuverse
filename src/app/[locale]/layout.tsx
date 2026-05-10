@@ -20,6 +20,13 @@ export default async function RootLayout({children, params}: Props) {
 
   return (
     <html lang={locale}>
+      <head>
+        <link rel="icon" type="image/png" href="https://res.cloudinary.com/ddilgv5ir/image/upload/v1778425102/shizu_icon_square_csisos.png" />
+        <meta property="og:image" content="https://res.cloudinary.com/ddilgv5ir/image/upload/v1778425102/shizu_icon_square_csisos.png" />
+        <meta property="og:title" content="Shizu — Nous prenons le relais" />
+        <meta property="og:description" content="Prestataires vérifiés à Abidjan. Réservation en 60 secondes." />
+        <meta name="twitter:card" content="summary_large_image" />
+      </head>
       <body>
         <NextIntlClientProvider locale={locale} messages={messages}>
           <ProviderAuthProvider>

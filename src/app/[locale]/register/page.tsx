@@ -150,6 +150,12 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm">
 
+        <img
+          src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1778425062/shizu_logo_transparent_blue_li9wwi.png"
+          alt="Shizu"
+          style={{ height: '48px', width: 'auto', objectFit: 'contain', margin: '0 auto 20px', display: 'block' }}
+        />
+
         {/* Back */}
         <button
           onClick={() => step > 1 ? setStep(s => s - 1) : router.push(`/${locale}`)}
