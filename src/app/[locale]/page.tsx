@@ -198,14 +198,6 @@ function Footer({ locale }: { locale: string }) {
   return (
     <footer className="bg-[#0F3A7A] text-white py-10 px-6">
       <div className="max-w-5xl mx-auto">
-        {/* Logo */}
-        <div className="mb-8">
-          <img
-            src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1778425045/shizu_logo_horizontal_dark_alfzxb.png"
-            alt="Shizu"
-            style={{ height: '36px', width: 'auto', objectFit: 'contain' }}
-          />
-        </div>
 
         {/* ── Mobile footer: 2 columns ── */}
         <div className="md:hidden grid grid-cols-2 gap-6 mb-8">
