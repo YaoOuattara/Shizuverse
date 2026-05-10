@@ -342,3 +342,128 @@ NEXT: Part 3 (provider category/zone filters, quote stored on booking)
 Commits:
 - Frontend: 1f7479c (frontend branch)
 - Backend: 20ed727 (staging branch)
+
+---
+2026-05-08 — Session: AI labeling pass (contextual & honest)
+
+Replaced generic "IA" / "Propulsé par IA" labels across 5 surfaces with
+specific, supervised-by-human language. No new features — purely copy/UX.
+
+Changes (commit 0a5be4c, frontend branch):
+1. AdminBookings.tsx:1988 — assign modal footer:
+   "Propulsé par IA" → "⚡ Classement calculé par l'IA Shizu — supervisé par l'équipe"
+2. AdminRetention.tsx — added contextual pill at top of page content:
+   "Messages personnalisés par l'IA · Envoi supervisé par l'admin"
+3. anomalies/page.tsx — added subtitle pill in header area:
+   "Surveillance automatique · Alertes générées par l'IA Shizu"
+4. AdminOverview.tsx — subtle line below KPI grid:
+   "Matching · Réengagement · Surveillance — opérés par l'IA Shizu"
+5. BookingForm.tsx — AI assistant section label:
+   Removed `uppercase tracking-wide`, removed Sparkles icon
+   FR: "✨ Décrivez votre besoin — l'IA Shizu pré-remplit le formulaire pour vous"
+   EN: "✨ Describe your need — Shizu AI pre-fills the form for you"
+
+Homepage: no AI label added (intentional — add only when real bookings/decisions exist).
+Provider registration "Améliorer avec l'IA" button: kept as-is (already contextual).
+
+NEXT: Continue build plan per CLAUDE.md (Tailwind production styling, wire client/provider pages to real API)
+
+---
+2026-05-08 — Session: Rebook routing + provider document display
+
+Commit b883f69, frontend branch. Two features in one pass.
+
+### 1 — Rebook button routing (3 files)
+
+client/dashboard/page.tsx and bookings/page.tsx:
+- Added ApiCategory interface and categories state
+- Fetch GET /api/services/categories on mount (separate useEffect)
+- findServiceId(serviceName, categories): case-insensitive match against
+  subcategory name_fr / name_en / name, falls back to category level
+- rebookHref(booking, categories, locale): builds
+  /[locale]/booking/[serviceId]?commune=…&address=…&rebook=true
+  or /[locale]/services if no match
+- dashboard: both "completed" and "cancelled" rebook buttons updated
+- bookings/page.tsx: "Réserver à nouveau" button added to completed
+  bookings (was missing entirely); Plus icon + FLASK_API constant added
+
+BookingForm.tsx:
+- Reads ?rebook=true from searchParams
+- Shows green CheckCircle context card on Step 1:
+  "Vous réservez à nouveau ce service. Vos informations ont été pré-remplies."
+
+### 2 — Provider document display in admin detail sheet (3 files)
+
+useAdminApi.ts: added profile_photo_url, experience_photo_url to ApiProvider
+adminStore.ts: added profilePhotoUrl, experiencePhotoUrl to AdminProvider
+  (optional fields, do not affect mock data or Zustand persist)
+
+AdminProviders.tsx:
+- useEffect mapper: sets profilePhotoUrl and experiencePhotoUrl from API
+- Replaced "Verification Checklist" section with rich "Documents soumis" section:
+  📷 Photo de profil — 80px circular img, fallback to initials avatar
+  🪪 Pièce d'identité — image thumbnail (opens full-size) or PDF link
+    (auto-detected via .pdf in URL); beauty provider missing ID → red
+    "🔴 Requis — non soumis" badge
+  🖼️ Photos de travaux — image thumbnail (opens full-size)
+  Any missing doc → amber "⚠ Manquant" badge
+  Section header shows "X/3 fournis" count
+
+Backend note: profile_photo_url and experience_photo_url are not yet
+exposed by GET /admin/providers — fields will show as "Manquant" until
+the Flask endpoint is updated to include them.
+
+NEXT: Expose profile_photo_url and experience_photo_url in Flask
+  GET /admin/providers response; then Tailwind production styling fix.
+
+---
+2026-05-08 — Backend: Expose document URLs in GET /admin/providers
+
+Commit 7a884d5, staging branch.
+
+shizuverse/api/admin.py — get_providers() serializer (line 238):
+Added 3 fields to the provider dict returned for each row:
+  id_document_url:       sp.id_document_url
+  profile_photo_url:     sp.profile_photo_url
+  experience_photo_url:  sp.experience_photo_url
+
+All three were already columns on the ServiceProvider model.
+They were simply not included in the admin list response before.
+No migration needed.
+
+After Render redeploys from staging, the admin Documents section
+will show real thumbnails/links instead of "Manquant" for providers
+who have uploaded their documents.
+
+NEXT: Tailwind production styling fix (purge config); wire
+  /bookings and /provider pages to real client/provider API.
+
+---
+2026-05-08 — Integration test run: all endpoints green
+
+Admin password correction:
+  Live Render password is Shizu@livenow37 (NOT YaAllahShizu@1 — that was dev)
+  Admin login: POST /api/admin/login  {"password": "Shizu@livenow37"}
+
+Admin endpoints (test_admin_endpoints.py): 8/8 passed
+  1. GET  /api/admin/bookings
+  2. PATCH /api/admin/bookings/<id>/status  {status: confirmed}
+  3. POST /admin/bookings/<id>/quote  {amount_xof: 15000}
+  4. POST /admin/bookings/<id>/lock-amount  {confirmed_amount: 15000}
+  5. PUT  /api/admin/bookings/<id>/assign  {provider_name: ...}
+  6. POST /admin/bookings/<id>/finance  {payment_status: paid}
+  7. PUT  /api/admin/bookings/<id>/status  {status: completed}
+  8. POST /admin/bookings/<id>/cancel  {reason: test}
+
+  Notes on actual API shape vs spec:
+  - assign body uses provider_name (string), not provider_id
+  - quote / lock-amount / finance / cancel paths are /admin/... not /api/admin/...
+
+Provider endpoints (test_provider_endpoints.py): 5/5 passed
+  1. GET  /api/provider/bookings
+  2. GET  /api/provider/profile
+  3. PATCH /api/provider/profile
+  4. PATCH /api/provider/bookings/<id>/accept
+  5. PATCH /api/provider/bookings/<id>/decline
+
+NEXT: Tailwind production styling fix; wire client/provider pages to real API.
