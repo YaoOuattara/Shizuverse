@@ -1216,14 +1216,14 @@ export default function AdminProviders() {
                 <div className="space-y-3 pt-4 border-t">
                   <h4 className="font-medium text-sm text-muted-foreground">{isFr ? "Examiner la candidature" : "Review Application"}</h4>
 
-                  {/* Beauty gate warning */}
+                  {/* Gate 5 beauty warning */}
                   {selectedProvider.services.some(s => /beaut/i.test(s)) && !selectedProvider.idDocumentUrl && (
                     <div className="flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2.5">
                       <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                       <p className="text-xs text-amber-700 dark:text-amber-400">
                         {isFr
-                          ? "Ce prestataire propose des services beauté. Une pièce d'identité est obligatoire avant approbation."
-                          : "This provider offers beauty services. An ID document is required before approval."}
+                          ? "⚠️ Catégorie sensible — ID gouvernemental obligatoire avant approbation"
+                          : "⚠️ Sensitive category — Government-issued ID required before approval"}
                       </p>
                     </div>
                   )}
@@ -1241,6 +1241,11 @@ export default function AdminProviders() {
                     )}
                     {t("approveButton")}
                   </Button>
+                  {selectedProvider.services.some(s => /beaut/i.test(s)) && !selectedProvider.idDocumentUrl && (
+                    <p className="text-xs text-center text-amber-600 dark:text-amber-400 font-medium">
+                      {isFr ? "Document d'identité manquant" : "ID document missing"}
+                    </p>
+                  )}
 
                   <div className="space-y-2">
                     <Select value={rejectionReason} onValueChange={setRejectionReason}>
@@ -1368,8 +1373,8 @@ export default function AdminProviders() {
                       <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                       <p className="text-xs text-amber-700 dark:text-amber-400">
                         {isFr
-                          ? "Pièce d'identité requise pour les prestataires beauté."
-                          : "ID document required for beauty providers."}
+                          ? "⚠️ Catégorie sensible — ID gouvernemental obligatoire avant approbation"
+                          : "⚠️ Sensitive category — Government-issued ID required before approval"}
                       </p>
                     </div>
                   )}
@@ -1386,6 +1391,11 @@ export default function AdminProviders() {
                     )}
                     {t("approveButton")}
                   </Button>
+                  {selectedProvider.services.some(s => /beaut/i.test(s)) && !selectedProvider.idDocumentUrl && (
+                    <p className="text-xs text-center text-amber-600 dark:text-amber-400 font-medium">
+                      {isFr ? "Document d'identité manquant" : "ID document missing"}
+                    </p>
+                  )}
                 </div>
               )}
 
