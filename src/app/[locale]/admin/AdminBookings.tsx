@@ -682,7 +682,7 @@ export default function AdminBookings() {
   };
 
   const handleMarkCompleted = async () => {
-    if (!selectedBooking || !['confirmed', 'assigned'].includes(selectedBooking.status)) return;
+    if (!selectedBooking || !['confirmed', 'assigned', 'in_progress'].includes(selectedBooking.status)) return;
     setIsUpdating(true);
     const prevStatus = selectedBooking.status;
     const prevPayoutStatus = selectedBooking.payoutStatus;
@@ -1613,6 +1613,31 @@ export default function AdminBookings() {
                       onClick={openCancelModal}
                       disabled={isUpdating}
                       data-testid="button-cancel-confirmed"
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      {isFr ? "Annuler" : "Cancel Booking"}
+                    </Button>
+                  </div>
+                )}
+
+                {/* In Progress Actions */}
+                {selectedBooking.status === "in_progress" && (
+                  <div className="space-y-2">
+                    <Button
+                      className="w-full"
+                      onClick={handleMarkCompleted}
+                      disabled={isUpdating}
+                      data-testid="button-complete-inprogress"
+                    >
+                      {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                      {isFr ? "Marquer terminé" : "Mark Completed"}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="w-full"
+                      onClick={openCancelModal}
+                      disabled={isUpdating}
+                      data-testid="button-cancel-inprogress"
                     >
                       <XCircle className="h-4 w-4 mr-2" />
                       {isFr ? "Annuler" : "Cancel Booking"}
