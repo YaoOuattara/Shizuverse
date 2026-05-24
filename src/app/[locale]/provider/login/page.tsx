@@ -58,7 +58,7 @@ export default function ProviderLoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center space-y-1">
           <img
-            src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1778425062/shizu_logo_transparent_blue_li9wwi.png"
+            src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1779646648/shizu_logo_horizontal_dark_khesrn.png"
             alt="Shizu"
             style={{ height: '48px', width: 'auto', objectFit: 'contain', margin: '0 auto 8px', display: 'block' }}
           />

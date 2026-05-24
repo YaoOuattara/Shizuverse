@@ -78,7 +78,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
       <div className="flex items-center justify-between pb-4 border-b mb-4">
         <div className="flex items-center gap-2">
           <img
-            src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1778425045/shizu_logo_horizontal_dark_alfzxb.png"
+            src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1779646648/shizu_logo_horizontal_dark_khesrn.png"
             alt="Shizu"
             style={{ height: '28px', width: 'auto', objectFit: 'contain' }}
           />

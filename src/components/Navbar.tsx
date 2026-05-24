@@ -87,7 +87,7 @@ export default function Navbar() {
         {/* Logo */}
         <Link href={`/${locale}`} className="shrink-0 flex items-center">
           <img
-            src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1778425045/shizu_logo_horizontal_dark_alfzxb.png"
+            src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1779646648/shizu_logo_horizontal_dark_khesrn.png"
             alt="Shizu"
             style={{ height: '36px', width: 'auto', objectFit: 'contain' }}
           />

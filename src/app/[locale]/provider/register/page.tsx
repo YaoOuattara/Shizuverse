@@ -340,7 +340,7 @@ export default function ProviderRegisterPage() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-lg w-full">
 
         <img
-          src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1778425062/shizu_logo_transparent_blue_li9wwi.png"
+          src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1779646648/shizu_logo_horizontal_dark_khesrn.png"
           alt="Shizu"
           style={{ height: '48px', width: 'auto', objectFit: 'contain', margin: '0 auto 20px', display: 'block' }}
         />
