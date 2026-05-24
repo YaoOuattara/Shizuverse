@@ -29,9 +29,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from flask_socketio import SocketIO
 from flask_migrate import Migrate
 from flasgger import Swagger
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-
 from shizuverse.models import db, User
 from shizuverse.models.service_models import Service, ServiceCategory, ServiceSubcategory
 from shizuverse.routes.socket_chat import create_socket_instance, socket_chat_bp
@@ -111,8 +108,13 @@ def create_app():
     CORS(app, origins=ALLOWED_ORIGINS)
     Babel(app)
 
-    limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
-    limiter.limit("10 per minute")(app.view_functions.get("auth.login", lambda: None))
+    from shizuverse.limiter import limiter
+    limiter.init_app(app)
+
+    @app.errorhandler(429)
+    def ratelimit_handler(e):
+        from flask import jsonify as _jsonify
+        return _jsonify({"error": "Trop de tentatives. Réessayez dans quelques minutes."}), 429
 
     login_manager = LoginManager()
     login_manager.init_app(app)

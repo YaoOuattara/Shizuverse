@@ -8,6 +8,7 @@ from shizuverse.models.service_models import Service, ServiceCategory
 from shizuverse.models.waitlist import Waitlist
 from datetime import datetime, timedelta, date
 from sqlalchemy import func
+from shizuverse.limiter import limiter
 import jwt
 import os
 
@@ -85,6 +86,7 @@ def require_admin_token(f):
 
 
 @admin_bp.route('/login', methods=['POST'])
+@limiter.limit("5 per minute")
 def admin_login():
     data = request.get_json() or {}
     password = data.get('password', '')
@@ -404,6 +406,7 @@ def require_provider_token(f):
 
 
 @provider_bp.route('/login', methods=['POST'])
+@limiter.limit("10 per minute")
 def provider_login():
     data = request.get_json() or {}
     raw_phone = (data.get('phone') or '').strip()
