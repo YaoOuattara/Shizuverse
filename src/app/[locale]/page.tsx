@@ -15,6 +15,7 @@ import Navbar from "@/components/Navbar";
 import HomeHero from "@/components/HomeHero";
 import ServicesGrid from "@/components/ServicesGrid";
 import ProviderCTAButton from "@/components/ProviderCTAButton";
+import Footer from "@/components/Footer";
 
 // ── Section 3: How It Works ────────────────────────────────────────────────
 
@@ -153,127 +154,6 @@ function ProviderCTA({ locale }: { locale: string }) {
   );
 }
 
-// ── Section 6: Footer ──────────────────────────────────────────────────────
-
-function Footer({ locale }: { locale: string }) {
-  const isFr = locale === "fr";
-
-  // Desktop: 3 full columns
-  const DESKTOP_COLS = isFr
-    ? {
-        Services:   ["Ménage & Nettoyage", "Plomberie", "Électricité", "Bricolage & Réparations", "Nounou & Baby-sitting", "Beauté à domicile", "Jardinage & Piscine", "Climatisation & Électroménager", "Aide aux seniors"],
-        Plateforme: ["Comment ça marche", "Tarifs", "Prestataires", "Avis clients"],
-        Entreprise: ["À propos", "Presse", "Carrières", "Contact"],
-      }
-    : {
-        Services:  ["Cleaning", "Plumbing", "Electrical", "Handyman", "Childcare", "Beauty at Home", "Garden & Pool", "AC & Appliances", "Senior Care"],
-        Platform:  ["How It Works", "Pricing", "Providers", "Reviews"],
-        Company:   ["About", "Press", "Careers", "Contact"],
-      };
-
-  // Mobile: col 1 = top 5 services
-  const MOBILE_SERVICES = isFr
-    ? ["Ménage & Nettoyage", "Plomberie", "Électricité", "Bricolage", "Nounou"]
-    : ["Cleaning", "Plumbing", "Electrical", "Handyman", "Childcare"];
-
-  // Mobile: col 2 = visible links + accordion
-  const MOBILE_VISIBLE = isFr
-    ? [
-        { label: "Comment ça marche", href: "#" },
-        { label: "Devenir prestataire", href: `/${locale}/provider/register` },
-        { label: "À propos", href: "#" },
-      ]
-    : [
-        { label: "How It Works", href: "#" },
-        { label: "Become a provider", href: `/${locale}/provider/register` },
-        { label: "About", href: "#" },
-      ];
-
-  const MOBILE_ACCORDION = isFr
-    ? ["Presse", "Carrières", "Contact"]
-    : ["Press", "Careers", "Contact"];
-
-  const linkClass = "text-white/70 text-sm hover:text-white transition-colors";
-
-  return (
-    <footer className="bg-[#0F3A7A] text-white py-10 px-6">
-      <div className="max-w-5xl mx-auto">
-
-        {/* ── Mobile footer: 2 columns ── */}
-        <div className="md:hidden grid grid-cols-2 gap-6 mb-8">
-          {/* Col 1: top services */}
-          <div>
-            <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-3">
-              Services
-            </p>
-            <ul className="space-y-2">
-              {MOBILE_SERVICES.map((s) => (
-                <li key={s}>
-                  <a href="#" className={linkClass}>{s}</a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Col 2: key links + accordion */}
-          <div>
-            <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-3">
-              {isFr ? "Liens" : "Links"}
-            </p>
-            <ul className="space-y-2">
-              {MOBILE_VISIBLE.map((l) => (
-                <li key={l.label}>
-                  <a href={l.href} className={linkClass}>{l.label}</a>
-                </li>
-              ))}
-            </ul>
-            <details className="mt-3 group">
-              <summary className="list-none cursor-pointer text-white/40 text-xs hover:text-white/70 transition-colors flex items-center gap-1 select-none">
-                {isFr ? "Plus d'infos" : "More info"}
-                <span className="group-open:rotate-180 inline-block transition-transform">▾</span>
-              </summary>
-              <ul className="mt-2 space-y-2">
-                {MOBILE_ACCORDION.map((l) => (
-                  <li key={l}>
-                    <a href="#" className={linkClass}>{l}</a>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          </div>
-        </div>
-
-        {/* ── Desktop footer: 3 columns ── */}
-        <div className="hidden md:grid md:grid-cols-3 gap-8 mb-10">
-          {Object.entries(DESKTOP_COLS).map(([category, links]) => (
-            <div key={category}>
-              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-3">
-                {category}
-              </p>
-              <ul className="space-y-2">
-                {(links as string[]).map((link) => (
-                  <li key={link}>
-                    <a href="#" className={linkClass}>{link}</a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        {/* Bottom bar */}
-        <div className="border-t border-white/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/40">
-          <p>© 2025 Shizu · Abidjan, Côte d&apos;Ivoire</p>
-          <div className="flex gap-4">
-            <Link href="/en" className="hover:text-white transition-colors">EN</Link>
-            <Link href="/fr" className="hover:text-white transition-colors">FR</Link>
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default async function HomePage({
@@ -298,7 +178,7 @@ export default async function HomePage({
       </div>
       <HowItWorks locale={locale} />
       <ProviderCTA locale={locale} />
-      <Footer locale={locale} />
+      <Footer />
     </>
   );
 }
