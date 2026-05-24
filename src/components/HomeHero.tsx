@@ -27,7 +27,7 @@ const CONTENT = {
     planBtn: "Planifier un service",
     browseAll: "Parcourir toutes les catégories →",
     becomeProvider: "Devenir prestataire →",
-    trust: ["Prestataires vérifiés", "Paiement sécurisé", "Support 7j/7"],
+    trust: ["Prestataires vérifiés", "Réponse en 2h", "Support 7j/7"],
     availability: "Disponible aujourd'hui dans plusieurs quartiers d'Abidjan",
   },
   en: {
@@ -41,7 +41,7 @@ const CONTENT = {
     planBtn: "Plan a service",
     browseAll: "Browse all categories →",
     becomeProvider: "Become a provider →",
-    trust: ["Verified providers", "Secure payment", "7-day support"],
+    trust: ["Verified providers", "Response within 2h", "7-day support"],
     availability: "Available today across multiple Abidjan neighbourhoods",
   },
 };
