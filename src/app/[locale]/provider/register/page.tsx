@@ -561,7 +561,7 @@ export default function ProviderRegisterPage() {
                   <span className="text-sm">{isFr ? "Chargement…" : "Loading…"}</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {categories.map((cat) => {
                     const selected = selectedServices.includes(cat.id);
                     const Icon = getCategoryIcon(cat);
@@ -579,7 +579,7 @@ export default function ProviderRegisterPage() {
                         }}
                         className={`relative flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all
                           ${selected
-                            ? "border-[#0F3A7A] bg-[#0F3A7A] text-white"
+                            ? "border-[#0D2B6B] bg-[#0D2B6B] text-white"
                             : "border-gray-100 hover:border-gray-200 bg-white"}`}
                       >
                         <Icon className={`h-5 w-5 shrink-0 ${selected ? "text-white" : "text-gray-400"}`} />
@@ -615,10 +615,10 @@ export default function ProviderRegisterPage() {
                           selected ? prev.filter((c) => c !== commune) : [...prev, commune]
                         )
                       }
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all
                         ${selected
-                          ? "border-[#16a34a] bg-[#16a34a] text-white"
-                          : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"}`}
+                          ? "border-[#0D2B6B] bg-[#0D2B6B] text-white"
+                          : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"}`}
                     >
                       {commune}
                     </button>
@@ -649,24 +649,28 @@ export default function ProviderRegisterPage() {
                       setServiceRates((prev) => ({ ...prev, [id]: { ...(prev[id] ?? { min: "", max: "" }), [field]: val } }));
                     return (
                       <div key={id} className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm text-gray-700 w-28 truncate shrink-0">{name}</span>
-                        <span className="text-xs text-gray-400 shrink-0">{isFr ? "de" : "from"}</span>
-                        <input
-                          type="number" min="0"
-                          value={rates.min}
-                          onChange={(e) => setRate("min", e.target.value)}
-                          placeholder="0"
-                          className="w-24 h-8 text-sm rounded-md border border-input bg-background px-2 py-1 text-right focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        />
-                        <span className="text-xs text-gray-400 shrink-0">{isFr ? "à" : "to"}</span>
-                        <input
-                          type="number" min="0"
-                          value={rates.max}
-                          onChange={(e) => setRate("max", e.target.value)}
-                          placeholder="0"
-                          className="w-24 h-8 text-sm rounded-md border border-input bg-background px-2 py-1 text-right focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        />
-                        <span className="text-xs text-gray-400 shrink-0">FCFA</span>
+                        <span className="text-sm font-medium text-gray-700 w-32 truncate shrink-0">{name}</span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-xs text-gray-400">De</span>
+                          <input
+                            type="number" min="0"
+                            value={rates.min}
+                            onChange={(e) => setRate("min", e.target.value)}
+                            placeholder="5 000"
+                            className="w-24 h-8 text-sm rounded-md border border-input bg-background px-2 py-1 text-right focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-xs text-gray-400">À</span>
+                          <input
+                            type="number" min="0"
+                            value={rates.max}
+                            onChange={(e) => setRate("max", e.target.value)}
+                            placeholder="15 000"
+                            className="w-24 h-8 text-sm rounded-md border border-input bg-background px-2 py-1 text-right focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          />
+                        </div>
+                        <span className="text-xs text-gray-500 font-medium shrink-0">FCFA</span>
                       </div>
                     );
                   })}
