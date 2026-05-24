@@ -125,7 +125,11 @@ export default function ProviderRegisterPage() {
       .finally(() => setCategoriesLoading(false));
   }, []);
 
+  // ── Step 1 extra ──────────────────────────────────────────────────────────
+  const [commune, setCommune] = useState("");
+
   // ── Step 3 ────────────────────────────────────────────────────────────────
+  const [experienceText, setExperienceText] = useState("");
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [profilePhotoUploading, setProfilePhotoUploading] = useState(false);
   const [idDocType, setIdDocType] = useState("");
@@ -141,19 +145,17 @@ export default function ProviderRegisterPage() {
     account.phone.replace(/\D/g, "").length >= 6 &&
     account.password.length >= 6 &&
     confirmPassword === account.password &&
+    commune.trim().length > 0 &&
     (accountType === "individual" || businessName.trim().length >= 2);
 
   const step2Valid = selectedServices.length > 0 && selectedCommunes.length > 0;
 
   // ── Cloudinary upload helper ───────────────────────────────────────────────
   const uploadToCloudinary = async (file: File): Promise<string> => {
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    const preset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-    if (!cloudName || !preset) throw new Error("Cloudinary non configuré");
     const fd = new FormData();
     fd.append("file", file);
-    fd.append("upload_preset", preset);
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+    fd.append("upload_preset", "shizu_uploads");
+    const res = await fetch("https://api.cloudinary.com/v1_1/ddilgv5ir/upload", {
       method: "POST",
       body: fd,
     });
@@ -220,6 +222,14 @@ export default function ProviderRegisterPage() {
     }
   };
 
+  // ── Step 1 → 2 transition: auto-add home commune to zones ────────────────
+  const handleStep1Continue = () => {
+    if (commune && !selectedCommunes.includes(commune)) {
+      setSelectedCommunes(prev => [commune, ...prev]);
+    }
+    setStep(2);
+  };
+
   // ── Final submit ──────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     setIsSubmitting(true);
@@ -228,6 +238,7 @@ export default function ProviderRegisterPage() {
       services: selectedServices,
       zones: selectedCommunes,
       bio,
+      experience_text: experienceText.trim() || undefined,
       account_type: accountType,
       company_name: accountType === "company" ? businessName.trim() : undefined,
       rccm_number: accountType === "company" && rccmNumber.trim() ? rccmNumber.trim() : undefined,
@@ -494,8 +505,34 @@ export default function ProviderRegisterPage() {
               )}
             </div>
 
+            {/* Commune */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {isFr ? "Localisation" : "Location"}
+              </p>
+              <Label htmlFor="commune" className="text-sm text-gray-700">
+                {isFr ? "Votre commune" : "Your commune"} <span className="text-red-500">*</span>
+              </Label>
+              <select
+                id="commune"
+                value={commune}
+                onChange={(e) => setCommune(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{isFr ? "Choisir votre commune…" : "Select your commune…"}</option>
+                {COMMUNES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400">
+                {isFr
+                  ? "La commune où vous êtes basé — elle sera incluse dans vos zones d'intervention."
+                  : "The commune where you are based — it will be included in your coverage zones."}
+              </p>
+            </div>
+
             <Button
-              onClick={() => setStep(2)}
+              onClick={handleStep1Continue}
               disabled={!step1Valid}
               className="w-full bg-green-600 hover:bg-green-700 mt-2"
             >
@@ -637,14 +674,35 @@ export default function ProviderRegisterPage() {
               )}
             </div>
 
+            <div className="flex gap-3 pt-1">
+              <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
+                {isFr ? "Retour" : "Back"}
+              </Button>
+              <Button
+                onClick={() => setStep(3)}
+                disabled={!step2Valid}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
+                {isFr ? "Continuer" : "Continue"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════
+            Step 3 — Dernière étape !
+        ══════════════════════════════════════════════════════════════════ */}
+        {step === 3 && (
+          <div className="space-y-7">
+            <h2 className="font-semibold text-gray-800 text-lg">
+              {isFr ? "Dernière étape !" : "Last step!"}
+            </h2>
+
             {/* Bio */}
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                {isFr ? "Présentez-vous" : "About you"}
+                {isFr ? "Présentation" : "Bio"} <span className="text-red-400">*</span>
               </p>
-              <Label htmlFor="bio" className="text-sm text-gray-700">
-                {isFr ? "Décrivez votre expérience" : "Describe your experience"}
-              </Label>
               <Textarea
                 id="bio"
                 rows={4}
@@ -671,29 +729,22 @@ export default function ProviderRegisterPage() {
               </Button>
             </div>
 
-            <div className="flex gap-3 pt-1">
-              <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
-                {isFr ? "Retour" : "Back"}
-              </Button>
-              <Button
-                onClick={() => setStep(3)}
-                disabled={!step2Valid}
-                className="flex-1 bg-green-600 hover:bg-green-700"
-              >
-                {isFr ? "Continuer" : "Continue"}
-              </Button>
+            {/* Experience */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {isFr ? "Expérience professionnelle" : "Professional experience"}
+                <span className="ml-1 normal-case font-normal text-gray-300">({isFr ? "optionnelle" : "optional"})</span>
+              </p>
+              <Textarea
+                rows={3}
+                placeholder={isFr
+                  ? "Ex : 5 ans de plomberie, formations suivies, certifications…"
+                  : "E.g. 5 years of plumbing, training attended, certifications..."}
+                value={experienceText}
+                onChange={(e) => setExperienceText(e.target.value)}
+                className="resize-none"
+              />
             </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════════
-            Step 3 — Dernière étape !
-        ══════════════════════════════════════════════════════════════════ */}
-        {step === 3 && (
-          <div className="space-y-7">
-            <h2 className="font-semibold text-gray-800 text-lg">
-              {isFr ? "Dernière étape !" : "Last step!"}
-            </h2>
 
             {/* Green motivational nudge */}
             <div className="rounded-xl border border-green-300 px-5 py-4" style={{ backgroundColor: "#f0fdf4" }}>
