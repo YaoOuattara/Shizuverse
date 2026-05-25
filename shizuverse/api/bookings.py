@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from shizuverse.models import db
 from shizuverse.models.client_booking import ClientBooking, VALID_STATUSES
 from shizuverse.models.service_models import Service
@@ -137,8 +137,8 @@ def create_booking():
             client_phone=booking.client_phone,
             booking_ref=str(booking.id),
         )
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.error(f"[create_booking] Unexpected error: {e}", exc_info=True)
 
     # WhatsApp: ping approved active providers in the matching commune
     try:
@@ -173,8 +173,8 @@ def create_booking():
                 date=date_str,
                 time_preference=booking.time_preference or '',
             )
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.error(f"[create_booking] Unexpected error: {e}", exc_info=True)
 
     return jsonify(booking.to_dict()), 201
 
@@ -215,8 +215,8 @@ def payment_declared(booking_id):
                 f"réservation #{booking_id} ({deposit_amt:,} FCFA). "
                 f"Vérifiez et confirmez."
             )
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.error(f"[payment_declared] Unexpected error: {e}", exc_info=True)
 
     return jsonify({"message": "Paiement déclaré — en attente de confirmation Shizu"})
 

@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from shizuverse.models import db
 from shizuverse.models.review import Review
 from shizuverse.models.client_booking import ClientBooking
@@ -65,7 +65,7 @@ def submit_review():
                     rating=rating,
                     comment_preview=(data.get("comment") or ""),
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.error(f"[submit_review] Unexpected error: {e}", exc_info=True)
 
     return jsonify({"success": True, "id": review.id}), 200

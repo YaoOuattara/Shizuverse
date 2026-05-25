@@ -169,8 +169,8 @@ def assign_booking(booking_id):
             date=apt.strftime('%d/%m/%Y') if apt else '',
             commune=commune,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.error(f"[assign_booking] Unexpected error: {e}", exc_info=True)
 
     return jsonify({
         'id': booking.id,
@@ -221,8 +221,8 @@ def update_booking_status(booking_id):
                     time=time_str,
                     commune=commune,
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            current_app.logger.error(f"[update_booking_status] Unexpected error: {e}", exc_info=True)
 
     return jsonify({'id': booking.id, 'status': booking.status})
 
@@ -556,8 +556,8 @@ def provider_register():
             provider_name=display_name,
             provider_phone=phone,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.error(f"[provider_register] Unexpected error: {e}", exc_info=True)
 
     return jsonify({
         'success': True,
@@ -651,8 +651,8 @@ def start_provider_booking(booking_id):
             client_phone=booking.client_phone,
             provider_name=booking.provider_name or (sp.company_name if sp else 'Le prestataire'),
         )
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.error(f"[start_provider_booking] Unexpected error: {e}", exc_info=True)
 
     return jsonify({'success': True, 'status': 'in_progress'})
 
@@ -693,8 +693,8 @@ def complete_provider_booking(booking_id):
             provider_name=booking.provider_name or 'votre prestataire',
             booking_id=booking_id,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.error(f"[complete_provider_booking] Unexpected error: {e}", exc_info=True)
 
     return jsonify({'success': True, 'status': 'completed'})
 
@@ -730,8 +730,8 @@ def accept_provider_booking(booking_id):
             date=apt.strftime('%d/%m/%Y') if apt else '',
             time=apt.strftime('%Hh%M') if apt else '',
         )
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.error(f"[accept_provider_booking] Unexpected error: {e}", exc_info=True)
 
     return jsonify({'success': True, 'status': 'confirmed'})
 

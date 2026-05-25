@@ -124,6 +124,23 @@ def create_app():
         from flask import jsonify as _jsonify
         return _jsonify({"error": "Trop de tentatives. Réessayez dans quelques minutes."}), 429
 
+    @app.errorhandler(500)
+    def internal_error(e):
+        app.logger.error(f"Internal server error: {e}", exc_info=True)
+        from flask import jsonify as _jsonify
+        return _jsonify({"error": "Internal server error"}), 500
+
+    @app.errorhandler(404)
+    def not_found(e):
+        from flask import jsonify as _jsonify
+        return _jsonify({"error": "Not found"}), 404
+
+    @app.errorhandler(Exception)
+    def unhandled_exception(e):
+        app.logger.error(f"Unhandled exception: {e}", exc_info=True)
+        from flask import jsonify as _jsonify
+        return _jsonify({"error": "Internal server error"}), 500
+
     login_manager = LoginManager()
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"

@@ -121,8 +121,8 @@ def approve_provider(provider_id):
         from shizuverse.utils.notifications import notify_provider_approved
         if p.phone_number:
             notify_provider_approved(provider_phone=p.phone_number)
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.error(f"[approve_provider] Unexpected error: {e}", exc_info=True)
 
     return jsonify({'message': 'Provider approved', 'provider_id': provider_id})
 
@@ -162,8 +162,8 @@ def reject_provider(provider_id):
                 provider_phone=p.phone_number,
                 reason=reason,
             )
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.error(f"[reject_provider] Unexpected error: {e}", exc_info=True)
 
     return jsonify({'message': 'Provider rejected', 'provider_id': provider_id})
 
@@ -497,8 +497,8 @@ def cancel_booking(booking_id):
                 booking_ref=str(b.id),
                 date=apt.strftime('%d/%m/%Y') if apt else '',
             )
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.error(f"[cancel_booking] Unexpected error: {e}", exc_info=True)
 
     return jsonify({'message': 'Booking cancelled', 'booking_id': booking_id})
 
@@ -555,8 +555,8 @@ def update_finance(booking_id):
                 provider_phone=b.provider_phone,
                 provider_payout=eff_payout,
             )
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.error(f"[update_finance] Unexpected error: {e}", exc_info=True)
 
     return jsonify({
         'message': 'Finance status updated',
@@ -801,8 +801,8 @@ def confirm_payment(booking_id):
             date=apt.strftime('%d/%m/%Y') if apt else '',
             time=apt.strftime('%Hh%M') if apt else '',
         )
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.error(f"[confirm_payment] Unexpected error: {e}", exc_info=True)
 
     return jsonify({'success': True, 'status': b.status, 'payment_status': b.payment_status})
 
