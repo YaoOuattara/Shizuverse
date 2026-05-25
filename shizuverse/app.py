@@ -44,11 +44,11 @@ def create_app():
     Swagger(app)
 
     _secret = os.environ.get("SECRET_KEY", "")
-    if not _secret or _secret == "dev-secret-key":
+    if os.getenv("ENV") == "production" and (not _secret or _secret == "dev-secret-key"):
         import sys
         print("FATAL: SECRET_KEY not set or using default. Refusing to start.", file=sys.stderr)
         sys.exit(1)
-    app.config["SECRET_KEY"] = _secret
+    app.config["SECRET_KEY"] = _secret or "dev-secret-key"
     app.config["SESSION_COOKIE_SECURE"] = True
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
