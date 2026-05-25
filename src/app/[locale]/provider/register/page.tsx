@@ -143,7 +143,7 @@ export default function ProviderRegisterPage() {
   const step1Valid =
     account.full_name.trim().length >= 2 &&
     account.phone.replace(/\D/g, "").length >= 6 &&
-    account.password.length >= 6 &&
+    account.password.length >= 8 &&
     confirmPassword === account.password &&
     commune.trim().length > 0 &&
     (accountType === "individual" || businessName.trim().length >= 2);
@@ -481,9 +481,17 @@ export default function ProviderRegisterPage() {
                 value={account.password}
                 onChange={(e) => setAccount((a) => ({ ...a, password: e.target.value }))}
               />
-              <p className="text-xs text-gray-400">
-                {isFr ? "Minimum 6 caractères" : "Minimum 6 characters"}
-              </p>
+              {account.password.length > 0 && account.password.length < 8 ? (
+                <p className="text-xs text-red-500">
+                  {isFr
+                    ? "Le mot de passe doit contenir au moins 8 caractères"
+                    : "Password must be at least 8 characters"}
+                </p>
+              ) : (
+                <p className="text-xs text-gray-400">
+                  {isFr ? "Minimum 8 caractères" : "Minimum 8 characters"}
+                </p>
+              )}
             </div>
 
             {/* Confirm password */}

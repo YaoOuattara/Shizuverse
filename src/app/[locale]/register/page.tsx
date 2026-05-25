@@ -54,7 +54,7 @@ export default function RegisterPage() {
   const step1Valid = firstName.trim().length >= 1 && lastName.trim().length >= 1;
   const step2Valid = phone.trim().length >= 8;
   const step3Valid =
-    password.length >= 6 && password === confirm;
+    password.length >= 8 && password === confirm;
 
   async function handleSubmit() {
     setError(null);
@@ -258,7 +258,7 @@ export default function RegisterPage() {
                   type={showPw ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isFr ? "Mot de passe (6 caractères min.)" : "Password (min. 6 chars)"}
+                  placeholder={isFr ? "Mot de passe (8 caractères min.)" : "Password (min. 8 chars)"}
                   autoFocus
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 placeholder:text-gray-300"
                 />
@@ -270,6 +270,13 @@ export default function RegisterPage() {
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {password.length > 0 && password.length < 8 && (
+                <p className="text-xs text-red-500">
+                  {isFr
+                    ? "Le mot de passe doit contenir au moins 8 caractères"
+                    : "Password must be at least 8 characters"}
+                </p>
+              )}
               {/* Confirm */}
               <div className="relative">
                 <input
@@ -297,7 +304,7 @@ export default function RegisterPage() {
 
               {error && <p className="text-sm text-red-600">{error}</p>}
 
-              {confirm && password === confirm && password.length >= 6 && (
+              {confirm && password === confirm && password.length >= 8 && (
                 <p className="text-xs text-green-600 font-medium">✓ {isFr ? "Mots de passe identiques" : "Passwords match"}</p>
               )}
               {confirm && password !== confirm && (
