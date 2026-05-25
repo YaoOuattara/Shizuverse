@@ -49,7 +49,7 @@ function HowItWorks({ locale }: { locale: string }) {
   const ctaClass = "bg-green-600 text-white font-semibold px-8 py-3 rounded-xl hover:bg-green-700 transition-colors";
 
   return (
-    <section className="bg-white py-10 md:py-16 px-6">
+    <section id="how-it-works" className="bg-white py-10 md:py-16 px-6">
       <div className="max-w-5xl mx-auto">
         <h2 className="text-2xl font-bold text-gray-900 text-center mb-6 md:mb-12">
           {isFr ? "Comment ça marche" : "How It Works"}
