@@ -22,7 +22,7 @@ export default function Footer() {
 
   const platform = [
     { label: isFr ? "Comment ça marche" : "How It Works", href: `/${locale}#how-it-works`        },
-    { label: isFr ? "Tarifs"            : "Pricing",      href: `/${locale}#pricing`              },
+    { label: isFr ? "Tarifs"            : "Pricing",      href: `/${locale}/provider/register`    },
     { label: isFr ? "Prestataires"      : "Providers",    href: `/${locale}/provider/register`    },
     { label: isFr ? "Avis clients"      : "Reviews",      href: `/${locale}#reviews`              },
   ];
