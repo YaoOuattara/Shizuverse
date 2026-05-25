@@ -43,7 +43,15 @@ def create_app():
     app = Flask(__name__, template_folder="templates", static_folder="static")
     Swagger(app)
 
-    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
+    _secret = os.environ.get("SECRET_KEY", "")
+    if not _secret or _secret == "dev-secret-key":
+        import sys
+        print("FATAL: SECRET_KEY not set or using default. Refusing to start.", file=sys.stderr)
+        sys.exit(1)
+    app.config["SECRET_KEY"] = _secret
+    app.config["SESSION_COOKIE_SECURE"] = True
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["BABEL_DEFAULT_LOCALE"] = os.getenv("BABEL_DEFAULT_LOCALE", "fr")
     app.config["TEMPLATES_AUTO_RELOAD"] = True
     app.config["DEBUG"] = os.getenv("DEBUG", "True") == "True"
@@ -102,9 +110,9 @@ def create_app():
         "https://www.shizu.pro",
         "https://client-sigma-gilt.vercel.app",
         "https://client-git-frontend-yao-ouattaras-projects.vercel.app",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
     ] + _extra
+    if os.getenv("ENV") != "production":
+        ALLOWED_ORIGINS += ["http://localhost:3000", "http://127.0.0.1:3000"]
     CORS(app, origins=ALLOWED_ORIGINS)
     Babel(app)
 

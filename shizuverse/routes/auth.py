@@ -17,6 +17,12 @@ def register():
     if not all([email, password, user_type]):
         return jsonify({'error': 'Missing required fields'}), 400
 
+    if user_type not in ('client', 'provider'):
+        return jsonify({'error': 'Invalid user type'}), 400
+
+    if len(password) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters'}), 400
+
     if User.query.filter_by(email=email).first():
         return jsonify({'error': 'Email already registered'}), 409
 
@@ -46,7 +52,7 @@ def login():
     return jsonify({'message': 'Logged in successfully', 'user_type': user.user_type}), 200
 
 
-@auth_bp.route('/logout', methods=['GET'])
+@auth_bp.route('/logout', methods=['POST'])
 @login_required
 def logout():
     logout_user()

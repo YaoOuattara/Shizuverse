@@ -6,6 +6,7 @@ from shizuverse.models import db, User, ServiceProvider, ClientBooking, Notifica
 from shizuverse.models.booking_event import BookingEvent
 from shizuverse.models.service_models import Service
 from shizuverse.models.review import Review
+from shizuverse.limiter import limiter
 
 admin_bp = Blueprint('admin_portal', __name__, url_prefix='/admin')
 
@@ -81,6 +82,7 @@ def get_provider_detail(provider_id):
 
 
 @admin_bp.route('/providers/<int:provider_id>/approve', methods=['POST'])
+@limiter.limit("20 per minute")
 @admin_required
 def approve_provider(provider_id):
     """Approve a provider. Sets all 3 status fields and notifies. Beauty providers require id_document_url."""
@@ -126,6 +128,7 @@ def approve_provider(provider_id):
 
 
 @admin_bp.route('/providers/<int:provider_id>/reject', methods=['POST'])
+@limiter.limit("20 per minute")
 @admin_required
 def reject_provider(provider_id):
     """Reject a provider with a required reason."""
@@ -166,6 +169,7 @@ def reject_provider(provider_id):
 
 
 @admin_bp.route('/providers/<int:provider_id>/suspend', methods=['POST'])
+@limiter.limit("20 per minute")
 @admin_required
 def suspend_provider(provider_id):
     p = ServiceProvider.query.get_or_404(provider_id)
@@ -243,6 +247,7 @@ def toggle_activation(provider_id):
 # ── Provider Service List Edit ────────────────────────────────
 
 @admin_bp.route('/providers/<int:provider_id>/services', methods=['PATCH'])
+@limiter.limit("20 per minute")
 @admin_required
 def update_provider_services(provider_id):
     """Replace a provider's service list. Accepts {services: [name, ...]}."""
@@ -290,6 +295,7 @@ def update_provider_services(provider_id):
 
 
 @admin_bp.route('/providers/<int:provider_id>/zones', methods=['PATCH'])
+@limiter.limit("20 per minute")
 @admin_required
 def update_provider_zones(provider_id):
     """Replace a provider's service zones. Accepts {zones: ["Cocody", "Plateau", ...]}."""
