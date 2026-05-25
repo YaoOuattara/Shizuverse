@@ -5,7 +5,6 @@ import { redirect } from 'next/navigation';
 export async function submitBooking(formData: FormData) {
   const FLASK_API =
     process.env.NEXT_PUBLIC_FLASK_API_URL ||
-    process.env.FLASK_API_URL ||
     'https://shizu-verse.onrender.com';
 
   const client_name     = (formData.get('name')      as string | null) ?? '';

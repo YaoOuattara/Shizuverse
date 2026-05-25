@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const FLASK_API =
-  process.env.FLASK_API_URL || "https://shizu-verse.onrender.com";
+  process.env.NEXT_PUBLIC_FLASK_API_URL || "https://shizu-verse.onrender.com";
 
 export async function POST(req: NextRequest) {
   try {
