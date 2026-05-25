@@ -110,8 +110,18 @@ export const adminApi = {
     const qs = params?.status ? `?status=${params.status}` : "";
     return adminFetch(`/admin/reviews${qs}`);
   },
-  portalModerateReview: (id: number, status: string, reason?: string) =>
-    adminFetch(`/admin/reviews/${id}/moderate`, { method: "POST", body: JSON.stringify({ status, reason: reason || "" }) }),
+  portalModerateReview: (id: number, status: string, reason?: string) => {
+    const isPublished = status === "published";
+    return adminFetch(`/admin/reviews/${id}/moderate`, {
+      method: "POST",
+      body: JSON.stringify({
+        status,
+        is_published: isPublished,
+        moderation_status: isPublished ? "approved" : "pending",
+        reason: reason || "",
+      }),
+    });
+  },
   portalLockAmount: (bookingId: number, confirmed_amount: number) =>
     adminFetch(`/admin/bookings/${bookingId}/lock-amount`, { method: "POST", body: JSON.stringify({ confirmed_amount }) }),
   portalConfirmPayment: (bookingId: number) =>

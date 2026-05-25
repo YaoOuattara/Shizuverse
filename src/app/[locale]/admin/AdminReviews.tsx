@@ -49,6 +49,8 @@ import {
   Building2,
   MoreVertical,
   CheckCircle2,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import { useAdminReviews, type ApiReview } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
@@ -66,6 +68,8 @@ interface ReviewItem {
   moderationReason?: string;
   serviceSlug: string;
   bookingId: number;
+  punctuality?: boolean;
+  respect?: boolean;
 }
 
 function toReviewItem(r: ApiReview): ReviewItem {
@@ -81,6 +85,8 @@ function toReviewItem(r: ApiReview): ReviewItem {
     moderationReason: undefined,
     serviceSlug: r.service_slug,
     bookingId: r.booking_id,
+    punctuality: r.punctuality,
+    respect: r.respect,
   };
 }
 
@@ -195,6 +201,34 @@ export default function AdminReviews() {
       ))}
     </div>
   );
+
+  const renderSoftSkills = (review: ReviewItem) => {
+    if (review.punctuality === undefined && review.respect === undefined) return null;
+    const chips: { label: string; value: boolean }[] = [];
+    if (review.punctuality !== undefined)
+      chips.push({ label: isFr ? "Ponctualité" : "Punctuality", value: review.punctuality });
+    if (review.respect !== undefined)
+      chips.push({ label: isFr ? "Respect" : "Respect", value: review.respect });
+    return (
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {chips.map(({ label, value }) => (
+          <span
+            key={label}
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+              value
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-red-100 text-red-700"
+            }`}
+          >
+            {value
+              ? <ThumbsUp className="h-3 w-3" />
+              : <ThumbsDown className="h-3 w-3" />}
+            {label}
+          </span>
+        ))}
+      </div>
+    );
+  };
 
   const getQuickActions = (review: ReviewItem) => {
     switch (review.status) {
@@ -335,12 +369,13 @@ export default function AdminReviews() {
                       {/* Header: Name, Stars, Quick Actions */}
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <button
-                          className="flex items-center gap-2 text-left"
+                          className="flex items-center gap-2 text-left flex-wrap"
                           onClick={() => setSelectedReview(review)}
                         >
                           <User className="h-4 w-4 text-muted-foreground" />
                           <span className="font-medium text-sm">{review.clientName}</span>
                           {renderStars(review.rating)}
+                          {renderSoftSkills(review)}
                         </button>
                         <div className="flex items-center gap-2">
                           {getQuickActions(review)}
@@ -410,6 +445,7 @@ export default function AdminReviews() {
                 </Badge>
                 {renderStars(selectedReview.rating)}
               </div>
+              {renderSoftSkills(selectedReview)}
 
               {/* Review Info */}
               <div className="space-y-4">

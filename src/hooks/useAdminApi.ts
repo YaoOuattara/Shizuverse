@@ -84,6 +84,9 @@ export interface ApiReview {
   provider_id: number | null;
   moderation_status: string;
   display_status: string;
+  is_published: boolean;
+  punctuality?: boolean;
+  respect?: boolean;
   created_at: string;
 }
 
