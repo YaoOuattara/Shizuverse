@@ -600,6 +600,9 @@ def get_all_reviews():
             'provider_id': r.provider_id,
             'moderation_status': ms,
             'display_status': display,
+            'is_published': r.is_published,
+            'punctuality': r.punctuality,
+            'respect': r.respect,
             'created_at': r.created_at.isoformat() if r.created_at else '',
         })
 
