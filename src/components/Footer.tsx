@@ -31,6 +31,12 @@ export default function Footer() {
     { label: "Contact",                    href: "mailto:contact@shizu.pro" },
   ];
 
+  const legal = [
+    { label: isFr ? "Politique de confidentialité" : "Privacy Policy",  href: `/${locale}/privacy`          },
+    { label: isFr ? "CGU Clients"                  : "Client Terms",     href: `/${locale}/terms/clients`    },
+    { label: isFr ? "CGU Prestataires"             : "Provider Terms",   href: `/${locale}/terms/providers`  },
+  ];
+
   const headingClass = "text-xs font-semibold uppercase tracking-wider text-gray-400";
   const linkClass    = "text-sm text-gray-600 hover:text-[#0D2B6B] transition-colors";
 
@@ -39,7 +45,7 @@ export default function Footer() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
 
         {/* Top grid */}
-        <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 mb-12">
+        <div className="grid grid-cols-2 gap-8 sm:grid-cols-5 mb-12">
 
           {/* Brand column */}
           <div className="col-span-2 sm:col-span-1 space-y-4">
@@ -99,6 +105,22 @@ export default function Footer() {
                 <li key={c.href}>
                   <Link href={c.href} className={linkClass}>
                     {c.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Legal column */}
+          <div className="space-y-3">
+            <h3 className={headingClass}>
+              {isFr ? "Légal" : "Legal"}
+            </h3>
+            <ul className="space-y-2">
+              {legal.map((l) => (
+                <li key={l.href}>
+                  <Link href={l.href} className={linkClass}>
+                    {l.label}
                   </Link>
                 </li>
               ))}
