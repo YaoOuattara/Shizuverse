@@ -266,42 +266,36 @@ def get_services():
     from shizuverse.models.service_models import ServiceSubcategory, ServiceCategory
 
     inspector = sa_inspect(db.engine)
-    cat_cols  = {c['name'] for c in inspector.get_columns('service_categories')}
-    svc_cols  = {c['name'] for c in inspector.get_columns('services')}
-    has_cat_fr  = 'name_fr' in cat_cols
-    has_svc_fr  = 'name_fr' in svc_cols
+    cat_cols = {c['name'] for c in inspector.get_columns('service_categories')}
+    svc_cols = {c['name'] for c in inspector.get_columns('services')}
+    cat_name_col = "sc.name_fr" if 'name_fr' in cat_cols else "sc.name"
+    svc_name_col = "svc.name_fr" if 'name_fr' in svc_cols else "svc.name"
 
-    services = Service.query.order_by(Service.subcategory_id, Service.id).all()
-    result = []
-    for s in services:
-        # Resolve category name through subcategory relationship
-        sub = ServiceSubcategory.query.get(s.subcategory_id) if s.subcategory_id else None
-        cat = ServiceCategory.query.get(sub.category_id) if sub else None
+    rows = db.session.execute(sa_text(f"""
+        SELECT svc.id         AS id,
+               {svc_name_col} AS name,
+               svc.name       AS name_fallback,
+               COALESCE({cat_name_col}, sc.name) AS category,
+               svc.is_active  AS active,
+               svc.is_priority AS is_priority,
+               svc.featured   AS featured
+        FROM services svc
+        LEFT JOIN service_subcategories ss ON ss.id = svc.subcategory_id
+        LEFT JOIN service_categories sc   ON sc.id = ss.category_id
+        ORDER BY svc.subcategory_id, svc.id
+    """)).mappings().all()
 
-        if cat and has_cat_fr:
-            row = db.session.execute(
-                sa_text("SELECT name_fr, name FROM service_categories WHERE id=:id"), {"id": cat.id}
-            ).first()
-            cat_name = (row[0] or row[1]) if row else (cat.name if cat else '')
-        else:
-            cat_name = cat.name if cat else ''
-
-        svc_name = s.name
-        if has_svc_fr:
-            row = db.session.execute(
-                sa_text("SELECT name_fr FROM services WHERE id=:id"), {"id": s.id}
-            ).first()
-            if row and row[0]:
-                svc_name = row[0]
-
-        result.append({
-            'id': s.id,
-            'name': svc_name,
-            'category': cat_name,
-            'active': s.is_active,
-            'is_priority': s.is_priority,
-            'featured': s.featured,
-        })
+    result = [
+        {
+            'id': r['id'],
+            'name': r['name'] or r['name_fallback'],
+            'category': r['category'] or '',
+            'active': r['active'],
+            'is_priority': r['is_priority'],
+            'featured': r['featured'],
+        }
+        for r in rows
+    ]
     return jsonify(result)
 
 
