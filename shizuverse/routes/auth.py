@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_login import login_user, logout_user, current_user, login_required
 from shizuverse.models import User, db
 from shizuverse.limiter import limiter
+from datetime import datetime
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
@@ -61,6 +62,23 @@ def login():
 def logout():
     logout_user()
     return jsonify({'message': 'Logged out successfully'}), 200
+
+
+@auth_bp.route('/account', methods=['DELETE'])
+@login_required
+def delete_account():
+    user = current_user
+    user_id = user.id
+    user.email = f'deleted_{user_id}@shizu.pro'
+    user.phone = None
+    user.full_name = 'Compte supprimé'
+    user.company_name = None
+    user.password_hash = 'deleted'
+    user.is_deleted = True
+    user.deleted_at = datetime.utcnow()
+    db.session.commit()
+    logout_user()
+    return jsonify({'message': 'Compte supprimé avec succès'}), 200
 
 
 @auth_bp.route('/status', methods=['GET'])

@@ -18,6 +18,8 @@ class User(UserMixin, db.Model):
     company_name = db.Column(db.String(120), nullable=True)
     full_name = db.Column(db.String(120), nullable=True)
     phone = db.Column(db.String(30), nullable=True)
+    is_deleted = db.Column(db.Boolean, nullable=True, default=False)
+    deleted_at = db.Column(db.DateTime, nullable=True)
 
     # Many-to-many: User <-> Service via service_providers junction table
     services = db.relationship(

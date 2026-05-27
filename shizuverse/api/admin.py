@@ -560,6 +560,49 @@ def provider_register():
     }), 201
 
 
+@provider_bp.route('/account', methods=['DELETE'])
+@require_provider_token
+def delete_provider_account():
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header[7:]
+    payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+    provider_sp_id = payload.get('provider_id')
+    user_id_str = payload.get('sub')
+
+    # Anonymize all ServiceProvider rows for this user
+    sps = ServiceProvider.query.filter_by(user_id=user_id_str).all()
+    if provider_sp_id and not sps:
+        sp = ServiceProvider.query.get(provider_sp_id)
+        if sp:
+            sps = [sp]
+    for sp in sps:
+        sp.phone_number = None
+        sp.bio = None
+        sp.profile_photo_url = None
+        sp.profile_picture = None
+        # 'deleted' is not in the verification_status enum; 'suspended' is the closest value
+        sp.verification_status = 'suspended'
+        sp.listed_status = 'unlisted'
+        sp.provider_status = 'paused'
+
+    # Anonymize the linked User record
+    try:
+        user = User.query.get(int(user_id_str)) if user_id_str else None
+    except (TypeError, ValueError):
+        user = None
+    if user:
+        user.email = f'deleted_{user.id}@shizu.pro'
+        user.phone = None
+        user.full_name = 'Compte supprimé'
+        user.company_name = None
+        user.password_hash = 'deleted'
+        user.is_deleted = True
+        user.deleted_at = datetime.utcnow()
+
+    db.session.commit()
+    return jsonify({'message': 'Compte supprimé avec succès'}), 200
+
+
 @provider_bp.route('/bookings', methods=['GET'])
 @require_provider_token
 def get_provider_bookings():
