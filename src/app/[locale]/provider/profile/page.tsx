@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Loader2, Sparkles, Save, CheckCircle2, XCircle,
-  ShieldCheck, ShieldAlert, ShieldX, Clock, Upload, Eye, Star, Lock, ChevronDown,
+  ShieldCheck, ShieldAlert, ShieldX, Clock, Upload, Eye, Star, Lock, ChevronDown, Trash2,
 } from 'lucide-react'
 import PhoneInput from '@/components/PhoneInput'
 import { Button } from '@/components/ui/button'
@@ -294,6 +294,9 @@ export default function ProviderProfilePage() {
   const [forceForm, setForceForm] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
   // Password change state
   const [pwOpen, setPwOpen] = useState(false)
   const [pwCurrent, setPwCurrent] = useState('')
@@ -510,6 +513,37 @@ export default function ProviderProfilePage() {
       setPwMsg({ type: 'error', text: isFr ? 'Erreur réseau.' : 'Network error.' })
     } finally {
       setPwSaving(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (isDeleting) return
+    setIsDeleting(true)
+    try {
+      const token = localStorage.getItem('provider_token')
+      if (!token) return
+      const res = await fetch(`${FLASK_API}/api/provider/account`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        localStorage.removeItem('provider_token')
+        localStorage.removeItem('provider_info')
+        router.push(`/${locale}`)
+      } else {
+        const data = await res.json().catch(() => ({})) as { error?: string }
+        toast({
+          title: isFr ? 'Erreur' : 'Error',
+          description: data.error ?? (isFr ? 'Échec de la suppression.' : 'Deletion failed.'),
+          variant: 'destructive',
+        })
+        setShowDeleteConfirm(false)
+      }
+    } catch {
+      toast({ title: isFr ? 'Erreur réseau' : 'Network error', variant: 'destructive' })
+      setShowDeleteConfirm(false)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -823,6 +857,62 @@ export default function ProviderProfilePage() {
           </div>
         )}
       </div>
+
+      {/* ── Danger Zone ───────────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-red-200 bg-red-50/30 p-4 mb-4">
+        <h2 className="text-sm font-semibold text-red-700 mb-1">
+          {isFr ? 'Zone dangereuse' : 'Danger Zone'}
+        </h2>
+        <p className="text-xs text-red-600/80 mb-3">
+          {isFr
+            ? 'La suppression de votre compte est définitive. Votre profil sera anonymisé et vos réservations conservées.'
+            : 'Account deletion is permanent. Your profile will be anonymised and booking history preserved.'}
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowDeleteConfirm(true)}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
+        >
+          <Trash2 className="h-4 w-4" />
+          {isFr ? 'Supprimer mon compte' : 'Delete my account'}
+        </button>
+      </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-red-700">
+              {isFr ? 'Supprimer mon compte' : 'Delete my account'}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {isFr
+              ? 'Êtes-vous sûr ? Cette action est irréversible. Votre profil sera anonymisé et vous ne pourrez plus vous connecter.'
+              : 'Are you sure? This action cannot be undone. Your profile will be anonymised and you will no longer be able to log in.'}
+          </p>
+          <div className="flex gap-3 mt-2">
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={isDeleting}
+              className="flex-1 px-4 py-2 rounded-lg border text-sm font-medium hover:bg-muted/40 transition-colors disabled:opacity-50"
+            >
+              {isFr ? 'Annuler' : 'Cancel'}
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteAccount}
+              disabled={isDeleting}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
+            >
+              {isDeleting
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : (isFr ? 'Supprimer définitivement' : 'Delete permanently')}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Profile preview modal ─────────────────────────────────────────── */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
