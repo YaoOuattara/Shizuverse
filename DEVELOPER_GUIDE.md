@@ -191,3 +191,70 @@ Verify `ANTHROPIC_API_KEY` is set in the Render environment. The key is not comm
 ### Cloudinary uploads failing
 
 Verify `CLOUDINARY_CLOUD_NAME` is set to `ddilgv5ir` in the Render environment. Also check that the upload preset configured in the Cloudinary dashboard is set to **unsigned** (required for client-side uploads from the provider registration form).
+
+---
+
+## 8. Rollback Procedures
+
+### Frontend (Vercel)
+
+1. Go to vercel.com → project `client` → Deployments
+2. Find the last known good deployment
+3. Click the three dots → "Promote to Production"
+4. Takes ~30 seconds, no rebuild needed
+
+### Backend (Render)
+
+1. Go to Render dashboard → Shizuverse → Events
+2. Find the last successful deploy commit hash
+3. In your local terminal: `git checkout <commit-hash> && git push origin staging --force`
+4. **WARNING**: only force-push to `staging`, never to `main`
+5. Run `flask db upgrade` in the Render shell if migrations are involved
+
+### Database Emergency
+
+If data is corrupted:
+
+1. Go to console.neon.tech → your project → Branches
+2. Use point-in-time restore to recover to a previous state
+3. Update `DATABASE_URL` in Render environment if a new branch is created
+
+---
+
+## 9. Incident Response Plan
+
+### Severity Levels
+
+**P0 — Platform Down** (site unreachable, DB down, payments broken)
+- **Who**: Yao immediately
+- **First action**: Check UptimeRobot alert → Render dashboard → Vercel dashboard
+- **Resolution target**: 1 hour
+- **Communicate**: WhatsApp message to active providers and clients if > 30 min down
+
+**P1 — Feature Broken** (booking flow broken, admin inaccessible, login failing)
+- **Who**: Yao or dev on call
+- **First action**: Check Sentry for error → identify commit → rollback if needed
+- **Resolution target**: 4 hours
+
+**P2 — Minor Bug** (UI glitch, non-critical feature broken)
+- **Who**: Next available dev
+- **First action**: Log in GitHub Issues
+- **Resolution target**: Next deploy
+
+### Data Breach Protocol
+
+1. Immediately revoke all JWT tokens: change `SECRET_KEY` in Render environment
+2. Notify affected users via WhatsApp within 24h
+3. Document what data was exposed and how
+4. Contact: contact@shizu.pro
+
+### Common Incidents & Fixes
+
+| Symptom | Fix |
+|---------|-----|
+| Backend cold start slow | Normal on Render free tier — upgrade to paid if persistent |
+| Vercel deploy stuck | Vercel → Deployments → Redeploy latest commit |
+| DB connection errors | Check `DATABASE_URL` in Render → verify Neon service status at status.neon.tech |
+| AI features broken | Verify `ANTHROPIC_API_KEY` in Render environment |
+| Cloudinary uploads failing | Verify `CLOUDINARY_CLOUD_NAME` in Render environment |
+| Admin login failing | Verify `ADMIN_PASSWORD` in Render environment → check JWT `SECRET_KEY` |
