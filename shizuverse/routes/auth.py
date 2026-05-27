@@ -26,6 +26,10 @@ def register():
     if User.query.filter_by(email=email).first():
         return jsonify({'error': 'Email already registered'}), 409
 
+    phone = (data.get('phone') or data.get('phone_number') or '').strip()
+    if phone and User.query.filter_by(phone=phone).first():
+        return jsonify({'error': 'Ce numéro de téléphone est déjà utilisé'}), 409
+
     user = User(email=email, user_type=user_type, preferred_language=preferred_language)
     user.set_password(password)
     db.session.add(user)
