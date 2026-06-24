@@ -6,6 +6,7 @@ import {locales, type Locale, loadMessages} from '@/i18n';
 import AnalyticsProvider from '@/components/AnalyticsProvider';
 import { ProviderAuthProvider } from '@/context/ProviderAuthContext';
 import { Analytics } from '@vercel/analytics/react';
+import PwaRegistration from '@/components/PwaRegistration';
 
 export function generateStaticParams() {
   return locales.map((locale) => ({locale}));
@@ -23,6 +24,11 @@ export default async function RootLayout({children, params}: Props) {
     <html lang={locale}>
       <head>
         <link rel="icon" type="image/png" href="https://res.cloudinary.com/ddilgv5ir/image/upload/v1779646648/shizu_icon_square_hkmm06.png" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <meta name="theme-color" content="#0D2B6B" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Shizu" />
         <meta property="og:image" content="https://res.cloudinary.com/ddilgv5ir/image/upload/v1779646648/shizu_icon_square_hkmm06.png" />
         <meta property="og:title" content="Shizu — Nous prenons le relais" />
         <meta property="og:description" content="Prestataires vérifiés à Abidjan. Réservation en 60 secondes." />
@@ -37,6 +43,7 @@ export default async function RootLayout({children, params}: Props) {
           </ProviderAuthProvider>
         </NextIntlClientProvider>
         <Analytics />
+        <PwaRegistration />
       </body>
     </html>
   );

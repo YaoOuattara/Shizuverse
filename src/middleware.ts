@@ -17,14 +17,14 @@ export function middleware(req: NextRequest) {
 
   if (pathname === '/') {
     const url = req.nextUrl.clone();
-    url.pathname = '/en';
+    url.pathname = '/fr';
     return withDebug(NextResponse.redirect(url), 'root-redirect');
   }
 
   const seg = pathname.split('/')[1];
   if (!SUPPORTED.includes(seg as any)) {
     const url = req.nextUrl.clone();
-    url.pathname = `/en${pathname}`;
+    url.pathname = `/fr${pathname}`;
     return withDebug(NextResponse.redirect(url), 'prefix-redirect');
   }
 
