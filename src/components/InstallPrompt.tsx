@@ -11,6 +11,9 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+const DISMISS_KEY = 'shizu_pwa_install_dismissed';
+const REVEAL_DELAY_MS = 2500; // starting value — tuned on the live deploy
+
 function isStandalone(): boolean {
   if (typeof window === 'undefined') return false;
   const displayMode = window.matchMedia('(display-mode: standalone)').matches;
@@ -30,18 +33,45 @@ function isIosSafari(): boolean {
   return isIos && isSafari;
 }
 
+// SSR-safe localStorage helpers — Safari private mode throws on access.
+function readDismissed(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(DISMISS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeDismissed(value: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (value) window.localStorage.setItem(DISMISS_KEY, '1');
+    else window.localStorage.removeItem(DISMISS_KEY);
+  } catch {
+    // Storage unavailable (private mode / quota) — fail silently.
+  }
+}
+
 export default function InstallPrompt() {
   const t = useTranslations('installPrompt');
   const [mounted, setMounted] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showIosHint, setShowIosHint] = useState(false);
+  const [visible, setVisible] = useState(false); // drives the slide-up entrance
 
   useEffect(() => {
     setMounted(true);
 
     // Installed users never see the banner.
     if (isStandalone()) return;
+
+    // Respect a remembered dismissal from a previous visit.
+    if (readDismissed()) {
+      setDismissed(true);
+      return;
+    }
 
     const onBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
@@ -50,6 +80,8 @@ export default function InstallPrompt() {
     const onAppInstalled = () => {
       setDeferredPrompt(null);
       setDismissed(true);
+      // Neutralize the flag: respect state, don't suppress forever.
+      writeDismissed(false);
     };
 
     window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
@@ -58,9 +90,13 @@ export default function InstallPrompt() {
     // iOS Safari fires no beforeinstallprompt — fall back to the manual hint.
     if (isIosSafari()) setShowIosHint(true);
 
+    // Timed reveal — slide up a moment after load, not instantly.
+    const revealTimer = window.setTimeout(() => setVisible(true), REVEAL_DELAY_MS);
+
     return () => {
       window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
       window.removeEventListener('appinstalled', onAppInstalled);
+      window.clearTimeout(revealTimer);
     };
   }, []);
 
@@ -72,6 +108,11 @@ export default function InstallPrompt() {
     setDeferredPrompt(null);
   };
 
+  const handleDismiss = () => {
+    setDismissed(true);
+    writeDismissed(true);
+  };
+
   // Render nothing until mounted (avoids hydration mismatch), when dismissed,
   // or when there's no actionable install path on this platform.
   if (!mounted || dismissed) return null;
@@ -79,36 +120,39 @@ export default function InstallPrompt() {
   if (!showAndroid && !showIosHint) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 px-4 pb-[env(safe-area-inset-bottom)]">
-      <div className="mx-auto mb-3 flex max-w-md items-center gap-3 rounded-xl bg-[#0D2B6B] px-4 py-3 text-white shadow-lg">
-        <div className="min-w-0 flex-1">
-          {showAndroid ? (
-            <p className="text-sm font-medium">{t('androidTitle')}</p>
-          ) : (
-            <p className="flex items-center gap-1.5 text-sm leading-snug">
-              <span>{t('iosBefore')}</span>
-              <Share className="inline h-4 w-4 shrink-0" aria-label={t('shareIconLabel')} />
-              <span>{t('iosAfter')}</span>
-            </p>
-          )}
-        </div>
-
-        {showAndroid && (
-          <button
-            onClick={handleInstall}
-            className="shrink-0 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#0D2B6B] transition-colors hover:bg-white/90"
-          >
-            {t('installButton')}
-          </button>
-        )}
-
+    <div
+      className={`fixed inset-x-4 bottom-4 z-50 pb-[env(safe-area-inset-bottom)] transition-all duration-300 ease-out motion-reduce:transition-none ${
+        visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+      }`}
+    >
+      <div className="relative mx-auto max-w-md rounded-2xl bg-[#0D2B6B] px-4 py-3.5 pr-12 text-white shadow-xl">
+        {/* Dismiss — 40px hit area, subtle press/hover state */}
         <button
-          onClick={() => setDismissed(true)}
+          onClick={handleDismiss}
           aria-label={t('dismissLabel')}
-          className="shrink-0 rounded-md p-1 text-white/80 transition-colors hover:text-white"
+          className="absolute right-1.5 top-1.5 flex h-10 w-10 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/10 hover:text-white active:bg-white/20"
         >
           <X className="h-5 w-5" />
         </button>
+
+        {showAndroid ? (
+          <div>
+            <p className="text-sm font-medium">{t('androidTitle')}</p>
+            <button
+              onClick={handleInstall}
+              className="mt-3 w-full rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#0D2B6B] transition-colors hover:bg-white/90 active:bg-white/80"
+            >
+              {t('installButton')}
+            </button>
+          </div>
+        ) : (
+          // Single paragraph so the sentence wraps naturally with the glyph inline.
+          <p className="text-sm leading-relaxed">
+            {t('iosBefore')}{' '}
+            <Share className="inline h-4 w-4 align-[-3px]" aria-label={t('shareIconLabel')} />{' '}
+            {t('iosAfter')}
+          </p>
+        )}
       </div>
     </div>
   );
