@@ -455,5 +455,13 @@
     "resumeButton": "Resume Operations",
     "suspendButton": "Suspend Provider",
     "reinstateButton": "Reinstate Provider"
+  },
+  "installPrompt": {
+    "androidTitle": "Install Shizu on your home screen",
+    "installButton": "Install the app",
+    "iosBefore": "Tap",
+    "iosAfter": "then \"Add to Home Screen\"",
+    "shareIconLabel": "Share icon",
+    "dismissLabel": "Close"
   }
 }

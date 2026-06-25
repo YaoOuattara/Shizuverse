@@ -7,6 +7,7 @@ import AnalyticsProvider from '@/components/AnalyticsProvider';
 import { ProviderAuthProvider } from '@/context/ProviderAuthContext';
 import { Analytics } from '@vercel/analytics/react';
 import PwaRegistration from '@/components/PwaRegistration';
+import InstallPrompt from '@/components/InstallPrompt';
 
 export function generateStaticParams() {
   return locales.map((locale) => ({locale}));
@@ -41,6 +42,7 @@ export default async function RootLayout({children, params}: Props) {
               {children}
             </AnalyticsProvider>
           </ProviderAuthProvider>
+          <InstallPrompt />
         </NextIntlClientProvider>
         <Analytics />
         <PwaRegistration />

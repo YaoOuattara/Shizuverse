@@ -455,5 +455,13 @@
     "resumeButton": "Reprendre les opérations",
     "suspendButton": "Suspendre le prestataire",
     "reinstateButton": "Réintégrer le prestataire"
+  },
+  "installPrompt": {
+    "androidTitle": "Installez Shizu sur votre écran d'accueil",
+    "installButton": "Installer l'application",
+    "iosBefore": "Appuyez sur",
+    "iosAfter": "puis « Ajouter à l'écran d'accueil »",
+    "shareIconLabel": "icône Partager",
+    "dismissLabel": "Fermer"
   }
 }
