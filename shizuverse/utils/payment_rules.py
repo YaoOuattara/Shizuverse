@@ -31,9 +31,11 @@ def get_payment_tier(quoted_price, client_booking_count=0):
     if quoted_price is None or quoted_price < 15000:
         return 'after_service'
     elif quoted_price < 50000:
-        return 'deposit_30'   # 30% deposit required
+        return 'deposit_30'    # 30% deposit required
     else:
-        return 'deposit_40'   # 40% deposit required
+        return 'full_prepay'   # >=50000 → 100% paid before service
+    # NOTE: 'deposit_40' is no longer returned by this function; the tier
+    # constant and its label are kept for backward compatibility only.
 
 
 def get_deposit_amount(quoted_price, tier):

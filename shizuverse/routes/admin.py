@@ -419,6 +419,8 @@ def get_booking_detail(booking_id):
 def set_booking_quote(booking_id):
     """Store a quoted price on the booking. Recomputes payment tier and deposit amount."""
     b = ClientBooking.query.get_or_404(booking_id)
+    if b.amount_locked:
+        return jsonify({'error': "Montant déjà verrouillé. Déverrouillage explicite requis (litige)."}), 409
     data = request.get_json() or {}
     amount = data.get('amount_xof')
     if amount is None or not isinstance(amount, (int, float)) or int(amount) <= 0:
@@ -441,7 +443,7 @@ def set_booking_quote(booking_id):
     b.payment_tier = tier
     b.deposit_amount = deposit
     b.cancellation_policy = policy
-    b.amount_locked = False  # quote set, but not yet confirmed
+    # Do NOT touch amount_locked here: a quote never unlocks a locked amount.
     db.session.commit()
 
     return jsonify({
@@ -738,6 +740,8 @@ def get_overview():
 def lock_booking_amount(booking_id):
     """Admin confirms the final quoted amount. Must happen before provider is assigned."""
     b = ClientBooking.query.get_or_404(booking_id)
+    if b.amount_locked:
+        return jsonify({'error': "Montant déjà verrouillé."}), 409
     data = request.get_json() or {}
     confirmed_amount = data.get('confirmed_amount')
 
@@ -759,6 +763,16 @@ def lock_booking_amount(booking_id):
     b.cancellation_policy = policy
     b.amount_locked = True
     b.amount_locked_at = _dt.utcnow()
+
+    event = BookingEvent(
+        booking_id=b.id,
+        event_type='amount_locked',
+        from_status=b.status,
+        to_status=b.status,
+        actor_id=None,
+        note=f'Montant verrouillé: {amt} XOF',
+    )
+    db.session.add(event)
     db.session.commit()
 
     return jsonify({
@@ -767,6 +781,36 @@ def lock_booking_amount(booking_id):
         'payment_tier': b.payment_tier,
         'deposit_amount': b.deposit_amount,
         'cancellation_policy': b.cancellation_policy,
+        'amount_locked': b.amount_locked,
+    })
+
+
+@admin_bp.route('/bookings/<int:booking_id>/unlock-amount', methods=['POST'])
+@admin_required
+def unlock_booking_amount(booking_id):
+    """Explicitly unlock a locked amount (dispute case only). Requires a reason."""
+    b = ClientBooking.query.get_or_404(booking_id)
+    data = request.get_json() or {}
+    reason = (data.get('reason') or '').strip()
+    if not reason:
+        return jsonify({'error': 'reason is required to unlock an amount'}), 400
+
+    b.amount_locked = False
+    b.amount_locked_at = None
+
+    event = BookingEvent(
+        booking_id=b.id,
+        event_type='amount_unlocked',
+        from_status=b.status,
+        to_status=b.status,
+        actor_id=None,
+        note=f'Montant déverrouillé (litige): {reason}',
+    )
+    db.session.add(event)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
         'amount_locked': b.amount_locked,
     })
 

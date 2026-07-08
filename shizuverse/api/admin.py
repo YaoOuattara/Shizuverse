@@ -151,9 +151,25 @@ def assign_booking(booking_id):
     if not booking.amount_locked:
         return jsonify({'error': "Veuillez confirmer le montant avant d'assigner un prestataire"}), 400
 
+    prev_status = booking.status
     booking.provider_name = provider_name
     booking.provider_phone = provider_phone
     booking.status = 'assigned'
+
+    from shizuverse.models.booking_event import BookingEvent
+    provider_id = data.get('provider_id')
+    event = BookingEvent(
+        booking_id=booking.id,
+        event_type='provider_assigned',
+        from_status=prev_status,
+        to_status='assigned',
+        actor_id=None,
+        actor_phone=provider_phone or None,
+        note=(f'Prestataire assigné: {provider_name}'
+              + (f' (id={provider_id})' if provider_id else '')
+              + (f' [{provider_phone}]' if provider_phone else '')),
+    )
+    db.session.add(event)
     db.session.commit()
 
     # WhatsApp: tell client a provider has been found
