@@ -7,6 +7,7 @@ import {
   ShieldCheck, UserPlus, X, ChevronLeft, ChevronRight, MapPin, Check,
 } from "lucide-react";
 import PhoneInput from "@/components/PhoneInput";
+import { formatPrice, type CategoryPricing } from "@/lib/formatPrice";
 
 interface Props {
   serviceId: string;
@@ -33,36 +34,6 @@ function formatDateFr(dateStr: string): string {
   return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-// ── Price ranges ──────────────────────────────────────────────────────────────
-
-const PRICE_RANGES: [string, string][] = [
-  ["ménage",         "5 000–15 000 FCFA"],
-  ["nettoyage",      "5 000–15 000 FCFA"],
-  ["plomberie",      "10 000–35 000 FCFA"],
-  ["lectricit",      "15 000–50 000 FCFA"],
-  ["lectrique",      "15 000–50 000 FCFA"],
-  ["bricolage",      "8 000–25 000 FCFA"],
-  ["nounou",         "5 000–12 000 FCFA"],
-  ["baby",           "5 000–12 000 FCFA"],
-  ["beauté",         "5 000–20 000 FCFA"],
-  ["coiffure",       "5 000–20 000 FCFA"],
-  ["manucure",       "5 000–20 000 FCFA"],
-  ["maquillage",     "5 000–20 000 FCFA"],
-  ["jardinage",      "10 000–25 000 FCFA"],
-  ["piscine",        "10 000–25 000 FCFA"],
-  ["climatisation",  "12 000–40 000 FCFA"],
-  ["lectroménager",  "12 000–40 000 FCFA"],
-  ["senior",         "5 000–12 000 FCFA"],
-];
-
-function getPriceRange(name: string): string {
-  const lower = name.toLowerCase();
-  for (const [key, range] of PRICE_RANGES) {
-    if (lower.includes(key.toLowerCase())) return range;
-  }
-  return "Sur devis";
-}
-
 // ── Calendar helpers ──────────────────────────────────────────────────────────
 
 function buildCalendarCells(year: number, month: number): (number | null)[] {
@@ -82,7 +53,7 @@ function toDateStr(year: number, month: number, day: number): string {
 // ── API types ─────────────────────────────────────────────────────────────────
 
 interface ApiSubcategory { id: number; name: string; name_fr: string; name_en: string; service_id: number | null }
-interface ApiCategory    { id: number; name: string; name_fr: string; name_en: string; subcategories: ApiSubcategory[] }
+interface ApiCategory extends CategoryPricing { id: number; name: string; name_fr: string; name_en: string; subcategories: ApiSubcategory[] }
 
 // ── Step labels ───────────────────────────────────────────────────────────────
 
@@ -147,6 +118,8 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   // ── Service info ──────────────────────────────────────────────────────────
   const [categoryName, setCategoryName] = useState<string>("");
   const [subName, setSubName] = useState<string>(serviceName ?? "");
+  // Indicative pricing of the matched category (display only, from the API)
+  const [pricing, setPricing] = useState<CategoryPricing | null>(null);
 
   useEffect(() => {
     fetch(`${FLASK_API}/api/services/categories`)
@@ -157,6 +130,11 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
             if (String(sub.service_id) === String(serviceId)) {
               setCategoryName(isFr ? (cat.name_fr || cat.name) : (cat.name_en || cat.name));
               setSubName(isFr ? (sub.name_fr || sub.name) : (sub.name_en || sub.name));
+              setPricing({
+                price_min: cat.price_min,
+                price_max: cat.price_max,
+                is_quote_based: cat.is_quote_based,
+              });
               return;
             }
           }
@@ -801,7 +779,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
     ? (timeSlot === "morning" ? "Matin · 8h–12h" : timeSlot === "afternoon" ? "Après-midi · 12h–17h" : "Soirée · 17h–20h")
     : (timeSlot === "morning" ? "Morning · 8–12" : timeSlot === "afternoon" ? "Afternoon · 12–17"     : "Evening · 17–20");
 
-  const priceRange = getPriceRange(categoryName || subName || serviceName || "");
+  const priceRange = formatPrice(pricing, isFr);
 
   const RecapRow = ({ label, value }: { label: string; value: string }) => (
     <div className="flex justify-between items-start py-2.5 border-b border-gray-100 last:border-0">

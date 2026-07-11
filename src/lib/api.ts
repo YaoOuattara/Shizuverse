@@ -71,6 +71,13 @@ export const adminApi = {
     adminFetch("/api/admin/services", { method: "POST", body: JSON.stringify(body) }),
   deleteService: (id: number) =>
     adminFetch(`/api/admin/services/${id}`, { method: "DELETE" }),
+  // Category catalogue + indicative pricing (display only)
+  getPublicCategories: () => apiFetch("/api/services/categories"),
+  patchCategoryPricing: (
+    id: number,
+    body: { price_min: number | null; price_max: number | null; is_quote_based: boolean },
+  ) =>
+    adminFetch(`/api/admin/categories/${id}/pricing`, { method: "PATCH", body: JSON.stringify(body) }),
 
   // New admin portal endpoints (/admin/* blueprint)
   portalGetProviders: (params?: { verification_status?: string; listed_status?: string; provider_status?: string }) => {

@@ -57,6 +57,7 @@ import {
 import { useAdminStore, type AdminService, type PricingRules } from "@/data/adminStore";
 import { useAdminServices, type ApiService } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
+import { formatPrice } from "@/lib/formatPrice";
 import { useToast } from "@/hooks/use-toast";
 import { formatMoney } from "@/lib/currency";
 import {
@@ -78,6 +79,23 @@ const FORM_CATEGORIES = [
 interface FormErrors {
   name?: string;
   category?: string;
+}
+
+interface CatPricing {
+  id: number;
+  price_min: number | null;
+  price_max: number | null;
+  is_quote_based: boolean;
+}
+
+interface ApiCategoryPricing {
+  id: number;
+  name: string;
+  name_fr?: string;
+  name_en?: string;
+  price_min: number | null;
+  price_max: number | null;
+  is_quote_based: boolean;
 }
 
 function adaptApiService(s: ApiService): AdminService {
@@ -103,6 +121,90 @@ export default function AdminServices() {
   const [searchQuery, setSearchQuery] = useState("");
   // Track which category sections are expanded (all open by default)
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
+
+  // ── Category indicative pricing (display only) ──────────────────────────
+  // Keyed by lowercased category name (name / name_fr / name_en) so we can
+  // resolve the pricing entry from the grouping key used in the service list.
+  const [catPricing, setCatPricing] = useState<Record<string, CatPricing>>({});
+  const [editingCat, setEditingCat] = useState<string | null>(null);
+  const [catForm, setCatForm] = useState({ price_min: "", price_max: "", is_quote_based: false });
+  const [savingCat, setSavingCat] = useState(false);
+
+  useEffect(() => {
+    adminApi.getPublicCategories()
+      .then((cats: ApiCategoryPricing[]) => {
+        const map: Record<string, CatPricing> = {};
+        for (const c of cats) {
+          const entry: CatPricing = {
+            id: c.id,
+            price_min: c.price_min ?? null,
+            price_max: c.price_max ?? null,
+            is_quote_based: !!c.is_quote_based,
+          };
+          for (const key of [c.name, c.name_fr, c.name_en]) {
+            if (key) map[key.toLowerCase()] = entry;
+          }
+        }
+        setCatPricing(map);
+      })
+      .catch(() => {});
+  }, []);
+
+  const pricingForCategory = (cat: string): CatPricing | null =>
+    catPricing[cat.toLowerCase()] ?? null;
+
+  const openCatPriceEditor = (cat: string) => {
+    const p = pricingForCategory(cat);
+    setCatForm({
+      price_min: p?.price_min != null ? String(p.price_min) : "",
+      price_max: p?.price_max != null ? String(p.price_max) : "",
+      is_quote_based: p?.is_quote_based ?? false,
+    });
+    setEditingCat(cat);
+  };
+
+  const handleSaveCatPrice = async (cat: string) => {
+    const p = pricingForCategory(cat);
+    if (!p) return;
+    const toNum = (s: string): number | null => {
+      const t = s.trim();
+      if (t === "") return null;
+      const n = Number(t);
+      return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+    };
+    const body = {
+      price_min: catForm.is_quote_based ? null : toNum(catForm.price_min),
+      price_max: catForm.is_quote_based ? null : toNum(catForm.price_max),
+      is_quote_based: catForm.is_quote_based,
+    };
+    if (!body.is_quote_based && body.price_min != null && body.price_max != null && body.price_max < body.price_min) {
+      toast({ title: isFr ? "Fourchette invalide" : "Invalid range", description: isFr ? "Le max doit être ≥ au min." : "Max must be ≥ min.", variant: "destructive" });
+      return;
+    }
+    setSavingCat(true);
+    try {
+      const res = await adminApi.patchCategoryPricing(p.id, body) as CatPricing;
+      const updated: CatPricing = {
+        id: p.id,
+        price_min: res.price_min ?? null,
+        price_max: res.price_max ?? null,
+        is_quote_based: !!res.is_quote_based,
+      };
+      setCatPricing(prev => {
+        const next = { ...prev };
+        for (const k of Object.keys(next)) {
+          if (next[k].id === p.id) next[k] = updated;
+        }
+        return next;
+      });
+      setEditingCat(null);
+      toast({ title: isFr ? "Prix mis à jour" : "Price updated" });
+    } catch {
+      toast({ title: isFr ? "Échec de la mise à jour" : "Update failed", variant: "destructive" });
+    } finally {
+      setSavingCat(false);
+    }
+  };
 
   const [editingService, setEditingService] = useState<AdminService | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -432,27 +534,109 @@ export default function AdminServices() {
               return (
                 <Card key={cat} className="overflow-hidden">
                   {/* Category header */}
-                  <button
-                    type="button"
-                    onClick={() => toggleCategory(cat)}
-                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors text-left"
-                  >
-                    <div className="flex items-center gap-2">
-                      <ChevronDown
-                        className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
-                          isOpen ? "" : "-rotate-90"
-                        }`}
-                      />
-                      <span className="font-semibold text-sm">{cat}</span>
-                      <Badge variant="secondary" className="text-xs tabular-nums">
-                        {catServices.length}
-                      </Badge>
+                  <div className="flex items-stretch">
+                    <button
+                      type="button"
+                      onClick={() => toggleCategory(cat)}
+                      className="flex-1 flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors text-left min-w-0"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <ChevronDown
+                          className={`h-4 w-4 text-muted-foreground transition-transform duration-200 shrink-0 ${
+                            isOpen ? "" : "-rotate-90"
+                          }`}
+                        />
+                        <span className="font-semibold text-sm truncate">{cat}</span>
+                        <Badge variant="secondary" className="text-xs tabular-nums shrink-0">
+                          {catServices.length}
+                        </Badge>
+                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0 ml-2">
+                        {activeCount}/{catServices.length}{" "}
+                        {isFr ? "actif" : "active"}
+                      </span>
+                    </button>
+
+                    {/* Indicative price + edit trigger (display only) */}
+                    <div className="flex items-center gap-2 px-3 shrink-0 border-l">
+                      <span className="text-xs font-medium text-[#0F3A7A] whitespace-nowrap hidden sm:block">
+                        {formatPrice(pricingForCategory(cat), isFr)}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openCatPriceEditor(cat)}
+                        disabled={!pricingForCategory(cat)}
+                        title={isFr ? "Modifier le prix indicatif" : "Edit indicative price"}
+                      >
+                        <Settings2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      {activeCount}/{catServices.length}{" "}
-                      {isFr ? "actif" : "active"}
-                    </span>
-                  </button>
+                  </div>
+
+                  {/* Inline indicative-price editor */}
+                  {editingCat === cat && (
+                    <div className="border-t bg-muted/30 px-4 py-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {isFr ? "Prix indicatif (affichage client)" : "Indicative price (client display)"}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">{isFr ? "Sur devis" : "On request"}</span>
+                          <Switch
+                            checked={catForm.is_quote_based}
+                            onCheckedChange={(v) => setCatForm(f => ({ ...f, is_quote_based: v }))}
+                          />
+                        </div>
+                      </div>
+
+                      {!catForm.is_quote_based && (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number" min={0} inputMode="numeric"
+                            placeholder={isFr ? "Min (FCFA)" : "Min (FCFA)"}
+                            value={catForm.price_min}
+                            onChange={(e) => setCatForm(f => ({ ...f, price_min: e.target.value }))}
+                            className="h-9"
+                          />
+                          <span className="text-muted-foreground">–</span>
+                          <Input
+                            type="number" min={0} inputMode="numeric"
+                            placeholder={isFr ? "Max (vide = plancher)" : "Max (empty = from)"}
+                            value={catForm.price_max}
+                            onChange={(e) => setCatForm(f => ({ ...f, price_max: e.target.value }))}
+                            className="h-9"
+                          />
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs text-muted-foreground">
+                          {isFr ? "Aperçu : " : "Preview: "}
+                          <span className="font-medium text-foreground">
+                            {formatPrice({
+                              price_min: catForm.is_quote_based ? null : (Number(catForm.price_min) || null),
+                              price_max: catForm.is_quote_based ? null : (Number(catForm.price_max) || null),
+                              is_quote_based: catForm.is_quote_based,
+                            }, isFr)}
+                          </span>
+                        </p>
+                        <div className="flex justify-end gap-2 shrink-0">
+                          <Button variant="ghost" size="sm" onClick={() => setEditingCat(null)} disabled={savingCat}>
+                            {isFr ? "Annuler" : "Cancel"}
+                          </Button>
+                          <Button size="sm" onClick={() => handleSaveCatPrice(cat)} disabled={savingCat}>
+                            {savingCat ? <Loader2 className="h-4 w-4 animate-spin" /> : (isFr ? "Enregistrer" : "Save")}
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground/80">
+                        {isFr
+                          ? "Indicatif uniquement — n'affecte pas le montant verrouillé sur une réservation."
+                          : "Indicative only — does not affect the amount locked on a booking."}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Service rows */}
                   {isOpen && (
