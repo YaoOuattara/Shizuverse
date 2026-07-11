@@ -393,6 +393,53 @@ def delete_service(service_id):
     return jsonify({'success': True, 'id': service_id})
 
 
+@admin_bp.route('/categories/<int:category_id>/pricing', methods=['PATCH'])
+@require_admin_token
+def patch_category_pricing(category_id):
+    """Edit a category's INDICATIVE price range (display only).
+
+    Body: { price_min?: int|null, price_max?: int|null, is_quote_based?: bool }
+    These values never constrain the amount_xof an admin locks on a booking.
+    When is_quote_based is true, min/max are cleared (the UI shows "Sur devis").
+    """
+    cat = ServiceCategory.query.get_or_404(category_id)
+    data = request.get_json() or {}
+
+    def _coerce_amount(v):
+        if v is None or v == '':
+            return None
+        if not isinstance(v, (int, float)) or int(v) < 0:
+            raise ValueError
+        return int(v)
+
+    try:
+        if 'is_quote_based' in data:
+            cat.is_quote_based = bool(data.get('is_quote_based'))
+        if 'price_min' in data:
+            cat.price_min = _coerce_amount(data.get('price_min'))
+        if 'price_max' in data:
+            cat.price_max = _coerce_amount(data.get('price_max'))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'price_min / price_max must be non-negative numbers or null'}), 400
+
+    # Quote-based ignores the range entirely — keep the row unambiguous.
+    if cat.is_quote_based:
+        cat.price_min = None
+        cat.price_max = None
+    elif cat.price_min is not None and cat.price_max is not None and cat.price_max < cat.price_min:
+        return jsonify({'error': 'price_max must be greater than or equal to price_min'}), 400
+
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'id': cat.id,
+        'name': cat.name,
+        'price_min': cat.price_min,
+        'price_max': cat.price_max,
+        'is_quote_based': cat.is_quote_based,
+    })
+
+
 provider_bp = Blueprint('provider', __name__)
 
 

@@ -60,6 +60,12 @@ def list_categories():
     sub_en = "ss.name_en" if 'name_en' in sub_cols else "ss.name"
     active_clause = "AND sc.is_active = true" if 'is_active' in cat_cols else ""
 
+    # Indicative price range (display only). Fall back to NULL/false when the
+    # pricing columns are not yet present (migration not run).
+    price_min = "sc.price_min"      if 'price_min' in cat_cols      else "NULL"
+    price_max = "sc.price_max"      if 'price_max' in cat_cols      else "NULL"
+    quote_col = "sc.is_quote_based" if 'is_quote_based' in cat_cols else "false"
+
     # Single query: all categories + subcategories + one service_id per subcategory
     rows = db.session.execute(text(f"""
         SELECT
@@ -68,6 +74,9 @@ def list_categories():
             {cat_fr}       AS cat_name_fr,
             {cat_en}       AS cat_name_en,
             sc.description AS cat_desc,
+            {price_min}    AS price_min,
+            {price_max}    AS price_max,
+            {quote_col}    AS is_quote_based,
             ss.id          AS sub_id,
             ss.name        AS sub_name,
             {sub_fr}       AS sub_name_fr,
@@ -79,6 +88,7 @@ def list_categories():
                ON svc.subcategory_id = ss.id AND svc.is_active = true
         WHERE 1=1 {active_clause}
         GROUP BY sc.id, sc.name, {cat_fr}, {cat_en}, sc.description,
+                 {price_min}, {price_max}, {quote_col},
                  ss.id, ss.name, {sub_fr}, {sub_en}
         ORDER BY sc.id, ss.id
     """)).mappings().all()
@@ -94,6 +104,10 @@ def list_categories():
                 "name_fr": row["cat_name_fr"],
                 "name_en": row["cat_name_en"],
                 "description": row["cat_desc"] or "",
+                # Indicative price range (display only)
+                "price_min": row["price_min"],
+                "price_max": row["price_max"],
+                "is_quote_based": bool(row["is_quote_based"]),
                 "subcategories": [],
             }
         if row["sub_id"] is not None:

@@ -9,6 +9,17 @@ class ServiceCategory(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.String(255))
 
+    # ── Indicative price range (DISPLAY ONLY) ─────────────────────────
+    # These drive the "À partir de / fourchette / Sur devis" shown to the
+    # client. They are indicative and NEVER constrain the amount_xof that
+    # the admin locks on a booking. Three modes:
+    #   price_min + price_max  → "min – max FCFA"       (FOURCHETTE)
+    #   price_min only         → "À partir de min FCFA" (PLANCHER)
+    #   is_quote_based = true  → "Sur devis"            (ignores min/max)
+    price_min      = db.Column(db.Integer, nullable=True)
+    price_max      = db.Column(db.Integer, nullable=True)
+    is_quote_based = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
+
     subcategories = db.relationship(
         "ServiceSubcategory",
         backref="category",
