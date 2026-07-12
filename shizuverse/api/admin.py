@@ -93,13 +93,25 @@ def admin_login():
     expected = os.environ.get('ADMIN_PASSWORD', 'admin')
     if password != expected:
         return jsonify({'error': 'Invalid password'}), 401
+    return jsonify({'token': _issue_admin_token()})
+
+
+def _issue_admin_token():
+    """Short-lived (8h) admin JWT. Sliding refresh via /admin/refresh."""
     payload = {
         'sub': 'admin',
         'iat': datetime.utcnow(),
-        'exp': datetime.utcnow() + timedelta(days=30),
+        'exp': datetime.utcnow() + timedelta(hours=8),
     }
-    token = jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm='HS256')
-    return jsonify({'token': token})
+    return jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm='HS256')
+
+
+@admin_bp.route('/refresh', methods=['POST'])
+@require_admin_token
+def admin_refresh():
+    """Re-issue a fresh 8h token while the current one is still valid.
+    Keeps a working admin logged in without a 30-day exposure window."""
+    return jsonify({'token': _issue_admin_token()})
 
 
 @admin_bp.route('/bookings', methods=['GET'])
@@ -497,6 +509,27 @@ def require_provider_token(f):
     return decorated
 
 
+def _issue_provider_token(user_id, provider_id):
+    """Short-lived (8h) provider JWT. Sliding refresh via /provider/refresh."""
+    payload = {
+        'sub': str(user_id),
+        'type': 'provider',
+        'provider_id': provider_id,
+        'iat': datetime.utcnow(),
+        'exp': datetime.utcnow() + timedelta(hours=8),
+    }
+    return jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm='HS256')
+
+
+@provider_bp.route('/refresh', methods=['POST'])
+@require_provider_token
+def provider_refresh():
+    """Re-issue a fresh 8h provider token while the current one is valid."""
+    auth_header = request.headers.get('Authorization', '')
+    payload = jwt.decode(auth_header[7:], current_app.config['SECRET_KEY'], algorithms=['HS256'])
+    return jsonify({'token': _issue_provider_token(payload.get('sub'), payload.get('provider_id'))})
+
+
 @provider_bp.route('/login', methods=['POST'])
 @limiter.limit("10 per minute")
 def provider_login():
@@ -522,14 +555,7 @@ def provider_login():
     if not user or not user.check_password(password):
         return jsonify({'error': 'Invalid credentials'}), 401
 
-    payload = {
-        'sub': str(user.id),
-        'type': 'provider',
-        'provider_id': sp.id,
-        'iat': datetime.utcnow(),
-        'exp': datetime.utcnow() + timedelta(days=30),
-    }
-    token = jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm='HS256')
+    token = _issue_provider_token(str(user.id), sp.id)
     return jsonify({
         'token': token,
         'provider': {

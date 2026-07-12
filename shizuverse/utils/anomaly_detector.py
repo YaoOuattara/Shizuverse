@@ -239,12 +239,16 @@ def run_anomaly_check() -> dict:
 
     alert = generate_anomaly_alert(anomalies)
 
-    admin_phone = os.environ.get('SHIZU_ADMIN_PHONE', '').strip()
+    # Fall back to the public Shizu WhatsApp number when the dedicated admin
+    # number is unset — consistent with bookings.py so alerts still reach someone.
+    admin_phone = (os.environ.get('SHIZU_ADMIN_PHONE')
+                   or os.environ.get('NEXT_PUBLIC_SHIZU_WHATSAPP')
+                   or '').strip()
     alert_sent = False
     if admin_phone:
         alert_sent = send_whatsapp(admin_phone, alert)
     else:
-        logger.warning("SHIZU_ADMIN_PHONE not configured — WhatsApp alert skipped")
+        logger.warning("Neither SHIZU_ADMIN_PHONE nor NEXT_PUBLIC_SHIZU_WHATSAPP set — WhatsApp alert skipped")
 
     # Persist to anomaly_log
     for a in anomalies:

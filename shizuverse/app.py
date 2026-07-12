@@ -152,7 +152,10 @@ def create_app():
     socketio = SocketIO(app, async_mode="gevent", cors_allowed_origins=ALLOWED_ORIGINS, logger=True, engineio_logger=True)
     create_socket_instance(socketio)
 
-    SKIP_NAMES = {"auth", "socket_chat", "chat"}
+    # client/provider are legacy Replit server-rendered blueprints (Appointment
+    # model + Jinja templates), unused by the Next.js frontend. Disabled here
+    # (not deleted) — remove from this set to re-enable in one line.
+    SKIP_NAMES = {"auth", "socket_chat", "chat", "client", "provider"}
     from shizuverse.routes.admin import admin_bp
     app.register_blueprint(admin_bp)
     app.register_blueprint(auth_bp, url_prefix="/auth")

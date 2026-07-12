@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 from shizuverse.models import db
 from shizuverse.models.client_booking import ClientBooking, VALID_STATUSES
 from shizuverse.models.service_models import Service
+from shizuverse.limiter import limiter
 from datetime import datetime
 
 bookings_bp = Blueprint("bookings", __name__)
@@ -66,6 +67,7 @@ def check_booking_anomaly(phone: str) -> dict:
 # Body: { client_name, client_phone, client_location, service_id|service_slug|service_name,
 #         appointment_date (ISO 8601), notes? }
 @bookings_bp.route("/", methods=["POST"])
+@limiter.limit("5 per hour")
 def create_booking():
     data = request.get_json(silent=True) or {}
 
