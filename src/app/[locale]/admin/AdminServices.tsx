@@ -64,18 +64,6 @@ import {
   DEFAULT_PRICING_RULES,
 } from "@/utils/pricingEngine";
 
-const FORM_CATEGORIES = [
-  "Ménage et nettoyage",
-  "Plomberie",
-  "Électricité",
-  "Bricolage & Réparations",
-  "Nounou et baby-sitting",
-  "Beauté à domicile",
-  "Jardinage et piscine",
-  "Climatisation et électroménager",
-  "Autre",
-];
-
 interface FormErrors {
   name?: string;
   category?: string;
@@ -130,9 +118,15 @@ export default function AdminServices() {
   const [catForm, setCatForm] = useState({ price_min: "", price_max: "", is_quote_based: false });
   const [savingCat, setSavingCat] = useState(false);
 
+  // Full category catalogue from the API — the single source for the
+  // create/edit dropdown (id + display label), replacing the old hardcoded
+  // FORM_CATEGORIES list.
+  const [apiCategories, setApiCategories] = useState<ApiCategoryPricing[]>([]);
+
   useEffect(() => {
     adminApi.getPublicCategories()
       .then((cats: ApiCategoryPricing[]) => {
+        setApiCategories(cats);
         const map: Record<string, CatPricing> = {};
         for (const c of cats) {
           const entry: CatPricing = {
@@ -149,6 +143,15 @@ export default function AdminServices() {
       })
       .catch(() => {});
   }, []);
+
+  // Dropdown options: display name_fr (fallback name), value = category id.
+  const categoryOptions = useMemo(
+    () =>
+      apiCategories
+        .map(c => ({ id: c.id, label: c.name_fr || c.name }))
+        .sort((a, b) => a.label.localeCompare(b.label, "fr")),
+    [apiCategories],
+  );
 
   const pricingForCategory = (cat: string): CatPricing | null =>
     catPricing[cat.toLowerCase()] ?? null;
@@ -215,7 +218,8 @@ export default function AdminServices() {
 
   const [formData, setFormData] = useState({
     name: "",
-    category: FORM_CATEGORIES[0],
+    categoryId: null as number | null,
+    category: "",            // display label, for local grouping only
     durationMins: 60,
     basePrice: 100,
     description: "",
@@ -320,7 +324,8 @@ export default function AdminServices() {
     if (isDuplicate) {
       errors.name = isFr ? "Ce service existe déjà" : "A service with this name already exists";
     }
-    if (!formData.category) {
+    // A category id is required to create a service (edit never re-persists it).
+    if (!editingService && formData.categoryId == null) {
       errors.category = isFr ? "La catégorie est obligatoire" : "Category is required";
     }
     setFormErrors(errors);
@@ -330,7 +335,8 @@ export default function AdminServices() {
   const handleOpenCreate = () => {
     setFormData({
       name: "",
-      category: FORM_CATEGORIES[0],
+      categoryId: null,
+      category: "",
       durationMins: 60,
       basePrice: 100,
       description: "",
@@ -344,8 +350,14 @@ export default function AdminServices() {
   };
 
   const handleOpenEdit = (service: AdminService) => {
+    // Resolve the category id from the service's display label (name_fr|name).
+    const match = apiCategories.find(
+      c => (c.name_fr || c.name).toLowerCase() === service.category.toLowerCase()
+        || c.name.toLowerCase() === service.category.toLowerCase(),
+    );
     setFormData({
       name: service.name,
+      categoryId: match?.id ?? null,
       category: service.category,
       durationMins: service.durationMins,
       basePrice: service.basePrice,
@@ -404,12 +416,15 @@ export default function AdminServices() {
       try {
         const created = await adminApi.createService({
           name: formData.name.trim(),
-          category: formData.category,
+          category_id: formData.categoryId ?? undefined,
+          category: formData.category || undefined,
         }) as { id: number; name: string; category: string; active: boolean };
         const newService: AdminService = {
           id: String(created.id),
           name: created.name,
-          category: created.category || formData.category,
+          // Group under the chosen display label so the new row lands in the
+          // same section as existing services (which group by name_fr|name).
+          category: formData.category || created.category,
           durationMins: formData.durationMins,
           basePrice: formData.basePrice,
           description: formData.description.trim(),
@@ -742,9 +757,10 @@ export default function AdminServices() {
                 {isFr ? "Catégorie" : "Category"} <span className="text-destructive">*</span>
               </Label>
               <Select
-                value={formData.category}
+                value={formData.categoryId != null ? String(formData.categoryId) : ""}
                 onValueChange={value => {
-                  setFormData(prev => ({ ...prev, category: value }));
+                  const opt = categoryOptions.find(o => String(o.id) === value);
+                  setFormData(prev => ({ ...prev, categoryId: opt?.id ?? null, category: opt?.label ?? "" }));
                   if (formErrors.category) setFormErrors(prev => ({ ...prev, category: undefined }));
                 }}
               >
@@ -752,8 +768,8 @@ export default function AdminServices() {
                   <SelectValue placeholder={isFr ? "Choisir une catégorie" : "Select category"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {FORM_CATEGORIES.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  {categoryOptions.map(opt => (
+                    <SelectItem key={opt.id} value={String(opt.id)}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
