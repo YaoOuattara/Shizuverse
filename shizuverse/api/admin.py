@@ -343,18 +343,36 @@ def create_service():
     if not name:
         return jsonify({'error': 'name is required'}), 400
 
+    category_id = data.get('category_id')
     category_name = str(data.get('category', '')).strip()
 
-    # Try to find best-matching subcategory by category name
     subcategory = None
-    if category_name:
-        cats = ServiceCategory.query.all()
-        for cat in cats:
-            if category_name.lower() in cat.name.lower() or cat.name.lower() in category_name.lower():
-                sub = ServiceSubcategory.query.filter_by(category_id=cat.id).first()
-                if sub:
-                    subcategory = sub
-                    break
+
+    # Preferred: resolve the category directly by id (stable, unambiguous).
+    if category_id is not None:
+        try:
+            cat = ServiceCategory.query.get(int(category_id))
+        except (TypeError, ValueError):
+            cat = None
+        if cat is None:
+            return jsonify({'error': f'Unknown category_id: {category_id}'}), 400
+        subcategory = ServiceSubcategory.query.filter_by(category_id=cat.id).first()
+
+    # Backward-compat fallback: match by name across name / name_fr / name_en.
+    elif category_name:
+        from sqlalchemy import inspect as sa_inspect, text
+        cat_cols = {c['name'] for c in sa_inspect(db.engine).get_columns('service_categories')}
+        name_fr = "name_fr" if 'name_fr' in cat_cols else "name"
+        name_en = "name_en" if 'name_en' in cat_cols else "name"
+        row = db.session.execute(text(f"""
+            SELECT id FROM service_categories
+            WHERE lower(name) = lower(:n)
+               OR lower(coalesce({name_fr}, '')) = lower(:n)
+               OR lower(coalesce({name_en}, '')) = lower(:n)
+            ORDER BY id LIMIT 1
+        """), {"n": category_name}).fetchone()
+        if row:
+            subcategory = ServiceSubcategory.query.filter_by(category_id=row[0]).first()
 
     if not subcategory:
         subcategory = ServiceSubcategory.query.first()
