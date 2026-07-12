@@ -216,11 +216,20 @@ export function getPricingSuggestion(
   }
   
   const suggestedQuote = Math.round(result);
-  
+
   const padding = rules.rangePaddingPct ?? 0.2;
-  const suggestedMin = Math.round(suggestedQuote * (1 - padding));
-  const suggestedMax = Math.round(suggestedQuote * (1 + padding));
-  
+  let suggestedMin = Math.round(suggestedQuote * (1 - padding));
+  let suggestedMax = Math.round(suggestedQuote * (1 + padding));
+
+  // Clamp the padded range too — the padding is applied AFTER the floor/cap,
+  // so without this the displayed min/max could escape the category bounds
+  // (e.g. suggestedMax = quote × 1.2 exceeding category_price_max).
+  if (rules.minFloor !== undefined) suggestedMin = Math.max(suggestedMin, rules.minFloor);
+  if (rules.maxCap !== undefined)   suggestedMax = Math.min(suggestedMax, rules.maxCap);
+  // Keep the band coherent: min ≤ quote ≤ max.
+  suggestedMin = Math.min(suggestedMin, suggestedQuote);
+  suggestedMax = Math.max(suggestedMax, suggestedQuote);
+
   return {
     suggestedMin,
     suggestedMax,

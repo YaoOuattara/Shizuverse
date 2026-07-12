@@ -55,6 +55,8 @@ import {
   CalendarClock,
   MessageSquare,
   AlertCircle,
+  AlertTriangle,
+  Sparkles,
   Lock,
   LockOpen,
   Copy,
@@ -63,7 +65,7 @@ import {
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useAdminStore, type AdminBooking, type StatusHistoryEntry } from "@/data/adminStore";
-import { useAdminBookings, useAdminProviders, useAdminServices, type ApiBooking, type ApiProvider } from "@/hooks/useAdminApi";
+import { useAdminBookings, useAdminProviders, useAdminServices, type ApiBooking, type ApiProvider, type ApiService } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
@@ -446,6 +448,7 @@ export default function AdminBookings() {
   const [quotePrice, setQuotePrice] = useState("");
   const [quoteNote, setQuoteNote] = useState("");
   const [pricingSuggestion, setPricingSuggestion] = useState<PricingSuggestion | null>(null);
+  const [quoteJustifLoading, setQuoteJustifLoading] = useState(false);
 
   // Payment confirmation modal state
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -799,25 +802,31 @@ export default function AdminBookings() {
   //   basePrice = service.base_price || category_price_min || 0  (else no suggestion)
   //   maxCap    = category_price_max  (skipped when the category is quote-based)
   // The engine only SUGGESTS — the admin can always override the value.
+  // Match a booking to its real API service — by service_id (robust), then
+  // name, then category label. Shared by the engine and the over-cap warning.
+  const resolveServiceForBooking = (booking: AdminBooking): ApiService | undefined =>
+    (booking.serviceId != null ? apiServices.find(s => s.id === booking.serviceId) : undefined) ||
+    apiServices.find(s => s.name?.toLowerCase() === (booking.serviceName || "").toLowerCase()) ||
+    apiServices.find(s => (s.category || "").toLowerCase() === (booking.serviceCategory || "").toLowerCase());
+
   const computeSuggestion = (
     booking: AdminBooking,
     zone: string | undefined,
     urgency: UrgencyLevel,
     timePreference: TimePreference,
   ): PricingSuggestion | null => {
-    // Match by service_id first (robust), then name, then category label.
-    const svc =
-      (booking.serviceId != null && apiServices.find(s => s.id === booking.serviceId)) ||
-      apiServices.find(s => s.name?.toLowerCase() === (booking.serviceName || "").toLowerCase()) ||
-      apiServices.find(s => (s.category || "").toLowerCase() === (booking.serviceCategory || "").toLowerCase());
+    const svc = resolveServiceForBooking(booking);
     if (!svc) return null;
 
     const basePrice = svc.base_price || svc.category_price_min || 0;
     if (!basePrice) return null; // both null → no suggestion, field stays empty
 
     const rules = { ...DEFAULT_PRICING_RULES };
-    if (!svc.category_is_quote_based && svc.category_price_max != null) {
-      rules.maxCap = svc.category_price_max; // anti-dispute cap; quote-based promises nothing
+    // Bound the suggestion to the category range — but a quote-based category
+    // promises nothing, so it gets neither floor nor cap.
+    if (!svc.category_is_quote_based) {
+      if (svc.category_price_min != null) rules.minFloor = svc.category_price_min;
+      if (svc.category_price_max != null) rules.maxCap = svc.category_price_max;
     }
     return getPricingSuggestion({ basePrice, pricingRules: rules }, { zone, urgency, timePreference });
   };
@@ -914,6 +923,42 @@ export default function AdminBookings() {
         setPricingSuggestion(suggestion);
         setQuotePrice(suggestion.suggestedQuote.toString());
       }
+    }
+  };
+
+  // AI: generate a short client-facing note explaining an over-cap quote.
+  // Reuses the existing Anthropic plumbing (Next.js route, like improve-bio).
+  // Pre-fills the editable Note field — never auto-sent; fails gracefully.
+  const handleGenerateJustification = async () => {
+    if (!selectedBooking) return;
+    const svc = resolveServiceForBooking(selectedBooking);
+    setQuoteJustifLoading(true);
+    try {
+      const res = await fetch("/api/quote-justification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service: selectedBooking.serviceName,
+          category: svc?.category ?? selectedBooking.serviceCategory,
+          rangeMin: svc?.category_price_min ?? null,
+          rangeMax: svc?.category_price_max ?? null,
+          amount: Number(quotePrice),
+          commune: (selectedBooking.address || "").split(",")[0].trim(),
+          urgency: quoteUrgency,
+          timePreference: quoteTimePreference,
+          description: selectedBooking.notes || "",
+        }),
+      });
+      const data = await res.json();
+      if (data?.note) {
+        setQuoteNote(data.note);
+      } else {
+        toast({ title: isFr ? "Génération indisponible" : "Generation unavailable", description: isFr ? "Rédigez la note à la main." : "Please write the note manually." });
+      }
+    } catch {
+      toast({ title: isFr ? "Génération indisponible" : "Generation unavailable", description: isFr ? "Rédigez la note à la main." : "Please write the note manually." });
+    } finally {
+      setQuoteJustifLoading(false);
     }
   };
 
@@ -2332,6 +2377,43 @@ export default function AdminBookings() {
                 </Button>
               )}
             </div>
+
+            {/* Over-cap warning (informative, not blocking) + AI note generator.
+                Hidden for quote-based categories (nothing is promised). */}
+            {(() => {
+              const svc = selectedBooking ? resolveServiceForBooking(selectedBooking) : undefined;
+              const catMax = svc?.category_price_max ?? null;
+              const catQuote = svc?.category_is_quote_based ?? false;
+              const overCap = !catQuote && catMax != null && quotePrice !== "" && Number(quotePrice) > catMax;
+              if (!overCap) return null;
+              const rangeLabel = `${formatMoney(svc?.category_price_min ?? 0, 'XOF')} \u2013 ${formatMoney(catMax, 'XOF')}`;
+              return (
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 space-y-2">
+                  <p className="text-xs text-amber-800 flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>
+                      {isFr
+                        ? `Ce montant d\u00e9passe la fourchette affich\u00e9e au client (${rangeLabel}). Expliquez la raison dans la note ci-dessous.`
+                        : `This amount exceeds the range shown to the client (${rangeLabel}). Explain the reason in the note below.`}
+                    </span>
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-amber-300 text-amber-800 hover:bg-amber-100"
+                    onClick={handleGenerateJustification}
+                    disabled={quoteJustifLoading}
+                    data-testid="button-generate-justification"
+                  >
+                    {quoteJustifLoading
+                      ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
+                    {isFr ? "G\u00e9n\u00e9rer une explication" : "Generate explanation"}
+                  </Button>
+                </div>
+              );
+            })()}
 
             <div className="space-y-2">
               <Label htmlFor="quote-note">{isFr ? "Note (optionnel)" : "Note (optional)"}</Label>
