@@ -83,6 +83,7 @@ export interface AdminBooking {
   providerCompany?: string;
   providerPhone?: string;
   providerId: string;
+  serviceId?: number | null;
   serviceName: string;
   serviceCategory: string;
   date: string;

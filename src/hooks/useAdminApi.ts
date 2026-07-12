@@ -15,6 +15,7 @@ export interface ApiBooking {
   client_name: string;
   client_phone: string;
   client_location: string;
+  service_id?: number | null;
   service_name: string;
   service_slug: string;
   appointment_date: string;
@@ -94,9 +95,15 @@ export interface ApiService {
   id: number;
   name: string;
   category: string;
+  category_id?: number | null;
   price: number;
   duration: number;
   active: boolean;
+  // Pricing inputs for the suggestion engine (display only; never constrains amount_xof)
+  base_price?: number | null;
+  category_price_min?: number | null;
+  category_price_max?: number | null;
+  category_is_quote_based?: boolean;
 }
 
 export function useAdminStats() {

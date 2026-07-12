@@ -767,7 +767,7 @@ export default function AdminServices() {
                 <SelectTrigger className={formErrors.category ? "border-destructive" : ""}>
                   <SelectValue placeholder={isFr ? "Choisir une catégorie" : "Select category"} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="z-[60]">
                   {categoryOptions.map(opt => (
                     <SelectItem key={opt.id} value={String(opt.id)}>{opt.label}</SelectItem>
                   ))}
@@ -779,21 +779,6 @@ export default function AdminServices() {
                   {formErrors.category}
                 </p>
               )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="service-price">
-                {isFr ? "Prix de base (CFA)" : "Base Price (CFA)"}
-              </Label>
-              <Input
-                id="service-price"
-                type="number"
-                min={0}
-                value={formData.basePrice}
-                onChange={e =>
-                  setFormData(prev => ({ ...prev, basePrice: parseInt(e.target.value) || 0 }))
-                }
-              />
             </div>
 
             <div className="space-y-2">
@@ -829,88 +814,8 @@ export default function AdminServices() {
               />
             </div>
 
-            {/* Pricing rules (advanced) */}
-            <Accordion type="single" collapsible defaultValue="">
-              <AccordionItem value="pricing" className="border rounded-md">
-                <AccordionTrigger className="px-3 py-2">
-                  <span className="flex items-center gap-2 text-sm font-medium">
-                    <Settings2 className="h-4 w-4" />
-                    {isFr ? "Règles de tarification" : "Pricing Rules"}
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent className="px-3 pb-3">
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label>{isFr ? "Mode de tarification" : "Pricing Mode"}</Label>
-                      <Select
-                        value={formData.pricingMode}
-                        onValueChange={(v: "instant" | "range" | "quote_required") =>
-                          setFormData(prev => ({ ...prev, pricingMode: v }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="instant">
-                            {isFr ? "Devis instantané" : "Instant Quote"}
-                          </SelectItem>
-                          <SelectItem value="range">
-                            {isFr ? "Fourchette de prix" : "Price Range"}
-                          </SelectItem>
-                          <SelectItem value="quote_required">
-                            {isFr ? "Devis manuel" : "Quote Required"}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {formData.pricingMode === "range" && (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-xs">
-                            {isFr ? "Prix min (CFA)" : "Min Price (CFA)"}
-                          </Label>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={formData.minPrice}
-                            onChange={e =>
-                              setFormData(prev => ({ ...prev, minPrice: parseInt(e.target.value) || 0 }))
-                            }
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">
-                            {isFr ? "Prix max (CFA)" : "Max Price (CFA)"}
-                          </Label>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={formData.maxPrice}
-                            onChange={e =>
-                              setFormData(prev => ({ ...prev, maxPrice: parseInt(e.target.value) || 0 }))
-                            }
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setFormData(prev => ({ ...prev, pricingRules: { ...DEFAULT_PRICING_RULES } }))
-                      }
-                    >
-                      <RotateCcw className="h-3 w-3 mr-1" />
-                      {isFr ? "Réinitialiser" : "Reset to Defaults"}
-                    </Button>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+            {/* "Règles de tarification" removed — the mode & range live on the
+                category (price_min / price_max / is_quote_based), not per service. */}
           </div>
 
           <DialogFooter>

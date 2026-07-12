@@ -63,13 +63,15 @@ import {
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useAdminStore, type AdminBooking, type StatusHistoryEntry } from "@/data/adminStore";
-import { useAdminBookings, useAdminProviders, type ApiBooking, type ApiProvider } from "@/hooks/useAdminApi";
+import { useAdminBookings, useAdminProviders, useAdminServices, type ApiBooking, type ApiProvider } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
 import { formatMoney } from "@/lib/currency";
-import { 
-  getPricingSuggestion, 
+import {
+  getPricingSuggestion,
+  normalizeZone,
+  DEFAULT_PRICING_RULES,
   ZONES_LIST,
   URGENCY_OPTIONS,
   TIME_PREFERENCE_OPTIONS,
@@ -354,7 +356,9 @@ export default function AdminBookings() {
   const { toast } = useToast();
   const { bookings: apiBookings, loading: bookingsLoading } = useAdminBookings();
   const { providers: liveProviders } = useAdminProviders();
-  const { reviews, services } = useAdminStore();
+  const { reviews } = useAdminStore();
+  // Real services from the API — replaces the mock store as the engine's source.
+  const { services: apiServices } = useAdminServices();
 
   const mapApiBooking = (b: ApiBooking): AdminBooking => ({
     id: String(b.id),
@@ -364,6 +368,7 @@ export default function AdminBookings() {
     providerName: b.provider_name || "En attente",
     providerPhone: b.provider_phone || undefined,
     providerId: "",
+    serviceId: b.service_id ?? null,
     serviceName: b.service_name,
     serviceCategory: b.service_slug,
     date: b.appointment_date,
@@ -382,6 +387,9 @@ export default function AdminBookings() {
     paymentStatus: (b.payment_status as AdminBooking["paymentStatus"]) || "unpaid",
     payoutStatus: (b.payout_status as AdminBooking["payoutStatus"]) || "not_due",
     address: b.client_location || "",
+    // Zone slug derived from the commune in client_location (fixes the quote
+    // engine always falling back to the default zone multiplier).
+    zone: normalizeZone((b.client_location || "").split(",")[0]) || undefined,
     notes: b.notes || "",
     createdAt: b.created_at || "",
   });
@@ -787,25 +795,48 @@ export default function AdminBookings() {
     }
   };
 
+  // Suggest a quote from REAL data:
+  //   basePrice = service.base_price || category_price_min || 0  (else no suggestion)
+  //   maxCap    = category_price_max  (skipped when the category is quote-based)
+  // The engine only SUGGESTS — the admin can always override the value.
+  const computeSuggestion = (
+    booking: AdminBooking,
+    zone: string | undefined,
+    urgency: UrgencyLevel,
+    timePreference: TimePreference,
+  ): PricingSuggestion | null => {
+    // Match by service_id first (robust), then name, then category label.
+    const svc =
+      (booking.serviceId != null && apiServices.find(s => s.id === booking.serviceId)) ||
+      apiServices.find(s => s.name?.toLowerCase() === (booking.serviceName || "").toLowerCase()) ||
+      apiServices.find(s => (s.category || "").toLowerCase() === (booking.serviceCategory || "").toLowerCase());
+    if (!svc) return null;
+
+    const basePrice = svc.base_price || svc.category_price_min || 0;
+    if (!basePrice) return null; // both null → no suggestion, field stays empty
+
+    const rules = { ...DEFAULT_PRICING_RULES };
+    if (!svc.category_is_quote_based && svc.category_price_max != null) {
+      rules.maxCap = svc.category_price_max; // anti-dispute cap; quote-based promises nothing
+    }
+    return getPricingSuggestion({ basePrice, pricingRules: rules }, { zone, urgency, timePreference });
+  };
+
   const openQuoteModal = () => {
     if (selectedBooking) {
       setQuoteZone(selectedBooking.zone || "");
       setQuoteUrgency(selectedBooking.urgency || "normal");
       setQuoteTimePreference(selectedBooking.timePreference || "anytime");
-      setQuotePrice("");
       setQuoteNote("");
-      
-      const service = services.find(s => s.name === selectedBooking.serviceName);
-      if (service) {
-        const suggestion = getPricingSuggestion(
-          { basePrice: service.basePrice, pricingRules: service.pricingRules },
-          { zone: selectedBooking.zone, urgency: selectedBooking.urgency, timePreference: selectedBooking.timePreference }
-        );
-        setPricingSuggestion(suggestion);
-        setQuotePrice(suggestion.suggestedQuote.toString());
-      } else {
-        setPricingSuggestion(null);
-      }
+
+      const suggestion = computeSuggestion(
+        selectedBooking,
+        selectedBooking.zone,
+        selectedBooking.urgency || "normal",
+        selectedBooking.timePreference || "anytime",
+      );
+      setPricingSuggestion(suggestion);
+      setQuotePrice(suggestion ? suggestion.suggestedQuote.toString() : "");
     }
     setQuoteModalOpen(true);
   };
@@ -876,14 +907,10 @@ export default function AdminBookings() {
     if (field === 'zone') setQuoteZone(value);
     if (field === 'urgency') setQuoteUrgency(value as UrgencyLevel);
     if (field === 'timePreference') setQuoteTimePreference(value as TimePreference);
-    
+
     if (selectedBooking) {
-      const service = services.find(s => s.name === selectedBooking.serviceName);
-      if (service) {
-        const suggestion = getPricingSuggestion(
-          { basePrice: service.basePrice, pricingRules: service.pricingRules },
-          { zone: newZone, urgency: newUrgency, timePreference: newTimePreference }
-        );
+      const suggestion = computeSuggestion(selectedBooking, newZone, newUrgency, newTimePreference);
+      if (suggestion) {
         setPricingSuggestion(suggestion);
         setQuotePrice(suggestion.suggestedQuote.toString());
       }

@@ -329,6 +329,18 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
             <CalendarCheck className="h-4 w-4 text-[#0F3A7A] shrink-0" />
             <span className="font-mono font-semibold text-[#0F3A7A] text-sm tracking-wide">{ref}</span>
           </div>
+
+          {/* Next-step note — sets expectation on the WhatsApp quote */}
+          <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-[#0F3A7A]/5 border border-[#0F3A7A]/15 px-4 py-3 text-left">
+            <MessageCircle className="h-4 w-4 text-[#0F3A7A] shrink-0 mt-0.5" />
+            <p className="text-xs text-gray-600 leading-relaxed">
+              <span className="font-semibold text-[#0F3A7A]">{isFr ? "Prochaine étape : " : "Next step: "}</span>
+              {isFr
+                ? "notre équipe vous envoie un devis précis sur WhatsApp sous 2h (8h–20h). Vous confirmez, et nous assignons un prestataire vérifié."
+                : "our team sends you an accurate quote on WhatsApp within 2h (8am–8pm). You confirm, and we assign a verified provider."}
+            </p>
+          </div>
+
           <div className="flex flex-col gap-3 mt-6">
             <a href={`/${locale}/bookings`}
               className="w-full inline-flex items-center justify-center gap-2 bg-[#0F3A7A] text-white text-sm font-semibold py-3 rounded-xl hover:bg-[#0d3068] transition-colors">
@@ -813,6 +825,20 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
       <div className="rounded-xl bg-[#0F3A7A]/5 border border-[#0F3A7A]/15 px-4 py-3 flex items-center justify-between">
         <span className="text-sm text-[#0F3A7A]/80 font-medium">{isFr ? "Fourchette indicative" : "Indicative range"}</span>
         <span className="text-sm font-bold text-[#0F3A7A]">{priceRange}</span>
+      </div>
+
+      {/* Price-expectation note — adapted to the category pricing mode */}
+      <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
+        <MessageCircle className="h-4 w-4 text-[#0F3A7A] shrink-0 mt-0.5" />
+        <p className="text-xs text-gray-600 leading-relaxed">
+          {pricing?.is_quote_based
+            ? (isFr
+                ? "Ce service nécessite une évaluation. Nous vous envoyons un devis précis sur WhatsApp sous 2h (8h–20h). Aucun engagement avant votre accord."
+                : "This service requires an assessment. We'll send you an accurate quote on WhatsApp within 2h (8am–8pm). No commitment until you approve it.")
+            : (isFr
+                ? "Le prix final dépend de votre commune, de l'urgence et de l'ampleur du travail. Un devis précis vous sera envoyé sur WhatsApp avant toute intervention. Vous ne payez rien avant de l'avoir accepté."
+                : "The final price depends on your district, urgency and the scope of the work. An accurate quote will be sent to you on WhatsApp before any work begins. You pay nothing until you've accepted it.")}
+        </p>
       </div>
 
       <div className="flex items-center gap-2 text-xs text-gray-500">
