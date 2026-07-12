@@ -287,14 +287,25 @@ def get_services():
     cat_name_col = "sc.name_fr" if 'name_fr' in cat_cols else "sc.name"
     svc_name_col = "svc.name_fr" if 'name_fr' in svc_cols else "svc.name"
 
+    # Pricing columns — fall back to NULL/false when not yet migrated.
+    base_price_col = "svc.base_price"   if 'base_price' in svc_cols     else "NULL"
+    cat_pmin_col   = "sc.price_min"     if 'price_min' in cat_cols      else "NULL"
+    cat_pmax_col   = "sc.price_max"     if 'price_max' in cat_cols      else "NULL"
+    cat_quote_col  = "sc.is_quote_based" if 'is_quote_based' in cat_cols else "false"
+
     rows = db.session.execute(sa_text(f"""
         SELECT svc.id         AS id,
                {svc_name_col} AS name,
                svc.name       AS name_fallback,
                COALESCE({cat_name_col}, sc.name) AS category,
+               sc.id          AS category_id,
                svc.is_active  AS active,
                svc.is_priority AS is_priority,
-               svc.featured   AS featured
+               svc.featured   AS featured,
+               {base_price_col} AS base_price,
+               {cat_pmin_col}   AS category_price_min,
+               {cat_pmax_col}   AS category_price_max,
+               {cat_quote_col}  AS category_is_quote_based
         FROM services svc
         LEFT JOIN service_subcategories ss ON ss.id = svc.subcategory_id
         LEFT JOIN service_categories sc   ON sc.id = ss.category_id
@@ -306,9 +317,15 @@ def get_services():
             'id': r['id'],
             'name': r['name'] or r['name_fallback'],
             'category': r['category'] or '',
+            'category_id': r['category_id'],
             'active': r['active'],
             'is_priority': r['is_priority'],
             'featured': r['featured'],
+            # Pricing (display/engine inputs — never constrains amount_xof)
+            'base_price': r['base_price'],
+            'category_price_min': r['category_price_min'],
+            'category_price_max': r['category_price_max'],
+            'category_is_quote_based': bool(r['category_is_quote_based']),
         }
         for r in rows
     ]
