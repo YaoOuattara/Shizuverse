@@ -204,6 +204,31 @@ def create_app():
         except Exception as e:
             return {"error": str(e)}, 500
 
+    @app.route("/internal/anomalies/run", methods=["POST"])
+    def internal_anomalies_run():
+        """Cron-triggered anomaly check. Protected by a shared secret header
+        (X-CRON-SECRET == env CRON_SECRET), NOT the admin JWT — an external
+        pinger can't hold a short-lived token.
+
+        Root-level route with no lazy warm-up: hitting it wakes a sleeping
+        Render dyno and runs the full detect → alert → persist cycle.
+        """
+        import hmac
+        import os as _os
+        from flask import request as _request, jsonify as _jsonify
+
+        secret = _os.environ.get("CRON_SECRET", "")
+        provided = _request.headers.get("X-CRON-SECRET", "")
+        if not secret or not hmac.compare_digest(provided, secret):
+            return _jsonify({"error": "unauthorized"}), 401
+
+        from shizuverse.utils.anomaly_detector import run_anomaly_check
+        result = run_anomaly_check()
+        return _jsonify({
+            "detected": result.get("detected", 0),
+            "alert_sent": result.get("alert_sent", False),
+        })
+
     return app, socketio
 
 
