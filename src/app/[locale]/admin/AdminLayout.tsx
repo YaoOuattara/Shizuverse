@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useParams } from "next/navigation";
 import { isAdminAuthenticated, clearAdminToken } from "@/lib/adminAuth";
 import { Button } from "@/components/ui/button";
+import TokenRefresher from "@/components/TokenRefresher";
 
 import {
   Sheet,
@@ -147,6 +148,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
 
   return (
     <div className="flex flex-col lg:flex-row min-h-[100dvh]">
+      <TokenRefresher kind="admin" />
       {/* Mobile header with drawer trigger */}
       <div className="lg:hidden flex items-center justify-between p-3 border-b bg-background sticky top-0 z-40">
         <div className="flex items-center gap-2">
