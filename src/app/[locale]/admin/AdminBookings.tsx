@@ -974,7 +974,7 @@ export default function AdminBookings() {
 
     setIsUpdating(true);
     try {
-      await adminApi.portalSetBookingQuote(selectedBooking.id, Number(quotePrice));
+      await adminApi.portalSetBookingQuote(selectedBooking.id, Number(quotePrice), quoteNote);
       setSelectedBooking(prev => prev ? {
         ...prev,
         zone: quoteZone,
