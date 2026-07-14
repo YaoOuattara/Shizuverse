@@ -273,17 +273,10 @@ def notify_payment_instructions(
     *, client_name: str, client_phone: str,
     booking_ref: str, amount: int,
     service_name: str = None, payment_tier: str = None, note: str = None,
+    quote_token: str = None,
 ) -> bool:
-    """Sent when admin sets a quote and requests payment from the client."""
+    """Sent when admin sets a quote. Includes a magic link to accept/decline."""
     amt_fmt = f"{amount:,}".replace(",", " ")
-    wave   = os.environ.get("SHIZU_WAVE_NUMBER", "").strip()
-    orange = os.environ.get("SHIZU_ORANGE_NUMBER", "").strip()
-    mtn    = os.environ.get("SHIZU_MTN_NUMBER", "").strip()
-    methods = []
-    if wave:   methods.append(f"Wave: {wave}")
-    if orange: methods.append(f"Orange Money: {orange}")
-    if mtn:    methods.append(f"MTN MoMo: {mtn}")
-    methods_str = " | ".join(methods) if methods else "contactez Shizu"
 
     svc_part = f" ({service_name})" if service_name else ""
     parts = [
@@ -295,7 +288,22 @@ def notify_payment_instructions(
         parts.append(tier_label)
     if note and note.strip():
         parts.append(note.strip())
-    parts.append(f"Réglez via Mobile Money ({methods_str}) puis envoyez la capture à Shizu. Merci !")
+
+    # Magic link — base URL from env only (never hardcoded); no link if unset.
+    base = os.environ.get("FRONTEND_URL", "").rstrip("/")
+    if quote_token and base:
+        parts.append(f"Accepter ou refuser : {base}/fr/devis/{quote_token}")
+    else:
+        wave   = os.environ.get("SHIZU_WAVE_NUMBER", "").strip()
+        orange = os.environ.get("SHIZU_ORANGE_NUMBER", "").strip()
+        mtn    = os.environ.get("SHIZU_MTN_NUMBER", "").strip()
+        methods = [m for m in (
+            f"Wave: {wave}" if wave else "",
+            f"Orange Money: {orange}" if orange else "",
+            f"MTN MoMo: {mtn}" if mtn else "",
+        ) if m]
+        methods_str = " | ".join(methods) if methods else "contactez Shizu"
+        parts.append(f"Réglez via Mobile Money ({methods_str}) puis envoyez la capture à Shizu. Merci !")
     return send_whatsapp(client_phone, " ".join(parts))
 
 

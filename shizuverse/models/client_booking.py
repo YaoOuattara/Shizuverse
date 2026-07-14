@@ -38,6 +38,9 @@ class ClientBooking(db.Model):
     decline_reason = db.Column(db.Text, nullable=True)
     cancellation_reason = db.Column(db.Text, nullable=True)
     quote_note = db.Column(db.Text, nullable=True)   # note sent to client with the quote
+    # Magic-link quote acceptance (anonymous clients, no account required)
+    quote_token            = db.Column(db.String(64), unique=True, nullable=True, index=True)
+    quote_token_expires_at = db.Column(db.DateTime, nullable=True)
     created_at       = db.Column(db.DateTime, default=datetime.utcnow)
 
     # ── Payment rules engine ──────────────────────────────────

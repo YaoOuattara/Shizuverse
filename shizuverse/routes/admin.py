@@ -446,10 +446,17 @@ def set_booking_quote(booking_id):
     b.deposit_amount = deposit
     b.cancellation_policy = policy
     b.quote_note = note
+
+    # Fresh single-use magic-link token (7 days). Regenerating on every quote
+    # invalidates any previous link (e.g. after a dispute unlock + re-quote).
+    import secrets
+    from datetime import timedelta as _td
+    b.quote_token = secrets.token_urlsafe(32)
+    b.quote_token_expires_at = _dt.utcnow() + _td(days=7)
     # Do NOT touch amount_locked here: a quote never unlocks a locked amount.
     db.session.commit()
 
-    # WhatsApp: send the quote to the client (service + amount + tier + note).
+    # WhatsApp: send the quote to the client (service + amount + tier + note + link).
     try:
         from shizuverse.utils.notifications import notify_payment_instructions
         notify_payment_instructions(
@@ -460,6 +467,7 @@ def set_booking_quote(booking_id):
             service_name=b.service_name,
             payment_tier=tier,
             note=note,
+            quote_token=b.quote_token,
         )
     except Exception as e:
         current_app.logger.error(f"[set_booking_quote] notification error: {e}", exc_info=True)
