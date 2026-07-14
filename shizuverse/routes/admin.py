@@ -426,6 +426,8 @@ def set_booking_quote(booking_id):
     if amount is None or not isinstance(amount, (int, float)) or int(amount) <= 0:
         return jsonify({'error': 'amount_xof must be a positive number'}), 400
 
+    note = (data.get('note') or '').strip() or None
+
     from shizuverse.utils.payment_rules import get_payment_tier, get_deposit_amount, get_cancellation_policy
     from shizuverse.models.client_booking import ClientBooking as CB
     prior = CB.query.filter_by(client_phone=b.client_phone).count()
@@ -443,8 +445,24 @@ def set_booking_quote(booking_id):
     b.payment_tier = tier
     b.deposit_amount = deposit
     b.cancellation_policy = policy
+    b.quote_note = note
     # Do NOT touch amount_locked here: a quote never unlocks a locked amount.
     db.session.commit()
+
+    # WhatsApp: send the quote to the client (service + amount + tier + note).
+    try:
+        from shizuverse.utils.notifications import notify_payment_instructions
+        notify_payment_instructions(
+            client_name=b.client_name,
+            client_phone=b.client_phone,
+            booking_ref=str(b.id),
+            amount=amt,
+            service_name=b.service_name,
+            payment_tier=tier,
+            note=note,
+        )
+    except Exception as e:
+        current_app.logger.error(f"[set_booking_quote] notification error: {e}", exc_info=True)
 
     return jsonify({
         'success': True, 'id': b.id,

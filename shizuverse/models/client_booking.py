@@ -37,6 +37,7 @@ class ClientBooking(db.Model):
     provider_payout = db.Column(db.Integer, nullable=True)
     decline_reason = db.Column(db.Text, nullable=True)
     cancellation_reason = db.Column(db.Text, nullable=True)
+    quote_note = db.Column(db.Text, nullable=True)   # note sent to client with the quote
     created_at       = db.Column(db.DateTime, default=datetime.utcnow)
 
     # ── Payment rules engine ──────────────────────────────────
@@ -89,6 +90,7 @@ class ClientBooking(db.Model):
             "provider_payout":      self.provider_payout,
             "decline_reason":       self.decline_reason,
             "cancellation_reason":  self.cancellation_reason,
+            "quote_note":           self.quote_note,
             # Payment rules
             "payment_tier":         self.payment_tier,
             "deposit_amount":       self.deposit_amount,

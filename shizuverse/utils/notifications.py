@@ -183,6 +183,24 @@ def notify_provider_assigned(
     return send_whatsapp(client_phone, msg)
 
 
+def notify_provider_new_mission(
+    *, provider_phone: str, service_name: str,
+    date: str, commune: str,
+    time_slot: str = None, provider_payout: int = None,
+) -> bool:
+    """Sent TO THE PROVIDER when a mission is assigned to them.
+    Includes their payout (85% of the quote) when the amount is known."""
+    when = date + (f" ({time_slot})" if time_slot else "")
+    parts = [
+        f"🧰 Nouvelle mission Shizu : {service_name} le {when} à {commune}."
+    ]
+    if provider_payout:
+        payout_fmt = f"{provider_payout:,}".replace(",", " ")
+        parts.append(f"Votre rémunération : {payout_fmt} FCFA.")
+    parts.append("Confirmez votre disponibilité auprès de Shizu.")
+    return send_whatsapp(provider_phone, " ".join(parts))
+
+
 def notify_provider_started(
     *, client_name: str, client_phone: str, provider_name: str,
 ) -> bool:
@@ -242,9 +260,19 @@ def notify_registration_submitted(*, provider_name: str, provider_phone: str) ->
     return send_whatsapp(provider_phone, msg)
 
 
+# Human-readable FR labels for the payment tiers (payment_rules engine values).
+_TIER_LABELS = {
+    "after_service": "Paiement à la fin de la prestation.",
+    "deposit_30":    "Acompte de 30% à la confirmation, solde à la fin.",
+    "deposit_40":    "Acompte de 40% à la confirmation, solde à la fin.",
+    "full_prepay":   "Paiement intégral avant le début de la prestation.",
+}
+
+
 def notify_payment_instructions(
     *, client_name: str, client_phone: str,
     booking_ref: str, amount: int,
+    service_name: str = None, payment_tier: str = None, note: str = None,
 ) -> bool:
     """Sent when admin sets a quote and requests payment from the client."""
     amt_fmt = f"{amount:,}".replace(",", " ")
@@ -256,12 +284,19 @@ def notify_payment_instructions(
     if orange: methods.append(f"Orange Money: {orange}")
     if mtn:    methods.append(f"MTN MoMo: {mtn}")
     methods_str = " | ".join(methods) if methods else "contactez Shizu"
-    msg = (
-        f"💳 {client_name}, votre devis pour la réservation #{booking_ref} est de {amt_fmt} FCFA. "
-        f"Réglez via Mobile Money ({methods_str}) puis envoyez la capture à Shizu. "
-        f"Merci !"
-    )
-    return send_whatsapp(client_phone, msg)
+
+    svc_part = f" ({service_name})" if service_name else ""
+    parts = [
+        f"💳 {client_name}, votre devis Shizu pour la réservation #{booking_ref}{svc_part} "
+        f"est de {amt_fmt} FCFA."
+    ]
+    tier_label = _TIER_LABELS.get(payment_tier)
+    if tier_label:
+        parts.append(tier_label)
+    if note and note.strip():
+        parts.append(note.strip())
+    parts.append(f"Réglez via Mobile Money ({methods_str}) puis envoyez la capture à Shizu. Merci !")
+    return send_whatsapp(client_phone, " ".join(parts))
 
 
 def notify_payment_confirmed(

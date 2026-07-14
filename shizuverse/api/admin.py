@@ -200,6 +200,25 @@ def assign_booking(booking_id):
     except Exception as e:
         current_app.logger.error(f"[assign_booking] Unexpected error: {e}", exc_info=True)
 
+    # WhatsApp: tell the PROVIDER about their new mission + their payout (85%).
+    try:
+        if provider_phone:
+            from shizuverse.utils.notifications import notify_provider_new_mission
+            apt = booking.appointment_date
+            commune = (booking.client_location or '').split(',')[0].strip()
+            # Reuse the existing payout formula (85% of the locked amount).
+            payout = round(booking.amount_xof * 0.85) if booking.amount_xof else None
+            notify_provider_new_mission(
+                provider_phone=provider_phone,
+                service_name=booking.service_name,
+                date=apt.strftime('%d/%m/%Y') if apt else '',
+                commune=commune,
+                time_slot=booking.time_slot or booking.time_preference or None,
+                provider_payout=payout,
+            )
+    except Exception as e:
+        current_app.logger.error(f"[assign_booking] provider notification error: {e}", exc_info=True)
+
     return jsonify({
         'id': booking.id,
         'status': booking.status,
