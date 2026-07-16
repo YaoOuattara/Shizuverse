@@ -420,7 +420,7 @@ def set_booking_quote(booking_id):
     """Store a quoted price on the booking. Recomputes payment tier and deposit amount."""
     b = ClientBooking.query.get_or_404(booking_id)
     if b.amount_locked:
-        return jsonify({'error': "Montant déjà verrouillé. Déverrouillage explicite requis (litige)."}), 409
+        return jsonify({'error': "Devis déjà accepté et verrouillé — déverrouillage litige requis."}), 409
     data = request.get_json() or {}
     amount = data.get('amount_xof')
     if amount is None or not isinstance(amount, (int, float)) or int(amount) <= 0:
@@ -796,7 +796,7 @@ def lock_booking_amount(booking_id):
         from_status=b.status,
         to_status=b.status,
         actor_id=None,
-        note=f'Montant verrouillé: {amt} XOF',
+        note='Verrouillé manuellement — acceptation hors app confirmée par l\'admin',
     )
     db.session.add(event)
     db.session.commit()

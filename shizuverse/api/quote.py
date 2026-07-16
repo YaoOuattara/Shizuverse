@@ -69,8 +69,20 @@ def accept_quote(token):
         from_status=prev, to_status="accepted",
         actor_id=None, note="Devis accepté par le client",
     ))
+
+    # Lock the amount AT acceptance — from here it is immutable (dispute unlock
+    # only). Guarded so a prior manual lock isn't duplicated/overwritten.
+    if not b.amount_locked:
+        b.amount_locked = True
+        b.amount_locked_at = datetime.utcnow()
+        db.session.add(BookingEvent(
+            booking_id=b.id, event_type="amount_locked",
+            from_status="accepted", to_status="accepted",
+            actor_id=None, note="Verrouillé à l'acceptation du devis par le client",
+        ))
+
     db.session.commit()
-    return jsonify({"success": True, "status": "accepted"})
+    return jsonify({"success": True, "status": "accepted", "amount_locked": b.amount_locked})
 
 
 @quote_bp.route("/<token>/decline", methods=["POST"])
