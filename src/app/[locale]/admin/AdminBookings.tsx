@@ -1309,14 +1309,15 @@ export default function AdminBookings() {
                       </div>
                     )}
 
-                    {/* Amount lock — show input if not yet locked */}
+                    {/* Amount lock — FALLBACK only: acceptance via the WhatsApp
+                        magic link auto-locks. This manual path is for off-app
+                        confirmation. Kept visually discreet (not the main step). */}
                     {!isLocked && !isClosed && (
-                      <div className="bg-amber-50 border border-amber-200 rounded-md p-3 space-y-2">
-                        <p className="text-xs text-amber-700 flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
+                      <div className="border border-gray-200 rounded-md p-3 space-y-2">
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
                           {isFr
-                            ? "Le montant doit être confirmé avant d'assigner un prestataire"
-                            : "Amount must be confirmed before assigning a provider"}
+                            ? "L'acceptation via le lien WhatsApp verrouille le montant automatiquement. N'utilisez ceci que si le client a confirmé par un autre canal (appel, WhatsApp direct)."
+                            : "Acceptance via the WhatsApp link auto-locks the amount. Use this only if the client confirmed through another channel (call, direct WhatsApp)."}
                         </p>
                         <div className="flex gap-2">
                           <Input
@@ -1326,12 +1327,12 @@ export default function AdminBookings() {
                             onChange={e => setLockAmountInput(e.target.value)}
                             className="flex-1 h-8 text-sm"
                           />
-                          <Button size="sm" onClick={handleLockAmount}
+                          <Button size="sm" variant="outline" onClick={handleLockAmount}
                             disabled={!lockAmountInput || Number(lockAmountInput) <= 0 || lockAmountSaving}>
                             {lockAmountSaving
                               ? <Loader2 className="h-3 w-3 animate-spin" />
                               : <Lock className="h-3 w-3" />}
-                            {isFr ? "Verrouiller" : "Lock"}
+                            {isFr ? "Confirmer l'acceptation (hors app)" : "Confirm acceptance (off-app)"}
                           </Button>
                         </div>
                       </div>
