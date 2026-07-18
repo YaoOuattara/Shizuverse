@@ -274,6 +274,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           client_phone:     phone.trim(),
           client_location:  location,
           appointment_date: appointmentIso,
+          locale,   // capture the client's active UI language for all downstream messaging
           notes:            [providerNote, notes.trim()].filter(Boolean).join('\n') || undefined,
           service_name:     serviceName ?? "",
           urgency,

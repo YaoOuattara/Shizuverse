@@ -19,6 +19,7 @@ export interface ApiBooking {
   service_name: string;
   service_slug: string;
   appointment_date: string;
+  locale?: string;
   status: string;
   notes: string | null;
   provider_name: string | null;

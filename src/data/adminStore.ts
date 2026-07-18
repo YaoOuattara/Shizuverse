@@ -86,6 +86,7 @@ export interface AdminBooking {
   serviceId?: number | null;
   serviceName: string;
   serviceCategory: string;
+  locale?: string;   // client's booking-time language ('fr' | 'en') — drives client-facing copy
   date: string;
   time: string;
   duration: string;

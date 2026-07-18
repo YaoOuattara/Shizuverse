@@ -374,6 +374,7 @@ export default function AdminBookings() {
     serviceId: b.service_id ?? null,
     serviceName: b.service_name,
     serviceCategory: b.service_slug,
+    locale: b.locale === "en" ? "en" : "fr",   // graceful fallback to fr
     date: b.appointment_date,
     time: (() => {
       // Translate the slot to the active language (was forcing .fr, and the
@@ -539,7 +540,7 @@ export default function AdminBookings() {
       });
     } catch (err) {
       console.error("Failed to update booking status:", err);
-      toast({ title: "Erreur", description: "Impossible de mettre à jour le statut.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de mettre à jour le statut." : "Couldn't update the status.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -563,7 +564,7 @@ export default function AdminBookings() {
       toast({ title: isFr ? "Statut mis à jour" : "Status Updated", description: `→ ${statusLabels[newStatus] || newStatus}` });
     } catch (err) {
       console.error("handleStatusChange error:", err);
-      toast({ title: "Erreur", description: "Impossible de mettre à jour le statut.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de mettre à jour le statut." : "Couldn't update the status.", variant: "destructive" });
     }
   };
 
@@ -587,7 +588,7 @@ export default function AdminBookings() {
     } catch (err) {
       updateLocalBooking(selectedBooking.id, { status: prevStatus });
       console.error("Failed to cancel booking:", err);
-      toast({ title: "Erreur", description: "Impossible d'annuler la réservation.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'annuler la réservation." : "Couldn't cancel the booking.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -640,7 +641,7 @@ export default function AdminBookings() {
     } catch (err) {
       updateLocalBooking(selectedBooking.id, { status: prevStatus, providerName: prevProviderName });
       console.error("Failed to assign provider:", err);
-      toast({ title: "Erreur", description: "Impossible d'assigner le prestataire.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'assigner le prestataire." : "Couldn't assign the provider.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -668,7 +669,7 @@ export default function AdminBookings() {
     } catch (err) {
       updateLocalBooking(selectedBooking.id, { status: prevStatus, providerName: prevProviderName });
       console.error("Failed to assign provider:", err);
-      toast({ title: "Erreur", description: "Impossible d'assigner le prestataire.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'assigner le prestataire." : "Couldn't assign the provider.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -718,7 +719,7 @@ export default function AdminBookings() {
     } catch (err) {
       updateLocalBooking(selectedBooking.id, { status: prevStatus, payoutStatus: prevPayoutStatus });
       console.error("Failed to complete booking:", err);
-      toast({ title: "Erreur", description: "Impossible de terminer la réservation.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de terminer la réservation." : "Couldn't complete the booking.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -768,7 +769,7 @@ export default function AdminBookings() {
     } catch (err) {
       updateLocalBooking(selectedBooking.id, { paymentStatus: prevPaymentStatus });
       console.error("Failed to record payment:", err);
-      toast({ title: "Erreur", description: "Impossible d'enregistrer le paiement.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'enregistrer le paiement." : "Couldn't record the payment.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -864,7 +865,7 @@ export default function AdminBookings() {
       setLockAmountInput("");
       toast({ title: isFr ? "Montant verrouillé" : "Amount Locked", description: `${Number(lockAmountInput).toLocaleString('fr-FR')} FCFA confirmé.` });
     } catch {
-      toast({ title: "Erreur", description: "Impossible de verrouiller le montant.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de verrouiller le montant." : "Couldn't lock the amount.", variant: "destructive" });
     } finally {
       setLockAmountSaving(false);
     }
@@ -881,7 +882,7 @@ export default function AdminBookings() {
       setDisputeReason("");
       toast({ title: isFr ? "Litige ouvert" : "Dispute Opened", variant: "destructive" });
     } catch {
-      toast({ title: "Erreur", description: "Impossible d'ouvrir le litige.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'ouvrir le litige." : "Couldn't open the dispute.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -895,7 +896,7 @@ export default function AdminBookings() {
       setDisputeFlagOverrides(prev => ({ ...prev, [selectedBooking.id]: false }));
       toast({ title: isFr ? "Litige résolu" : "Dispute Resolved" });
     } catch {
-      toast({ title: "Erreur", description: "Impossible de résoudre le litige.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de résoudre le litige." : "Couldn't resolve the dispute.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -908,7 +909,7 @@ export default function AdminBookings() {
       setPaymentInstructionsOpen(false);
       toast({ title: isFr ? "Instructions envoyées" : "Instructions Sent" });
     } catch {
-      toast({ title: "Erreur", description: "Impossible d'envoyer les instructions.", variant: "destructive" });
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'envoyer les instructions." : "Couldn't send the instructions.", variant: "destructive" });
     }
   };
 
@@ -951,6 +952,8 @@ export default function AdminBookings() {
           urgency: quoteUrgency,
           timePreference: quoteTimePreference,
           description: selectedBooking.notes || "",
+          // Client-facing note → generated in the CLIENT's language, not the admin's.
+          locale: selectedBooking.locale === "en" ? "en" : "fr",
         }),
       });
       const data = await res.json();
