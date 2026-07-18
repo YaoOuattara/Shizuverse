@@ -16,7 +16,18 @@ from shizuverse.limiter import limiter
 quote_bp = Blueprint("quote", __name__)
 
 DECLINE_REASONS = {"trop_cher", "plus_disponible", "trouve_ailleurs", "autre"}
-FINAL_STATES = ("accepted", "declined")
+
+
+def _is_decided(b) -> bool:
+    """A quote is single-use. Acceptance locks the amount (and moves the
+    booking to under_review for assignment), so 'accepted' can't be keyed on
+    status anymore — we key on amount_locked. Decline sets status='declined'."""
+    return b.status == "declined" or bool(b.amount_locked)
+
+
+def _decision(b) -> str:
+    """Which terminal decision was taken (for the client 'already handled' UI)."""
+    return "declined" if b.status == "declined" else "accepted"
 
 
 def _resolve(token: str):
@@ -36,8 +47,8 @@ def get_quote(token):
     b, err = _resolve(token)
     if err:
         return err
-    if b.status in FINAL_STATES:
-        return jsonify({"error": "already_decided", "status": b.status}), 409
+    if _is_decided(b):
+        return jsonify({"error": "already_decided", "decision": _decision(b)}), 409
 
     apt = b.appointment_date
     return jsonify({
@@ -59,14 +70,16 @@ def accept_quote(token):
     b, err = _resolve(token)
     if err:
         return err
-    if b.status in FINAL_STATES:
-        return jsonify({"error": "already_decided", "status": b.status}), 409
+    if _is_decided(b):
+        return jsonify({"error": "already_decided", "decision": _decision(b)}), 409
 
     prev = b.status
-    b.status = "accepted"   # existing VALID_STATUSES value
+    # Move to under_review (not 'accepted'): this is the status the admin UI can
+    # act on — its assign block is gated on amount_locked, satisfied just below.
+    b.status = "under_review"
     db.session.add(BookingEvent(
         booking_id=b.id, event_type="quote_accepted",
-        from_status=prev, to_status="accepted",
+        from_status=prev, to_status="under_review",
         actor_id=None, note="Devis accepté par le client",
     ))
 
@@ -77,12 +90,12 @@ def accept_quote(token):
         b.amount_locked_at = datetime.utcnow()
         db.session.add(BookingEvent(
             booking_id=b.id, event_type="amount_locked",
-            from_status="accepted", to_status="accepted",
+            from_status="under_review", to_status="under_review",
             actor_id=None, note="Verrouillé à l'acceptation du devis par le client",
         ))
 
     db.session.commit()
-    return jsonify({"success": True, "status": "accepted", "amount_locked": b.amount_locked})
+    return jsonify({"success": True, "status": b.status, "amount_locked": b.amount_locked})
 
 
 @quote_bp.route("/<token>/decline", methods=["POST"])
@@ -91,8 +104,8 @@ def decline_quote(token):
     b, err = _resolve(token)
     if err:
         return err
-    if b.status in FINAL_STATES:
-        return jsonify({"error": "already_decided", "status": b.status}), 409
+    if _is_decided(b):
+        return jsonify({"error": "already_decided", "decision": _decision(b)}), 409
 
     data = request.get_json() or {}
     reason = (data.get("reason") or "").strip()
