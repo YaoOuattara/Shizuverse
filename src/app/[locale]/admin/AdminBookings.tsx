@@ -227,6 +227,7 @@ const STATUS_LABELS: Record<string, { fr: string; en: string }> = {
   cancelled:    { fr: 'Annulée',       en: 'Cancelled'    },
   declined:     { fr: 'Refusée',       en: 'Declined'     },
   disputed:     { fr: 'En litige',     en: 'Disputed'     },
+  pending_payment: { fr: 'En attente de paiement', en: 'Pending payment' },
   rescheduled:  { fr: 'Reprogrammée',  en: 'Rescheduled'  },
 };
 
@@ -374,9 +375,12 @@ export default function AdminBookings() {
     serviceName: b.service_name,
     serviceCategory: b.service_slug,
     date: b.appointment_date,
-    time: (b.time_slot && b.time_slot !== "0")
-      ? b.time_slot
-      : (b.time_preference ? (TIME_PREF_LABELS[b.time_preference]?.fr ?? b.time_preference) : ""),
+    time: (() => {
+      // Translate the slot to the active language (was forcing .fr, and the
+      // time_slot branch showed the raw English value like "evening").
+      const raw = (b.time_slot && b.time_slot !== "0") ? b.time_slot : (b.time_preference || "");
+      return raw ? (TIME_PREF_LABELS[raw]?.[isFr ? "fr" : "en"] ?? raw) : "";
+    })(),
     duration: "",
     status: ((b.status === "requested" ? "pending" : b.status) as AdminBooking["status"]) || "pending",
     price: b.amount_xof ?? 0,

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { timeSlotLabel } from "@/lib/timeSlots";
 import {
   Loader2, CheckCircle, XCircle, ShieldCheck, MessageCircle,
   Calendar, MapPin, Sparkles,
@@ -84,7 +85,7 @@ export default function QuotePage() {
         else if (res.status === 410) setErrKind("expired");
         else if (res.status === 409) {
           const b = await res.json().catch(() => ({}));
-          setAlreadyStatus(b?.status ?? null);
+          setAlreadyStatus(b?.decision ?? b?.status ?? null);
           setErrKind("already");
         } else setErrKind("network");
       })
@@ -281,7 +282,7 @@ export default function QuotePage() {
       <div className="mt-4 rounded-xl border border-gray-200 bg-white divide-y divide-gray-100 px-4">
         <div className="flex items-center gap-2 py-2.5 text-sm text-gray-700">
           <Calendar className="h-4 w-4 text-gray-400 shrink-0" />
-          {fmtDate(quote.appointment_date, isFr)}{quote.time_slot ? ` · ${quote.time_slot}` : ""}
+          {fmtDate(quote.appointment_date, isFr)}{quote.time_slot ? ` · ${timeSlotLabel(quote.time_slot, isFr)}` : ""}
         </div>
         {quote.commune && (
           <div className="flex items-center gap-2 py-2.5 text-sm text-gray-700">
