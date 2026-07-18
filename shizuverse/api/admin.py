@@ -196,6 +196,7 @@ def assign_booking(booking_id):
             provider_name=provider_name,
             date=apt.strftime('%d/%m/%Y') if apt else '',
             commune=commune,
+            locale=booking.locale,
         )
     except Exception as e:
         current_app.logger.error(f"[assign_booking] Unexpected error: {e}", exc_info=True)
@@ -258,6 +259,7 @@ def update_booking_status(booking_id):
                 provider_name=booking.provider_name or 'Shizu',
                 date=date_str,
                 time=time_str,
+                locale=booking.locale,
             )
             if booking.provider_phone:
                 notify_booking_confirmed_provider(
@@ -830,6 +832,7 @@ def start_provider_booking(booking_id):
             client_name=booking.client_name,
             client_phone=booking.client_phone,
             provider_name=booking.provider_name or (sp.company_name if sp else 'Le prestataire'),
+            locale=booking.locale,
         )
     except Exception as e:
         current_app.logger.error(f"[start_provider_booking] Unexpected error: {e}", exc_info=True)
@@ -872,6 +875,7 @@ def complete_provider_booking(booking_id):
             client_name=booking.client_name,
             provider_name=booking.provider_name or 'votre prestataire',
             booking_id=booking_id,
+            locale=booking.locale,
         )
     except Exception as e:
         current_app.logger.error(f"[complete_provider_booking] Unexpected error: {e}", exc_info=True)
@@ -909,6 +913,7 @@ def accept_provider_booking(booking_id):
             provider_name=booking.provider_name or 'Shizu',
             date=apt.strftime('%d/%m/%Y') if apt else '',
             time=apt.strftime('%Hh%M') if apt else '',
+            locale=booking.locale,
         )
     except Exception as e:
         current_app.logger.error(f"[accept_provider_booking] Unexpected error: {e}", exc_info=True)

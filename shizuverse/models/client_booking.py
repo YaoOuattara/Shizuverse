@@ -20,6 +20,9 @@ class ClientBooking(db.Model):
     service_slug = db.Column(db.String(80),  nullable=True)   # e.g. "menage"
 
     appointment_date = db.Column(db.DateTime, nullable=False)
+    # Client's UI language at booking time — drives WhatsApp / quote-note language.
+    # 'fr' (default, preserves current behaviour) or 'en'. Never affects the provider.
+    locale           = db.Column(db.String(5), default="fr", server_default="fr", nullable=False)
     urgency          = db.Column(db.String(20), nullable=True)   # urgent_2h | same_day | under_24h | normal
     time_preference  = db.Column(db.String(20), nullable=True)   # morning | afternoon | evening | anytime
     time_slot        = db.Column(db.String(20), nullable=True)   # morning | afternoon | evening
@@ -76,6 +79,7 @@ class ClientBooking(db.Model):
             "service_name":         self.service_name,
             "service_slug":         self.service_slug,
             "appointment_date":     self.appointment_date.isoformat(),
+            "locale":               self.locale,
             "urgency":              self.urgency,
             "time_preference":      self.time_preference,
             "time_slot":            self.time_slot,

@@ -468,6 +468,7 @@ def set_booking_quote(booking_id):
             payment_tier=tier,
             note=note,
             quote_token=b.quote_token,
+            locale=b.locale,
         )
     except Exception as e:
         current_app.logger.error(f"[set_booking_quote] notification error: {e}", exc_info=True)
@@ -517,6 +518,7 @@ def cancel_booking(booking_id):
             client_phone=b.client_phone,
             booking_ref=str(b.id),
             reason=reason or '',
+            locale=b.locale,
         )
         if b.provider_phone:
             apt = b.appointment_date
@@ -870,6 +872,7 @@ def confirm_payment(booking_id):
             provider_name=b.provider_name or 'Shizu',
             date=apt.strftime('%d/%m/%Y') if apt else '',
             time=apt.strftime('%Hh%M') if apt else '',
+            locale=b.locale,
         )
     except Exception as e:
         current_app.logger.error(f"[confirm_payment] Unexpected error: {e}", exc_info=True)

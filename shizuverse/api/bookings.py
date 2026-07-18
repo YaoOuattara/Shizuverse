@@ -104,6 +104,11 @@ def create_booking():
         return jsonify({"error": "appointment_date must be in the future"}), 400
 
     client_phone = data["client_phone"].strip()
+
+    # Client UI language — only 'en' is honoured, everything else degrades to 'fr'
+    # (missing, unknown, or malformed values all fall back to the current behaviour).
+    locale = "en" if str(data.get("locale") or "").strip().lower().startswith("en") else "fr"
+
     anomaly = check_booking_anomaly(client_phone)
     if anomaly["flagged"]:
         print(f"[ANOMALY] {anomaly['reason']} - {client_phone}")
@@ -120,6 +125,7 @@ def create_booking():
         service_name=service_name.strip(),
         service_slug=service_slug.strip(),
         appointment_date=apt_date,
+        locale=locale,
         notes=data.get("notes", "").strip() or None,
         urgency=(data.get("urgency") or "").strip() or None,
         time_preference=(data.get("time_preference") or "").strip() or None,
@@ -138,6 +144,7 @@ def create_booking():
             client_name=booking.client_name,
             client_phone=booking.client_phone,
             booking_ref=str(booking.id),
+            locale=booking.locale,
         )
     except Exception as e:
         current_app.logger.error(f"[create_booking] Unexpected error: {e}", exc_info=True)
