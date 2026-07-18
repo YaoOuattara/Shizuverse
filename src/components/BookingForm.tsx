@@ -25,13 +25,21 @@ const MONTHS_FR = [
   "Janvier","Février","Mars","Avril","Mai","Juin",
   "Juillet","Août","Septembre","Octobre","Novembre","Décembre",
 ];
+const MONTHS_EN = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
+];
+// Monday-first weekday headers (matches buildCalendarCells offset).
 const DAYS_FR = ["Lu","Ma","Me","Je","Ve","Sa","Di"];
+const DAYS_EN = ["Mo","Tu","We","Th","Fr","Sa","Su"];
 
-function formatDateFr(dateStr: string): string {
+// Long, localized selected-date label (e.g. "lundi 20 juillet 2026" /
+// "Monday, July 20, 2026"). Unknown locale → FR.
+function formatDateLong(dateStr: string, isFr: boolean): string {
   const d = new Date(dateStr + "T00:00:00");
-  const days = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
-  const months = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
-  return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  return new Intl.DateTimeFormat(isFr ? "fr-FR" : "en-US", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  }).format(d);
 }
 
 // ── Calendar helpers ──────────────────────────────────────────────────────────
@@ -594,7 +602,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
                 <ChevronLeft className="h-5 w-5 text-gray-600" />
               </button>
               <span className="font-semibold text-gray-900 text-sm">
-                {MONTHS_FR[calMonth]} {calYear}
+                {(isFr ? MONTHS_FR : MONTHS_EN)[calMonth]} {calYear}
               </span>
               <button type="button" onClick={() => setCalDate(new Date(calYear, calMonth + 1, 1))}
                 className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
@@ -603,7 +611,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
             </div>
 
             <div className="grid grid-cols-7 mb-2">
-              {DAYS_FR.map((d) => (
+              {(isFr ? DAYS_FR : DAYS_EN).map((d) => (
                 <div key={d} className="text-center text-xs font-medium text-gray-400 py-1">{d}</div>
               ))}
             </div>
@@ -640,7 +648,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           {date && (
             <p className="text-sm font-medium text-green-700 flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-500" />
-              {isFr ? formatDateFr(date) : date}
+              {formatDateLong(date, isFr)}
             </p>
           )}
         </>
@@ -815,7 +823,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
         {categoryName && <RecapRow label={isFr ? "Catégorie" : "Category"} value={categoryName} />}
         <RecapRow label={isFr ? "Urgence"    : "Urgency"}    value={urgencyLabel} />
         <RecapRow label={isFr ? "Horaire"    : "Time slot"}  value={timeLabel} />
-        <RecapRow label={isFr ? "Date"       : "Date"}       value={isFr ? formatDateFr(effectiveDate) : effectiveDate} />
+        <RecapRow label={isFr ? "Date"       : "Date"}       value={formatDateLong(effectiveDate, isFr)} />
         <RecapRow label={isFr ? "Nom"        : "Name"}       value={name} />
         <RecapRow label={isFr ? "Téléphone"  : "Phone"}      value={phone} />
         <RecapRow label={isFr ? "Commune"    : "District"}   value={commune} />

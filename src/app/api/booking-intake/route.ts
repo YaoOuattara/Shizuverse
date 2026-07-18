@@ -24,20 +24,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ suggested_notes: null, suggested_date_hint: null, suggested_location_hint: null })
     }
 
-    const prompt =
-      locale === 'fr'
-        ? `Service demandé : ${service_name || 'non précisé'}\nDescription du client : "${user_input}"\n\nExtrais les informations et retourne le JSON.`
-        : `Requested service: ${service_name || 'unspecified'}\nClient description: "${user_input}"\n\nExtract the information and return the JSON.`
+    // Graceful degradation: only 'en' switches to English; anything missing
+    // or unknown stays French (current behaviour).
+    const isEn = String(locale || '').trim().toLowerCase().startsWith('en')
+
+    const prompt = isEn
+      ? `Requested service: ${service_name || 'unspecified'}\nClient description: "${user_input}"\n\nExtract the information and return the JSON.`
+      : `Service demandé : ${service_name || 'non précisé'}\nDescription du client : "${user_input}"\n\nExtrais les informations et retourne le JSON.`
+
+    // The system prompt drives the OUTPUT language of the free-text fields the
+    // client sees (suggested_notes, suggested_date_hint). It must match the
+    // active page language — otherwise an EN client gets French notes.
+    const system = isEn
+      ? "You are a booking assistant for Shizu in Abidjan. " +
+        "The user describes their need in natural language. " +
+        "Extract the key information and return ONLY valid JSON with the fields: " +
+        "suggested_notes, suggested_date_hint, suggested_location_hint. " +
+        "IMPORTANT: write suggested_notes and suggested_date_hint IN ENGLISH. " +
+        "suggested_location_hint must contain the mentioned place/neighbourhood as-is. " +
+        "No extra text."
+      : "Tu es un assistant de réservation pour Shizu à Abidjan. " +
+        "L'utilisateur décrit son besoin en langage naturel. " +
+        "Extrais les informations clés et retourne UNIQUEMENT un JSON valide " +
+        "avec les champs: suggested_notes, suggested_date_hint, suggested_location_hint. " +
+        "IMPORTANT : rédige suggested_notes et suggested_date_hint EN FRANÇAIS. " +
+        "suggested_location_hint doit contenir le lieu/quartier mentionné tel quel. " +
+        "Pas de texte supplémentaire."
 
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 300,
-      system:
-        "Tu es un assistant de réservation pour Shizu à Abidjan. " +
-        "L'utilisateur décrit son besoin en langage naturel. " +
-        "Extrais les informations clés et retourne UNIQUEMENT un JSON valide " +
-        "avec les champs: suggested_notes, suggested_date_hint, " +
-        "suggested_location_hint. Pas de texte supplémentaire.",
+      system,
       messages: [{ role: 'user', content: prompt }],
     })
 
