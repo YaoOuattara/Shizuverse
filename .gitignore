@@ -9,3 +9,5 @@ __pycache__/
 # macOS
 .DS_Store
 shizuverse/.DS_Store
+.DS_Store
+instance/
