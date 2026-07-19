@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -59,6 +59,10 @@ interface PhoneInputProps {
   selectClassName?: string;
   inputClassName?: string;
   wrapperClassName?: string;
+  /** Notifies the parent whether the current number is valid (for submit gating). */
+  onValidityChange?: (valid: boolean) => void;
+  /** "fr" | "en" for the inline error message (defaults to fr). */
+  locale?: string;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -73,6 +77,8 @@ export default function PhoneInput({
   selectClassName,
   inputClassName,
   wrapperClassName,
+  onValidityChange,
+  locale = "fr",
 }: PhoneInputProps) {
   const init = parseFullPhone(defaultValue);
   const [code, setCode]       = useState(init.code);
@@ -81,6 +87,22 @@ export default function PhoneInput({
   const [local, setLocal]     = useState(init.local); // formatted display value
 
   const effectiveCode = isOther ? custom : code;
+  const isFr = locale !== "en";
+
+  // Validation: CI (+225) requires exactly 10 national digits. Other codes accept
+  // a generic 6–15 range. An empty field is "invalid" only when required.
+  const localDigits = rawDigits(local);
+  const ciExpected = effectiveCode === "+225";
+  const isValid = localDigits.length === 0
+    ? !required
+    : ciExpected
+      ? localDigits.length === 10
+      : localDigits.length >= 6 && localDigits.length <= 15;
+  const showError = localDigits.length > 0 && ciExpected && localDigits.length !== 10;
+
+  useEffect(() => {
+    onValidityChange?.(isValid);
+  }, [isValid, onValidityChange]);
 
   function emit(c: string, formatted: string) {
     // Always emit without spaces so callers get a clean E.164-ready string
@@ -132,7 +154,8 @@ export default function PhoneInput({
     "rounded-l-xl box-border focus:outline-none focus:ring-2 focus:ring-ring";
 
   return (
-    // w-full + overflow-hidden prevents horizontal overflow on mobile Safari
+    <div className="w-full">
+    {/* w-full + overflow-hidden prevents horizontal overflow on mobile Safari */}
     <div className={cn("flex w-full max-w-full overflow-hidden", wrapperClassName)}>
       {isOther ? (
         /* Custom code input (Autre) — no arrow needed */
@@ -179,8 +202,17 @@ export default function PhoneInput({
         placeholder={placeholder}
         required={required}
         autoFocus={autoFocus}
+        aria-invalid={showError}
         className={cn(baseInput, inputClassName)}
       />
+    </div>
+    {showError && (
+      <p className="mt-1 text-xs text-red-600">
+        {isFr
+          ? "Le numéro ivoirien doit contenir exactement 10 chiffres."
+          : "The Ivorian number must have exactly 10 digits."}
+      </p>
+    )}
     </div>
   );
 }

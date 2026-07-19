@@ -182,6 +182,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   // Step 4
   const [name, setName]       = useState("");
   const [phone, setPhone]     = useState("");
+  const [phoneValid, setPhoneValid] = useState(false);
   const [commune, setCommune] = useState(() => searchParams?.get("commune") ?? "");
   const [address, setAddress] = useState(() => searchParams?.get("address") ?? "");
 
@@ -668,7 +669,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   );
 
   // ── Step 4: Vos informations ──────────────────────────────────────────────
-  const step4CanContinue = name.trim() && phone.trim() && commune.trim();
+  const step4CanContinue = name.trim() && phone.trim() && phoneValid && commune.trim();
 
   const step4 = (
     <div className="space-y-5">
@@ -690,6 +691,8 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
         <PhoneInput
           defaultValue={phone}
           onChange={setPhone}
+          onValidityChange={setPhoneValid}
+          locale={locale}
           placeholder="07 XX XX XX XX"
           required
           selectClassName="rounded-l-md border-gray-300 bg-gray-50 text-gray-500 focus:ring-[#0F3A7A]/30"
