@@ -6,7 +6,7 @@
  * Uses centralized admin store for state management.
  */
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import AdminLayout from "./AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -274,6 +274,8 @@ const EVENT_LABELS: Record<string, { fr: string; en: string }> = {
   dispute_opened:    { fr: "Litige ouvert",                  en: "Dispute opened" },
   dispute_resolved:  { fr: "Litige résolu",                  en: "Dispute resolved" },
   status_changed:    { fr: "Statut modifié par l'admin",     en: "Status changed by admin" },
+  rescheduled:       { fr: "Reprogrammée",                    en: "Rescheduled" },
+  payment_instructions_sent: { fr: "Instructions de paiement envoyées", en: "Payment instructions sent" },
 };
 
 function EventHistory({ events, loading, error, createdAt, isFr }: {
@@ -500,7 +502,8 @@ export default function AdminBookings() {
 
   // Payment instructions modal (consultation only — never mutates the booking)
   const [paymentInstructionsOpen, setPaymentInstructionsOpen] = useState(false);
-  const [adminConfig, setAdminConfig] = useState<{ wave_number?: string; orange_number?: string; mtn_number?: string; whatsapp?: string } | null>(null);
+  const [adminConfig, setAdminConfig] = useState<{ wave_number?: string; orange_number?: string; mtn_number?: string; whatsapp?: string; twilio_enabled?: boolean } | null>(null);
+  const [sendingInstructions, setSendingInstructions] = useState(false);
 
   // Explicit "mark payment received" confirmation (financial action → confirm first)
   const [markPaidConfirmOpen, setMarkPaidConfirmOpen] = useState(false);
@@ -515,6 +518,26 @@ export default function AdminBookings() {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState(false);
 
+  // Reschedule modal state (admin-only date/slot change)
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleSlot, setRescheduleSlot] = useState("");
+  const [rescheduleReason, setRescheduleReason] = useState("");
+  const [rescheduleSaving, setRescheduleSaving] = useState(false);
+
+  // Load the real event history for a booking (reused by the drawer effect and
+  // after mutations that don't change status/id, e.g. a reschedule).
+  const loadBookingEvents = useCallback((bookingId: string | number) => {
+    setEventsLoading(true);
+    setEventsError(false);
+    return adminApi.portalGetBookingDetail(bookingId)
+      .then((data: { events?: BookingEventItem[] }) => {
+        setBookingEvents(Array.isArray(data?.events) ? data.events : []);
+      })
+      .catch(() => { setEventsError(true); })
+      .finally(() => { setEventsLoading(false); });
+  }, []);
+
   // Fetch the real event history whenever a booking drawer opens.
   useEffect(() => {
     if (!selectedBooking?.id) {
@@ -522,18 +545,9 @@ export default function AdminBookings() {
       setEventsError(false);
       return;
     }
-    let cancelled = false;
-    setEventsLoading(true);
-    setEventsError(false);
-    adminApi.portalGetBookingDetail(selectedBooking.id)
-      .then((data: { events?: BookingEventItem[] }) => {
-        if (!cancelled) setBookingEvents(Array.isArray(data?.events) ? data.events : []);
-      })
-      .catch(() => { if (!cancelled) setEventsError(true); })
-      .finally(() => { if (!cancelled) setEventsLoading(false); });
-    return () => { cancelled = true; };
+    loadBookingEvents(selectedBooking.id);
     // Re-fetch when the id changes or after mutations bump the local status.
-  }, [selectedBooking?.id, selectedBooking?.status]);
+  }, [selectedBooking?.id, selectedBooking?.status, loadBookingEvents]);
 
   const eligibleProviders = useMemo(() => {
     return liveProviders.filter((p: ApiProvider) =>
@@ -805,6 +819,47 @@ export default function AdminBookings() {
     setCancelModalOpen(true);
   };
 
+  const openRescheduleModal = () => {
+    if (!selectedBooking) return;
+    // Pre-fill the date input (yyyy-mm-dd) from the current appointment date.
+    const raw = rawSelected?.appointment_date;
+    setRescheduleDate(raw ? raw.slice(0, 10) : "");
+    setRescheduleSlot(rawSelected?.time_slot || rawSelected?.time_preference || "");
+    setRescheduleReason("");
+    setRescheduleModalOpen(true);
+  };
+
+  const handleRescheduleBooking = async () => {
+    if (!selectedBooking || !rescheduleDate || !rescheduleReason.trim()) return;
+    // Send the date at midday to avoid TZ edge cases pushing it to the day before.
+    const iso = `${rescheduleDate}T12:00:00`;
+    setRescheduleSaving(true);
+    try {
+      const res = await adminApi.portalRescheduleBooking(Number(selectedBooking.id), {
+        appointment_date: iso,
+        time_slot: rescheduleSlot || undefined,
+        reason: rescheduleReason.trim(),
+      }) as { appointment_date?: string };
+      // Reflect the new date locally and refresh the event history.
+      updateLocalBooking(selectedBooking.id, {
+        date: res?.appointment_date || iso,
+        ...(rescheduleSlot ? { timePreference: rescheduleSlot as TimePreference } : {}),
+      });
+      await loadBookingEvents(selectedBooking.id);
+      setRescheduleModalOpen(false);
+      toast({ title: isFr ? "Réservation reprogrammée" : "Booking rescheduled" });
+    } catch (err) {
+      const backendMsg = extractApiError(err);
+      toast({
+        title: isFr ? "Erreur" : "Error",
+        description: backendMsg || (isFr ? "Impossible de reprogrammer la réservation." : "Couldn't reschedule the booking."),
+        variant: "destructive",
+      });
+    } finally {
+      setRescheduleSaving(false);
+    }
+  };
+
   const openAssignModal = () => {
     setSelectedProviderId(selectedBooking?.providerId || "");
     setShowAllProviders(false);
@@ -937,6 +992,32 @@ export default function AdminBookings() {
       toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'enregistrer le paiement." : "Couldn't record the payment.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  // Send payment instructions to the client (WhatsApp). Read-only on the booking.
+  const handleSendPaymentInstructionsToClient = async () => {
+    if (!selectedBooking) return;
+    setSendingInstructions(true);
+    try {
+      const res = await adminApi.portalSendPaymentInstructions(Number(selectedBooking.id)) as { sent?: boolean };
+      if (res?.sent) {
+        await loadBookingEvents(selectedBooking.id);
+        toast({ title: isFr ? "Instructions envoyées" : "Instructions sent",
+                description: isFr ? "Le client a reçu les instructions de paiement." : "The client received the payment instructions." });
+      } else {
+        // Backend returned a non-sent result without throwing — report honestly.
+        toast({ title: isFr ? "Non envoyé" : "Not sent",
+                description: isFr ? "Le message n'a pas pu être envoyé." : "The message could not be sent.",
+                variant: "destructive" });
+      }
+    } catch (err) {
+      const backendMsg = extractApiError(err);
+      toast({ title: isFr ? "Échec de l'envoi" : "Send failed",
+              description: backendMsg || (isFr ? "Impossible d'envoyer les instructions." : "Couldn't send the instructions."),
+              variant: "destructive" });
+    } finally {
+      setSendingInstructions(false);
     }
   };
 
@@ -1296,25 +1377,50 @@ export default function AdminBookings() {
                   <span className="text-lg font-bold">{formatMoney(selectedBooking.price, selectedBooking.currency)}</span>
                 </div>
                 
-                {/* Fee Breakdown */}
-                <div className="text-xs text-muted-foreground space-y-1 bg-muted/50 rounded-md p-2">
-                  <div className="flex justify-between">
-                    <span>{isFr ? "Montant du devis" : "Quoted Amount"}</span>
-                    <span>{formatMoney(selectedBooking.price, selectedBooking.currency)}</span>
-                  </div>
-                  {selectedBooking.platformFeeAmount > 0 && (
-                    <>
-                      <div className="flex justify-between">
-                        <span>{isFr ? "Commission Shizu (15%)" : "Shizu Commission (15%)"}</span>
-                        <span>{formatMoney(selectedBooking.platformFeeAmount, selectedBooking.currency)}</span>
-                      </div>
-                      <div className="flex justify-between font-medium text-foreground">
-                        <span>{isFr ? "Versement prestataire (85%)" : "Provider Payout (85%)"}</span>
-                        <span>{formatMoney(selectedBooking.providerPayoutAmount, selectedBooking.currency)}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
+                {/* Fee Breakdown — commission/payout are computed on final_amount
+                    when it exists. Show quote AND final separately when they
+                    differ, so the lines always reconcile with the base used. */}
+                {(() => {
+                  const qAmt = rawSelected?.amount_xof ?? null;                 // accepted quote
+                  const fAmt = rawSelected?.final_amount ?? null;               // real final amount
+                  const commission = rawSelected?.shizu_commission ?? selectedBooking.platformFeeAmount;
+                  const payout = rawSelected?.provider_payout ?? selectedBooking.providerPayoutAmount;
+                  const hasFinalDiff = fAmt != null && qAmt != null && fAmt !== qAmt;
+                  const cur = selectedBooking.currency;
+                  return (
+                    <div className="text-xs text-muted-foreground space-y-1 bg-muted/50 rounded-md p-2">
+                      {hasFinalDiff ? (
+                        <>
+                          <div className="flex justify-between">
+                            <span>{isFr ? "Devis accepté" : "Accepted quote"}</span>
+                            <span>{formatMoney(qAmt!, cur)}</span>
+                          </div>
+                          <div className="flex justify-between font-medium text-foreground">
+                            <span>{isFr ? "Montant final" : "Final amount"}</span>
+                            <span>{formatMoney(fAmt!, cur)}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex justify-between">
+                          <span>{isFr ? "Montant du devis" : "Quoted Amount"}</span>
+                          <span>{formatMoney(fAmt ?? qAmt ?? selectedBooking.price, cur)}</span>
+                        </div>
+                      )}
+                      {commission > 0 && (
+                        <>
+                          <div className="flex justify-between">
+                            <span>{isFr ? "Commission Shizu (15%)" : "Shizu Commission (15%)"}</span>
+                            <span>{formatMoney(commission, cur)}</span>
+                          </div>
+                          <div className="flex justify-between font-medium text-foreground">
+                            <span>{isFr ? "Versement prestataire (85%)" : "Provider Payout (85%)"}</span>
+                            <span>{formatMoney(payout, cur)}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Montant & Paiement */}
@@ -1322,6 +1428,14 @@ export default function AdminBookings() {
                 const rawBooking = apiBookings.find(b => String(b.id) === selectedBooking.id);
                 const isLocked = amountLockedMap[selectedBooking.id] ?? false;
                 const hasDispute = disputeFlagOverrides[selectedBooking.id] ?? rawBooking?.dispute_flag ?? false;
+                // A dispute is resolved once a resolution (or its timestamp) is
+                // recorded — even if dispute_flag is still set.
+                const disputeResolved = !!(rawBooking?.dispute_resolution || rawBooking?.dispute_resolved_at);
+                const DISPUTE_RESOLUTION_LABELS: Record<string, { fr: string; en: string }> = {
+                  refund_client:    { fr: "Remboursement client", en: "Client refunded" },
+                  release_provider: { fr: "Prestataire payé",     en: "Provider released" },
+                  split:            { fr: "Partagé",              en: "Split" },
+                };
                 const isClosed = ['cancelled', 'completed'].includes(selectedBooking.status);
                 return (
                   <div className="space-y-3">
@@ -1330,8 +1444,27 @@ export default function AdminBookings() {
                       {isFr ? "Montant & Paiement" : "Amount & Payment"}
                     </h4>
 
-                    {/* Dispute banner */}
-                    {hasDispute && (
+                    {/* Dispute banner — resolved state (neutral/green) */}
+                    {hasDispute && disputeResolved && (
+                      <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 rounded-md p-3 space-y-1">
+                        <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                          <CheckCircle2 className="h-4 w-4" />
+                          {isFr ? "Litige résolu" : "Dispute resolved"}
+                        </p>
+                        {rawBooking?.dispute_reason && (
+                          <p className="text-xs text-muted-foreground">{rawBooking.dispute_reason}</p>
+                        )}
+                        {rawBooking?.dispute_resolution && (
+                          <p className="text-xs text-muted-foreground">
+                            {isFr ? "Résolution :" : "Resolution:"}{" "}
+                            {DISPUTE_RESOLUTION_LABELS[rawBooking.dispute_resolution]?.[isFr ? "fr" : "en"] ?? rawBooking.dispute_resolution}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Dispute banner — open state (alarming red, with resolve actions) */}
+                    {hasDispute && !disputeResolved && (
                       <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
                         <p className="text-sm font-semibold text-red-700 flex items-center gap-1">
                           <AlertCircle className="h-4 w-4" />
@@ -1648,7 +1781,22 @@ export default function AdminBookings() {
               {/* Actions */}
               <div className="space-y-4 pt-4 border-t">
                 <h4 className="font-medium text-sm text-muted-foreground">Actions</h4>
-                
+
+                {/* Reschedule — available on any non-terminal status. Changes only
+                    the date/slot; amount, lock and assigned provider are kept. */}
+                {!['completed', 'cancelled', 'declined'].includes(selectedBooking.status) && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={openRescheduleModal}
+                    disabled={isUpdating}
+                    data-testid="button-reschedule"
+                  >
+                    <CalendarClock className="h-4 w-4 mr-2" />
+                    {isFr ? "Reprogrammer" : "Reschedule"}
+                  </Button>
+                )}
+
                 {/* Quote status info for pending bookings */}
                 {selectedBooking.status === 'pending' && selectedBooking.quoteStatus !== 'accepted' && (
                   <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-md space-y-1">
@@ -1941,6 +2089,92 @@ export default function AdminBookings() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Reschedule Modal (admin-only: date/slot only, amount/lock/provider kept) */}
+      <Dialog open={rescheduleModalOpen} onOpenChange={setRescheduleModalOpen}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarClock className="h-5 w-5 text-[#0F3A7A]" />
+              {isFr ? "Reprogrammer la réservation" : "Reschedule Booking"}
+            </DialogTitle>
+            <DialogDescription>
+              {isFr
+                ? "Change uniquement la date et le créneau. Le montant, le verrouillage et le prestataire assigné sont conservés."
+                : "Changes only the date and slot. Amount, lock and assigned provider are kept."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Current date for comparison */}
+            <div className="flex justify-between items-center text-sm bg-muted/40 rounded-md px-3 py-2">
+              <span className="text-muted-foreground">{isFr ? "Date actuelle" : "Current date"}</span>
+              <span className="font-medium">
+                {rawSelected?.appointment_date
+                  ? format(parseISO(rawSelected.appointment_date), "d MMM yyyy")
+                  : (selectedBooking?.date ?? "—")}
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="reschedule-date">{isFr ? "Nouvelle date *" : "New date *"}</Label>
+              <Input
+                id="reschedule-date"
+                type="date"
+                value={rescheduleDate}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setRescheduleDate(e.target.value)}
+                data-testid="input-reschedule-date"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{isFr ? "Créneau" : "Time slot"}</Label>
+              <Select value={rescheduleSlot} onValueChange={setRescheduleSlot}>
+                <SelectTrigger data-testid="select-reschedule-slot">
+                  <SelectValue placeholder={isFr ? "Choisir un créneau…" : "Choose a slot…"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIME_PREFERENCE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {TIME_PREF_LABELS[opt.value]?.[isFr ? 'fr' : 'en'] ?? opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="reschedule-reason">{isFr ? "Motif de la reprogrammation *" : "Reason for rescheduling *"}</Label>
+              <Textarea
+                id="reschedule-reason"
+                value={rescheduleReason}
+                onChange={(e) => setRescheduleReason(e.target.value)}
+                rows={2}
+                placeholder={isFr ? "Ex. : le client a demandé de décaler…" : "e.g. the client asked to move the date…"}
+                data-testid="input-reschedule-reason"
+              />
+            </div>
+            {/* Summary / confirmation before sending */}
+            {rescheduleDate && (
+              <p className="text-xs text-muted-foreground">
+                {isFr ? "Le client" : "The client"}
+                {rawSelected?.provider_phone ? (isFr ? " et le prestataire seront prévenus" : " and the provider will be notified") : (isFr ? " sera prévenu" : " will be notified")}
+                {isFr ? " de la nouvelle date." : " of the new date."}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRescheduleModalOpen(false)} disabled={rescheduleSaving}>
+              {isFr ? "Annuler" : "Cancel"}
+            </Button>
+            <Button
+              onClick={handleRescheduleBooking}
+              disabled={rescheduleSaving || !rescheduleDate || !rescheduleReason.trim()}
+              data-testid="button-confirm-reschedule"
+            >
+              {rescheduleSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CalendarClock className="h-4 w-4 mr-2" />}
+              {isFr ? "Confirmer la reprogrammation" : "Confirm reschedule"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Cancel Booking Modal */}
       <Dialog open={cancelModalOpen} onOpenChange={setCancelModalOpen}>
@@ -2553,12 +2787,26 @@ export default function AdminBookings() {
           </div>
           <p className="text-xs text-muted-foreground italic pt-1">
             {isFr
-              ? "Consultation uniquement — copiez ces numéros pour les communiquer au client. Cette fenêtre ne modifie pas la réservation."
-              : "For reference only — copy these numbers to share with the client. This window does not change the booking."}
+              ? "Copiez ces numéros pour la copie manuelle, ou envoyez les instructions directement au client. L'envoi ne modifie pas la réservation."
+              : "Copy these numbers for manual sharing, or send the instructions directly to the client. Sending does not change the booking."}
           </p>
+          {!adminConfig?.twilio_enabled && (
+            <p className="text-xs text-amber-600 flex items-center gap-1">
+              <AlertCircle className="h-3.5 w-3.5" />
+              {isFr ? "WhatsApp non configuré — envoi indisponible." : "WhatsApp not configured — sending unavailable."}
+            </p>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPaymentInstructionsOpen(false)}>
+            <Button variant="outline" onClick={() => setPaymentInstructionsOpen(false)} disabled={sendingInstructions}>
               {isFr ? "Fermer" : "Close"}
+            </Button>
+            <Button
+              onClick={handleSendPaymentInstructionsToClient}
+              disabled={sendingInstructions || !adminConfig?.twilio_enabled}
+              data-testid="button-send-payment-instructions"
+            >
+              {sendingInstructions ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+              {isFr ? "Envoyer les instructions au client" : "Send instructions to client"}
             </Button>
           </DialogFooter>
         </DialogContent>

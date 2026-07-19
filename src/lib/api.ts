@@ -116,6 +116,9 @@ export const adminApi = {
     adminFetch(`/admin/bookings/${bookingId}/quote`, { method: 'POST', body: JSON.stringify({ amount_xof, note: note ?? '' }) }),
   portalCancelBooking: (bookingId: number, reason?: string) =>
     adminFetch(`/admin/bookings/${bookingId}/cancel`, { method: 'POST', body: JSON.stringify({ reason: reason || '' }) }),
+  // Admin-only reschedule: changes date/slot only (never amount/lock/provider).
+  portalRescheduleBooking: (bookingId: number, body: { appointment_date: string; time_slot?: string; reason: string }) =>
+    adminFetch(`/admin/bookings/${bookingId}/reschedule`, { method: 'POST', body: JSON.stringify(body) }),
   portalGetReviews: (params?: { status?: string }) => {
     const qs = params?.status ? `?status=${params.status}` : "";
     return adminFetch(`/admin/reviews${qs}`);
@@ -139,6 +142,10 @@ export const adminApi = {
     adminFetch(`/admin/bookings/${bookingId}/unlock-amount`, { method: "POST", body: JSON.stringify({ reason }) }),
   portalConfirmPayment: (bookingId: number) =>
     adminFetch(`/admin/bookings/${bookingId}/confirm-payment`, { method: "POST", body: JSON.stringify({}) }),
+  // Sends the payment instructions to the client via WhatsApp. Read-only w.r.t.
+  // the booking (no status/payment/amount change).
+  portalSendPaymentInstructions: (bookingId: number) =>
+    adminFetch(`/admin/bookings/${bookingId}/send-payment-instructions`, { method: "POST", body: JSON.stringify({}) }),
   portalOpenDispute: (bookingId: number, reason: string) =>
     adminFetch(`/admin/bookings/${bookingId}/dispute`, { method: "POST", body: JSON.stringify({ reason }) }),
   portalResolveDispute: (bookingId: number, resolution: string) =>
