@@ -548,6 +548,7 @@ def update_finance(booking_id):
     payment = data.get('payment_status')
     payout = data.get('payout_status')
     final_amount = data.get('final_amount')
+    reason = (data.get('reason') or '').strip()
 
     valid_payment = ('unpaid', 'pending', 'paid', 'refunded')
     valid_payout = ('not_due', 'due', 'sent', 'failed')
@@ -560,10 +561,44 @@ def update_finance(booking_id):
         return jsonify({'error': 'Cannot set payout to due until payment_status is paid'}), 400
 
     if final_amount is not None:
-        fa = int(final_amount)
+        # Validate before touching the row: a non-numeric or non-positive value
+        # must be a clean 400, never a 500 from int('abc').
+        try:
+            fa = int(final_amount)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'final_amount must be a positive integer'}), 400
+        if fa <= 0:
+            return jsonify({'error': 'final_amount must be a positive integer'}), 400
+
+        old_amount = b.final_amount
+        # amount_xof is the client-accepted, locked quote. If the real amount
+        # charged differs from that locked quote, an admin must justify it —
+        # this is the only sanctioned way final_amount may diverge from the
+        # immutable amount_xof (overrun, on-site adjustment, etc.).
+        if b.amount_locked and b.amount_xof is not None and fa != b.amount_xof and not reason:
+            return jsonify({
+                'error': "Le montant du devis est verrouillé. Un motif est obligatoire "
+                         "pour enregistrer un montant final différent du devis accepté."
+            }), 400
+
         b.final_amount = fa
         b.shizu_commission = round(fa * 0.15)
         b.provider_payout = fa - b.shizu_commission
+
+        # Always trace a final_amount write (T-07: actor_id=None — no admin row).
+        note_bits = [f"Montant final: {old_amount if old_amount is not None else '—'} → {fa} FCFA"]
+        if b.amount_xof is not None and fa != b.amount_xof:
+            note_bits.append(f"(devis accepté: {b.amount_xof} FCFA)")
+        if reason:
+            note_bits.append(f"Motif: {reason}")
+        db.session.add(BookingEvent(
+            booking_id=b.id,
+            event_type='final_amount_set',
+            from_status=b.status,
+            to_status=b.status,
+            actor_id=None,
+            note=' '.join(note_bits),
+        ))
 
     if payment:
         b.payment_status = payment
