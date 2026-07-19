@@ -20,25 +20,8 @@ def is_twilio_enabled() -> bool:
     ])
 
 
-def _normalize_phone(phone: str) -> str:
-    """Best-effort E.164 normalization for CI numbers."""
-    p = phone.strip().replace(" ", "").replace("-", "")
-    # De-duplicate country code (double-prefix bug)
-    if p.startswith("+225+225"):
-        p = "+225" + p[8:]
-    elif p.startswith("+225225"):
-        p = "+225" + p[7:]
-    elif p.startswith("225225"):
-        p = p[3:]
-    if p.startswith("00225"):
-        return "+" + p[2:]
-    if p.startswith("+"):
-        return p
-    if p.startswith("225") and len(p) >= 12:
-        return "+" + p
-    if p.startswith("0") and len(p) == 10:
-        return "+225" + p[1:]
-    return p
+# Single source of truth lives in utils.phone (kept as an alias for callers here).
+from shizuverse.utils.phone import normalize_phone as _normalize_phone
 
 
 def send_whatsapp(to_phone: str, message: str) -> bool:

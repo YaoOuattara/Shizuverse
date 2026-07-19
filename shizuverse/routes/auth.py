@@ -27,11 +27,15 @@ def register():
     if User.query.filter_by(email=email).first():
         return jsonify({'error': 'Email already registered'}), 409
 
-    phone = (data.get('phone') or data.get('phone_number') or '').strip()
-    if phone and User.query.filter_by(phone=phone).first():
-        return jsonify({'error': 'Ce numéro de téléphone est déjà utilisé'}), 409
+    from shizuverse.utils.phone import normalize_phone, is_valid_e164
+    phone = normalize_phone((data.get('phone') or data.get('phone_number') or '').strip())
+    if phone:
+        if not is_valid_e164(phone):
+            return jsonify({'error': 'Numéro de téléphone invalide. Format attendu : +225 suivi de 10 chiffres.'}), 400
+        if User.query.filter_by(phone=phone).first():
+            return jsonify({'error': 'Ce numéro de téléphone est déjà utilisé'}), 409
 
-    user = User(email=email, user_type=user_type, preferred_language=preferred_language)
+    user = User(email=email, user_type=user_type, preferred_language=preferred_language, phone=phone or None)
     user.set_password(password)
     db.session.add(user)
     db.session.commit()

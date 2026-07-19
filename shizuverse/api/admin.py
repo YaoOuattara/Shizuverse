@@ -9,33 +9,11 @@ from shizuverse.models.waitlist import Waitlist
 from datetime import datetime, timedelta, date
 from sqlalchemy import func
 from shizuverse.limiter import limiter
+from shizuverse.utils.phone import normalize_phone, is_valid_e164
 import jwt
 import os
 
 admin_bp = Blueprint('admin', __name__)
-
-
-def normalize_phone(phone: str) -> str:
-    """Normalize any CI phone format to +225XXXXXXXXX (E.164)."""
-    p = phone.strip().replace(' ', '').replace('-', '')
-    # De-duplicate country code (frontend double-prefix bug: "+225+225..." or "+225225...")
-    if p.startswith('+225+225'):
-        p = '+225' + p[8:]
-    elif p.startswith('+225225'):
-        p = '+225' + p[7:]
-    elif p.startswith('225225'):
-        p = p[3:]
-    if p.startswith('00225'):
-        return '+225' + p[5:]
-    if p.startswith('+225'):
-        return p
-    if p.startswith('+'):
-        return p                      # non-CI number, keep as-is
-    if p.startswith('225') and len(p) >= 12:
-        return '+' + p
-    if p.startswith('0') and len(p) == 10:
-        return '+225' + p[1:]
-    return p
 
 
 def phone_to_email(phone: str, domain: str) -> str:
@@ -166,7 +144,7 @@ def assign_booking(booking_id):
     booking = ClientBooking.query.get_or_404(booking_id)
     data = request.get_json() or {}
     provider_name = data.get('provider_name', '').strip()
-    provider_phone = data.get('provider_phone', '').strip()
+    provider_phone = normalize_phone(data.get('provider_phone', '').strip())
     if not provider_name:
         return jsonify({'error': 'provider_name required'}), 400
     if not booking.amount_locked:
@@ -644,6 +622,8 @@ def provider_register():
         return jsonify({'error': 'company_name is required for company accounts'}), 400
 
     canonical_phone = normalize_phone(phone)
+    if not is_valid_e164(canonical_phone):
+        return jsonify({'error': 'Numéro de téléphone invalide. Format attendu : +225 suivi de 10 chiffres.'}), 400
 
     # Duplicate check: does a ServiceProvider with this normalized phone already exist?
     for candidate in ServiceProvider.query.all():
@@ -1513,6 +1493,8 @@ def client_register():
         return jsonify({'error': 'company_name is required for company accounts'}), 400
 
     canonical_phone = normalize_phone(phone)
+    if not is_valid_e164(canonical_phone):
+        return jsonify({'error': 'Numéro de téléphone invalide. Format attendu : +225 suivi de 10 chiffres.'}), 400
     synthetic_email = phone_to_email(phone, 'client.shizu.ci')
     # Also check legacy format so we don't create a duplicate
     existing = None
@@ -1541,7 +1523,7 @@ def client_register():
         'type': 'client',
         'client_id': user.id,
         'name': full_name,
-        'phone': phone,
+        'phone': canonical_phone,
         'account_type': account_type,
         'company_name': company_name,
         'iat': datetime.utcnow(),
@@ -1554,7 +1536,7 @@ def client_register():
         'client': {
             'id': user.id,
             'name': full_name,
-            'phone': phone,
+            'phone': canonical_phone,
             'account_type': account_type,
             'company_name': company_name,
         },

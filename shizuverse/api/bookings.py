@@ -103,7 +103,11 @@ def create_booking():
     if apt_date < datetime.utcnow():
         return jsonify({"error": "appointment_date must be in the future"}), 400
 
-    client_phone = data["client_phone"].strip()
+    # Normalize the phone at the source of ownership, then validate E.164.
+    from shizuverse.utils.phone import normalize_phone, is_valid_e164
+    client_phone = normalize_phone(data["client_phone"])
+    if not is_valid_e164(client_phone):
+        return jsonify({"error": "Numéro de téléphone invalide. Format attendu : +225 suivi de 10 chiffres."}), 400
 
     # Client UI language — only 'en' is honoured, everything else degrades to 'fr'
     # (missing, unknown, or malformed values all fall back to the current behaviour).
