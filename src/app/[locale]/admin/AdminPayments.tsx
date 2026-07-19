@@ -76,6 +76,8 @@ interface PaymentBooking {
   baseAmount: number;
   platformFeeAmount: number;
   providerPayoutAmount: number;
+  amountXof: number | null;
+  amountLocked: boolean;
   currency: string;
   date: string;
   time: string;
@@ -84,6 +86,23 @@ interface PaymentBooking {
   payoutSentAt?: string;
   paymentMethod?: string;
   payoutMethod?: string;
+}
+
+// adminFetch throws `Error("API error <code>: <path> — <body>")` where <body>
+// is the raw JSON response. Pull out the backend's { error } message so the UI
+// can show the real reason (e.g. the locked-amount motif rule) rather than a
+// generic failure.
+function extractApiError(err: unknown): string | null {
+  const msg = err instanceof Error ? err.message : String(err);
+  const sep = msg.indexOf("— ");
+  const body = sep >= 0 ? msg.slice(sep + 2).trim() : msg;
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed.error === "string") return parsed.error;
+  } catch {
+    /* not JSON — fall through */
+  }
+  return null;
 }
 
 function toPaymentBooking(b: ApiBooking): PaymentBooking {
@@ -106,6 +125,8 @@ function toPaymentBooking(b: ApiBooking): PaymentBooking {
     baseAmount: finalAmt,
     platformFeeAmount: commission,
     providerPayoutAmount: payout,
+    amountXof: b.amount_xof ?? null,
+    amountLocked: !!b.amount_locked,
     currency: 'XOF',
     date: d ? d.toLocaleDateString('fr-FR') : '',
     time: d ? d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '',
@@ -170,6 +191,7 @@ export default function AdminPayments() {
   const [payoutModalOpen, setPayoutModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [finalAmountInput, setFinalAmountInput] = useState("");
+  const [discrepancyReason, setDiscrepancyReason] = useState("");
 
   // Payment form state
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'mobile_money' | 'bank_transfer'>('cash');
@@ -218,6 +240,7 @@ export default function AdminPayments() {
     setPaymentMethod('cash');
     setPaymentReference('');
     setPaymentNote('');
+    setDiscrepancyReason('');
     setPaymentModalOpen(true);
   };
 
@@ -231,6 +254,7 @@ export default function AdminPayments() {
       await adminApi.portalUpdateFinance(bookingId, {
         payment_status: 'paid',
         final_amount: finalAmt,
+        ...(discrepancyReason.trim() ? { reason: discrepancyReason.trim() } : {}),
       });
       updateLocalBooking(bookingId, {
         paymentStatus: 'paid',
@@ -251,7 +275,14 @@ export default function AdminPayments() {
       setPaymentModalOpen(false);
     } catch (err) {
       console.error("Failed to record payment:", err);
-      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'enregistrer le paiement." : "Failed to record payment.", variant: "destructive" });
+      // Surface the backend's own message (e.g. the locked-amount motif rule)
+      // instead of a generic toast, so the admin knows exactly what to fix.
+      const backendMsg = extractApiError(err);
+      toast({
+        title: isFr ? "Erreur" : "Error",
+        description: backendMsg || (isFr ? "Impossible d'enregistrer le paiement." : "Failed to record payment."),
+        variant: "destructive",
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -793,6 +824,36 @@ export default function AdminPayments() {
                 </div>
               </div>
 
+              {/* Motif — only when the final amount diverges from a locked,
+                  client-accepted quote (otherwise it just clutters the form). */}
+              {(() => {
+                const fa = Math.round(Number(finalAmountInput) || 0);
+                const showReason =
+                  selectedBooking.amountLocked &&
+                  selectedBooking.amountXof != null &&
+                  fa > 0 &&
+                  fa !== selectedBooking.amountXof;
+                if (!showReason) return null;
+                return (
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-amber-700 dark:text-amber-500">
+                      {isFr ? "Motif de l'écart *" : "Reason for discrepancy *"}
+                    </label>
+                    <Textarea
+                      value={discrepancyReason}
+                      onChange={(e) => setDiscrepancyReason(e.target.value)}
+                      rows={2}
+                      placeholder={
+                        isFr
+                          ? `Ce montant diffère du devis accepté par le client (${new Intl.NumberFormat('fr-FR').format(selectedBooking.amountXof!)} FCFA). Expliquez la raison.`
+                          : `This amount differs from the quote the client accepted (${new Intl.NumberFormat('fr-FR').format(selectedBooking.amountXof!)} FCFA). Explain why.`
+                      }
+                      data-testid="input-discrepancy-reason"
+                    />
+                  </div>
+                );
+              })()}
+
               {/* Live commission breakdown */}
               {Number(finalAmountInput) > 0 && (() => {
                 const fa = Math.round(Number(finalAmountInput));
@@ -858,7 +919,15 @@ export default function AdminPayments() {
             <Button
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={() => selectedBooking && handleRecordPayment(selectedBooking.id)}
-              disabled={isUpdating || !Number(finalAmountInput)}
+              disabled={
+                isUpdating ||
+                !Number(finalAmountInput) ||
+                (!!selectedBooking &&
+                  selectedBooking.amountLocked &&
+                  selectedBooking.amountXof != null &&
+                  Math.round(Number(finalAmountInput)) !== selectedBooking.amountXof &&
+                  !discrepancyReason.trim())
+              }
               data-testid="button-confirm-payment"
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}

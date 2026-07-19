@@ -215,6 +215,22 @@ const getDefaultTimeline = (isFr: boolean) => [
   { status: 'completed',   label: isFr ? 'Terminée'    : 'Completed'   },
 ];
 
+// adminFetch throws `Error("API error <code>: <path> — <body>")` where <body>
+// is the raw JSON response. Extract the backend's { error } message so the UI
+// can show the real reason (e.g. the locked-amount motif rule).
+function extractApiError(err: unknown): string | null {
+  const msg = err instanceof Error ? err.message : String(err);
+  const sep = msg.indexOf("— ");
+  const body = sep >= 0 ? msg.slice(sep + 2).trim() : msg;
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed.error === "string") return parsed.error;
+  } catch {
+    /* not JSON — fall through */
+  }
+  return null;
+}
+
 const STATUS_LABELS: Record<string, { fr: string; en: string }> = {
   requested:    { fr: 'Demande reçue', en: 'Requested'   },
   pending:      { fr: 'En attente',    en: 'Pending'      },
@@ -458,6 +474,20 @@ export default function AdminBookings() {
   // Payment confirmation modal state
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [finalAmountInput, setFinalAmountInput] = useState("");
+  const [discrepancyReason, setDiscrepancyReason] = useState("");
+
+  // Raw API row for the selected booking — carries amount_xof / amount_locked
+  // which the mapped AdminBooking type doesn't expose.
+  const rawSelected = selectedBooking
+    ? apiBookings.find((x) => String(x.id) === selectedBooking.id)
+    : undefined;
+  const selAmountXof = rawSelected?.amount_xof ?? null;
+  const selAmountLocked = !!rawSelected?.amount_locked;
+  const paymentNeedsReason =
+    selAmountLocked &&
+    selAmountXof != null &&
+    Math.round(Number(finalAmountInput) || 0) > 0 &&
+    Math.round(Number(finalAmountInput)) !== selAmountXof;
 
   // Amount lock state
   const [lockAmountInput, setLockAmountInput] = useState("");
@@ -734,11 +764,15 @@ export default function AdminBookings() {
         ? selectedBooking.price
         : 0;
     setFinalAmountInput(prefill > 0 ? String(prefill) : "");
+    setDiscrepancyReason("");
     setPaymentModalOpen(true);
   };
 
   const handleConfirmPayment = async () => {
     if (!selectedBooking || !finalAmountInput || Number(finalAmountInput) <= 0) return;
+    // Locked amount diverging from the accepted quote requires a motif — the
+    // backend enforces this too; guarding here avoids a needless 400 round-trip.
+    if (paymentNeedsReason && !discrepancyReason.trim()) return;
     const finalAmt = Math.round(Number(finalAmountInput));
     const commission = Math.round(finalAmt * 0.15);
     const payout = finalAmt - commission;
@@ -758,6 +792,7 @@ export default function AdminBookings() {
       await adminApi.portalUpdateFinance(selectedBooking.id, {
         payment_status: 'paid',
         final_amount: finalAmt,
+        ...(discrepancyReason.trim() ? { reason: discrepancyReason.trim() } : {}),
       });
       toast({
         title: isFr ? "Paiement enregistré" : "Payment Recorded",
@@ -769,7 +804,14 @@ export default function AdminBookings() {
     } catch (err) {
       updateLocalBooking(selectedBooking.id, { paymentStatus: prevPaymentStatus });
       console.error("Failed to record payment:", err);
-      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'enregistrer le paiement." : "Couldn't record the payment.", variant: "destructive" });
+      // Re-open the modal so the admin can act on the backend's message.
+      setPaymentModalOpen(true);
+      const backendMsg = extractApiError(err);
+      toast({
+        title: isFr ? "Erreur" : "Error",
+        description: backendMsg || (isFr ? "Impossible d'enregistrer le paiement." : "Couldn't record the payment."),
+        variant: "destructive",
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -2232,6 +2274,26 @@ export default function AdminBookings() {
                 <span className="text-sm text-muted-foreground whitespace-nowrap">FCFA</span>
               </div>
             </div>
+            {/* Motif — only when the final amount diverges from a locked,
+                client-accepted quote (otherwise it just clutters the form). */}
+            {paymentNeedsReason && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-amber-700 dark:text-amber-500">
+                  {isFr ? "Motif de l'écart *" : "Reason for discrepancy *"}
+                </label>
+                <Textarea
+                  value={discrepancyReason}
+                  onChange={(e) => setDiscrepancyReason(e.target.value)}
+                  rows={2}
+                  placeholder={
+                    isFr
+                      ? `Ce montant diffère du devis accepté par le client (${new Intl.NumberFormat('fr-FR').format(selAmountXof!)} FCFA). Expliquez la raison.`
+                      : `This amount differs from the quote the client accepted (${new Intl.NumberFormat('fr-FR').format(selAmountXof!)} FCFA). Explain why.`
+                  }
+                  data-testid="input-discrepancy-reason"
+                />
+              </div>
+            )}
             {/* Live commission breakdown */}
             {Number(finalAmountInput) > 0 && (() => {
               const fa = Math.round(Number(finalAmountInput));
@@ -2258,7 +2320,12 @@ export default function AdminBookings() {
             <Button
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={handleConfirmPayment}
-              disabled={!finalAmountInput || Number(finalAmountInput) <= 0 || isUpdating}
+              disabled={
+                !finalAmountInput ||
+                Number(finalAmountInput) <= 0 ||
+                isUpdating ||
+                (paymentNeedsReason && !discrepancyReason.trim())
+              }
               data-testid="button-confirm-payment"
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}

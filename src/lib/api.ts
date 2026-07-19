@@ -107,7 +107,7 @@ export const adminApi = {
   },
   portalGetOverview: () => adminFetch("/admin/overview"),
   portalGetFinanceSummary: () => adminFetch("/admin/finance/summary"),
-  portalUpdateFinance: (bookingId: string, body: { payment_status?: string; payout_status?: string; final_amount?: number }) =>
+  portalUpdateFinance: (bookingId: string, body: { payment_status?: string; payout_status?: string; final_amount?: number; reason?: string }) =>
     adminFetch(`/admin/bookings/${bookingId}/finance`, { method: "POST", body: JSON.stringify(body) }),
   portalSetBookingQuote: (bookingId: string, amount_xof: number, note?: string) =>
     adminFetch(`/admin/bookings/${bookingId}/quote`, { method: 'POST', body: JSON.stringify({ amount_xof, note: note ?? '' }) }),
