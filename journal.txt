@@ -153,13 +153,13 @@ TODO: Set NEXT_PUBLIC_FLASK_API_URL env var on Vercel dashboard pointing to http
 - Frontend: https://client-sigma-gilt.vercel.app
 - Backend: https://shizu-verse.onrender.com
 - Admin login: https://client-sigma-gilt.vercel.app/en/admin/login
-- Admin password to test: YaAllahShizu@1 (set ADMIN_PASSWORD on Render if not already)
+- Admin password: voir ADMIN_PASSWORD dans les variables d'environnement Render
 - NEXT_PUBLIC_FLASK_API_URL: set on Vercel ✅
 
 ### Known issues to fix next session
 1. Pages look minimal/unstyled on production — likely Tailwind purge stripping classes
    (check tailwind.config.ts content array, ensure it covers all src/ paths)
-2. Admin login needs live test with YaAllahShizu@1 — if 401, ADMIN_PASSWORD not set on Render
+2. Admin login needs live test (ADMIN_PASSWORD depuis les variables d'environnement Render) — if 401, ADMIN_PASSWORD not set on Render
 3. /bookings and /provider pages still use mock data — wire to real API when auth ready
 
 --- 2026-03-11 (Session 9) ---
@@ -442,8 +442,8 @@ NEXT: Tailwind production styling fix (purge config); wire
 2026-05-08 — Integration test run: all endpoints green
 
 Admin password correction:
-  Live Render password is Shizu@livenow37 (NOT YaAllahShizu@1 — that was dev)
-  Admin login: POST /api/admin/login  {"password": "Shizu@livenow37"}
+  Live Render password: voir ADMIN_PASSWORD dans les variables d'environnement Render
+  Admin login: POST /api/admin/login  {"password": "<ADMIN_PASSWORD>"}
 
 Admin endpoints (test_admin_endpoints.py): 8/8 passed
   1. GET  /api/admin/bookings
