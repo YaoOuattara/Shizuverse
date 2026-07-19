@@ -105,6 +105,9 @@ export const adminApi = {
     const qs = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => !!v).map(([k, v]) => [k, v as string])).toString() : "";
     return adminFetch(`/admin/bookings${qs ? `?${qs}` : ""}`);
   },
+  // Full detail incl. the real BookingEvent history (the list endpoint omits events).
+  portalGetBookingDetail: (bookingId: string | number) =>
+    adminFetch(`/admin/bookings/${bookingId}`),
   portalGetOverview: () => adminFetch("/admin/overview"),
   portalGetFinanceSummary: () => adminFetch("/admin/finance/summary"),
   portalUpdateFinance: (bookingId: string, body: { payment_status?: string; payout_status?: string; final_amount?: number; reason?: string }) =>
@@ -131,6 +134,9 @@ export const adminApi = {
   },
   portalLockAmount: (bookingId: number, confirmed_amount: number) =>
     adminFetch(`/admin/bookings/${bookingId}/lock-amount`, { method: "POST", body: JSON.stringify({ confirmed_amount }) }),
+  // Dispute-only: unlock the client-accepted amount. Backend requires a reason (400 without).
+  portalUnlockAmount: (bookingId: number, reason: string) =>
+    adminFetch(`/admin/bookings/${bookingId}/unlock-amount`, { method: "POST", body: JSON.stringify({ reason }) }),
   portalConfirmPayment: (bookingId: number) =>
     adminFetch(`/admin/bookings/${bookingId}/confirm-payment`, { method: "POST", body: JSON.stringify({}) }),
   portalOpenDispute: (bookingId: number, reason: string) =>

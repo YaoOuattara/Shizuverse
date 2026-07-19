@@ -46,12 +46,10 @@ import {
   Phone,
   CheckCircle2,
   XCircle,
-  StickyNote,
   Loader2,
   MapPin,
   Banknote,
   Building2,
-  ArrowRight,
   CalendarClock,
   MessageSquare,
   AlertCircle,
@@ -62,9 +60,10 @@ import {
   Copy,
   Send,
   Star,
+  Eye,
 } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useAdminStore, type AdminBooking, type StatusHistoryEntry } from "@/data/adminStore";
+import { useAdminStore, type AdminBooking } from "@/data/adminStore";
 import { useAdminBookings, useAdminProviders, useAdminServices, type ApiBooking, type ApiProvider, type ApiService } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -208,13 +207,6 @@ const getPayoutStatusLabels = (isFr: boolean): Record<string, string> => ({
 
 const statusOptions = ["all", "pending", "under_review", "assigned", "confirmed", "completed", "cancelled"];
 
-const getDefaultTimeline = (isFr: boolean) => [
-  { status: 'pending',     label: isFr ? 'En attente'  : 'Pending'     },
-  { status: 'confirmed',   label: isFr ? 'Confirmée'   : 'Confirmed'   },
-  { status: 'in_progress', label: isFr ? 'En cours'    : 'In progress' },
-  { status: 'completed',   label: isFr ? 'Terminée'    : 'Completed'   },
-];
-
 // adminFetch throws `Error("API error <code>: <path> — <body>")` where <body>
 // is the raw JSON response. Extract the backend's { error } message so the UI
 // can show the real reason (e.g. the locked-amount motif rule).
@@ -253,118 +245,120 @@ const getStatusLabel = (status: string, isFr: boolean): string =>
 const getStatusLabels = (isFr: boolean): Record<string, string> =>
   Object.fromEntries(Object.entries(STATUS_LABELS).map(([k, v]) => [k, v[isFr ? 'fr' : 'en']]));
 
-function StatusTimeline({ currentStatus, statusHistory, createdAt, isFr }: {
-  currentStatus: AdminBooking['status'];
-  statusHistory?: StatusHistoryEntry[];
+// One row of the real backend history (GET /admin/bookings/<id> → events[]).
+interface BookingEventItem {
+  id: number;
+  event_type: string;
+  from_status: string | null;
+  to_status: string;
+  actor_phone: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+// Readable labels for every event_type the backend emits. An unknown type is
+// NEVER hidden — the renderer falls back to the raw value (that silent masking
+// is exactly what made the history invisible before).
+const EVENT_LABELS: Record<string, { fr: string; en: string }> = {
+  payment_declared:  { fr: "Paiement déclaré par le client", en: "Payment declared by client" },
+  quote_accepted:    { fr: "Devis accepté par le client",    en: "Quote accepted by client" },
+  amount_locked:     { fr: "Montant verrouillé",             en: "Amount locked" },
+  quote_declined:    { fr: "Devis refusé par le client",     en: "Quote declined by client" },
+  provider_assigned: { fr: "Prestataire assigné",            en: "Provider assigned" },
+  started:           { fr: "Mission démarrée",               en: "Mission started" },
+  completed:         { fr: "Mission terminée",               en: "Mission completed" },
+  admin_cancel:      { fr: "Annulée par l'admin",            en: "Cancelled by admin" },
+  final_amount_set:  { fr: "Montant final enregistré",       en: "Final amount recorded" },
+  amount_unlocked:   { fr: "Montant déverrouillé (litige)",  en: "Amount unlocked (dispute)" },
+  payment_confirmed: { fr: "Paiement confirmé",              en: "Payment confirmed" },
+  dispute_opened:    { fr: "Litige ouvert",                  en: "Dispute opened" },
+  dispute_resolved:  { fr: "Litige résolu",                  en: "Dispute resolved" },
+  status_changed:    { fr: "Statut modifié par l'admin",     en: "Status changed by admin" },
+};
+
+function EventHistory({ events, loading, error, createdAt, isFr }: {
+  events: BookingEventItem[];
+  loading: boolean;
+  error: boolean;
   createdAt: string;
   isFr: boolean;
 }) {
-  const statusLabels = getStatusLabels(isFr);
-  const defaultTimeline = getDefaultTimeline(isFr);
-  const isCancelled = currentStatus === 'cancelled';
+  const title = isFr ? "Historique" : "History";
 
-  if (statusHistory && statusHistory.length > 0) {
+  if (loading) {
     return (
       <div className="space-y-2">
-        <h4 className="font-medium text-sm text-muted-foreground">
-          {isFr ? "Suivi du statut" : "Status Timeline"}
-        </h4>
-        <div className="space-y-3 pl-2 border-l-2 border-muted">
-          <div className="relative pl-4">
-            <div className="absolute -left-[9px] w-4 h-4 rounded-full bg-muted border-2 border-background" />
-            <div className="text-sm">
-              <span className="font-medium">{isFr ? "Créé" : "Created"}</span>
-              <span className="text-xs text-muted-foreground ml-2">{createdAt}</span>
-            </div>
-          </div>
-          {statusHistory.map((entry, index) => {
-            const isLatest = index === statusHistory.length - 1;
-            const isCancelledEntry = entry.status === 'cancelled';
-            return (
-              <div key={index} className="relative pl-4">
-                <div className={`absolute -left-[9px] w-4 h-4 rounded-full border-2 border-background
-                  ${isCancelledEntry ? 'bg-red-500' : isLatest ? 'bg-blue-500' : 'bg-emerald-500'}
-                `} />
-                <div className="text-sm">
-                  <span className="font-medium">{statusLabels[entry.status] || entry.status}</span>
-                  {entry.actor && (
-                    <Badge variant="outline" className="ml-2 text-xs">{entry.actor}</Badge>
-                  )}
-                  <span className="text-xs text-muted-foreground ml-2">
-                    {entry.timestamp ? format(parseISO(entry.timestamp), 'MMM d, yyyy HH:mm') : ''}
-                  </span>
-                  {entry.note && (
-                    <p className="text-xs text-muted-foreground mt-0.5">{entry.note}</p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+        <h4 className="font-medium text-sm text-muted-foreground">{title}</h4>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground pl-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {isFr ? "Chargement de l'historique…" : "Loading history…"}
         </div>
       </div>
     );
   }
-  
-  const getStepState = (step: string) => {
-    if (isCancelled) {
-      return step === 'pending' ? 'completed' : 'cancelled';
-    }
-    const statusOrder = ['pending', 'confirmed', 'in_progress', 'completed'];
-    const currentIndex = statusOrder.indexOf(currentStatus);
-    const stepIndex = statusOrder.indexOf(step);
-    
-    if (stepIndex < currentIndex) return 'completed';
-    if (stepIndex === currentIndex) return 'current';
-    return 'upcoming';
-  };
+
+  if (error) {
+    return (
+      <div className="space-y-2">
+        <h4 className="font-medium text-sm text-muted-foreground">{title}</h4>
+        <p className="text-sm text-red-600 pl-2">
+          {isFr
+            ? "Impossible de charger l'historique de cette réservation."
+            : "Couldn't load this booking's history."}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">
-      <h4 className="font-medium text-sm text-muted-foreground">
-        {isFr ? "Suivi du statut" : "Status Timeline"}
-      </h4>
-      <div className="flex items-center gap-2">
-        {defaultTimeline.map((step, index) => {
-          const state = getStepState(step.status);
-          return (
-            <div key={step.status} className="flex items-center gap-2">
-              <div className="flex flex-col items-center">
-                <div 
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium
-                    ${state === 'completed' ? 'bg-emerald-500 text-white' : ''}
-                    ${state === 'current' ? 'bg-blue-500 text-white ring-2 ring-blue-200 dark:ring-blue-800' : ''}
-                    ${state === 'upcoming' ? 'bg-muted text-muted-foreground' : ''}
-                    ${state === 'cancelled' ? 'bg-muted text-muted-foreground' : ''}
-                  `}
-                >
-                  {state === 'completed' ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+      <h4 className="font-medium text-sm text-muted-foreground">{title}</h4>
+      <div className="space-y-3 pl-2 border-l-2 border-muted">
+        <div className="relative pl-4">
+          <div className="absolute -left-[9px] w-4 h-4 rounded-full bg-muted border-2 border-background" />
+          <div className="text-sm">
+            <span className="font-medium">{isFr ? "Créé" : "Created"}</span>
+            <span className="text-xs text-muted-foreground ml-2">{createdAt}</span>
+          </div>
+        </div>
+        {events.length === 0 ? (
+          <div className="relative pl-4">
+            <p className="text-xs text-muted-foreground">
+              {isFr ? "Aucun événement enregistré pour l'instant." : "No events recorded yet."}
+            </p>
+          </div>
+        ) : (
+          events.map((e, index) => {
+            const label = EVENT_LABELS[e.event_type];
+            // Unknown type → show the raw event_type, never hide it.
+            const text = label ? label[isFr ? "fr" : "en"] : e.event_type;
+            const isLast = index === events.length - 1;
+            const isNegative = e.event_type === "admin_cancel" || e.event_type === "quote_declined" || e.event_type === "dispute_opened";
+            return (
+              <div key={e.id ?? index} className="relative pl-4">
+                <div className={`absolute -left-[9px] w-4 h-4 rounded-full border-2 border-background
+                  ${isNegative ? "bg-red-500" : isLast ? "bg-blue-500" : "bg-emerald-500"}`} />
+                <div className="text-sm">
+                  <span className="font-medium">{text}</span>
+                  {!label && (
+                    <Badge variant="outline" className="ml-2 text-[10px]">{isFr ? "type inconnu" : "unknown type"}</Badge>
+                  )}
+                  <span className="text-xs text-muted-foreground ml-2">
+                    {e.created_at ? format(parseISO(e.created_at), "MMM d, yyyy HH:mm") : ""}
+                  </span>
+                  {e.note && (
+                    <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-line">{e.note}</p>
+                  )}
                 </div>
-                <span className={`text-xs mt-1 ${state === 'current' ? 'font-medium' : 'text-muted-foreground'}`}>
-                  {step.label}
-                </span>
               </div>
-              {index < defaultTimeline.length - 1 && (
-                <ArrowRight className={`h-4 w-4 ${state === 'completed' ? 'text-emerald-500' : 'text-muted-foreground/30'}`} />
-              )}
-            </div>
-          );
-        })}
-        
-        {isCancelled && (
-          <>
-            <ArrowRight className="h-4 w-4 text-muted-foreground/30" />
-            <div className="flex flex-col items-center">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500 text-white">
-                <XCircle className="h-4 w-4" />
-              </div>
-              <span className="text-xs mt-1 font-medium text-red-600 dark:text-red-400">{isFr ? "Annulé" : "Cancelled"}</span>
-            </div>
-          </>
+            );
+          })
         )}
       </div>
     </div>
   );
 }
+
 
 export default function AdminBookings() {
   const params = useParams();
@@ -431,15 +425,11 @@ export default function AdminBookings() {
     setBookings(prev => prev.map(b => b.id === id ? { ...b, ...patch } : b));
     setSelectedBooking(prev => prev?.id === id ? { ...prev, ...patch } : prev);
   };
-  const [adminNote, setAdminNote] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
-  
+
   // Modal states
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
-  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
-  const [rescheduleDate, setRescheduleDate] = useState("");
-  const [rescheduleTime, setRescheduleTime] = useState("");
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const [aiRecommendations, setAiRecommendations] = useState<AIRecommendation[]>([]);
@@ -483,6 +473,15 @@ export default function AdminBookings() {
     : undefined;
   const selAmountXof = rawSelected?.amount_xof ?? null;
   const selAmountLocked = !!rawSelected?.amount_locked;
+  // Payment tier decides whether "assigned" may be confirmed without payment.
+  // after_service (< 15 000) is paid AFTER the mission → a bare confirm is
+  // legitimate. deposit_30 / full_prepay must be paid BEFORE → confirmation
+  // only via "Mark payment received". If the tier is unknown, fall back to the
+  // amount threshold; if that too is unknown, default to prepay (no bare confirm).
+  const selTier = rawSelected?.payment_tier ?? null;
+  const selIsAfterService = selTier
+    ? selTier === 'after_service'
+    : (selAmountXof != null && selAmountXof < 15000);
   const paymentNeedsReason =
     selAmountLocked &&
     selAmountXof != null &&
@@ -499,9 +498,42 @@ export default function AdminBookings() {
   const [disputeReason, setDisputeReason] = useState("");
   const [disputeFlagOverrides, setDisputeFlagOverrides] = useState<Record<string, boolean>>({});
 
-  // Payment instructions modal
+  // Payment instructions modal (consultation only — never mutates the booking)
   const [paymentInstructionsOpen, setPaymentInstructionsOpen] = useState(false);
   const [adminConfig, setAdminConfig] = useState<{ wave_number?: string; orange_number?: string; mtn_number?: string; whatsapp?: string } | null>(null);
+
+  // Explicit "mark payment received" confirmation (financial action → confirm first)
+  const [markPaidConfirmOpen, setMarkPaidConfirmOpen] = useState(false);
+
+  // Dispute unlock (déverrouillage litige) — reason required, confirmed
+  const [unlockModalOpen, setUnlockModalOpen] = useState(false);
+  const [unlockReason, setUnlockReason] = useState("");
+  const [unlockSaving, setUnlockSaving] = useState(false);
+
+  // Real BookingEvent history for the open booking (the list endpoint omits events)
+  const [bookingEvents, setBookingEvents] = useState<BookingEventItem[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState(false);
+
+  // Fetch the real event history whenever a booking drawer opens.
+  useEffect(() => {
+    if (!selectedBooking?.id) {
+      setBookingEvents([]);
+      setEventsError(false);
+      return;
+    }
+    let cancelled = false;
+    setEventsLoading(true);
+    setEventsError(false);
+    adminApi.portalGetBookingDetail(selectedBooking.id)
+      .then((data: { events?: BookingEventItem[] }) => {
+        if (!cancelled) setBookingEvents(Array.isArray(data?.events) ? data.events : []);
+      })
+      .catch(() => { if (!cancelled) setEventsError(true); })
+      .finally(() => { if (!cancelled) setEventsLoading(false); });
+    return () => { cancelled = true; };
+    // Re-fetch when the id changes or after mutations bump the local status.
+  }, [selectedBooking?.id, selectedBooking?.status]);
 
   const eligibleProviders = useMemo(() => {
     return liveProviders.filter((p: ApiProvider) =>
@@ -624,31 +656,6 @@ export default function AdminBookings() {
     }
   };
 
-  const handleReschedule = async () => {
-    if (!selectedBooking || !rescheduleDate || !rescheduleTime) return;
-    
-    setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    setSelectedBooking(prev => prev ? {
-      ...prev, 
-      date: rescheduleDate, 
-      time: rescheduleTime,
-    } : null);
-
-    toast({
-      title: isFr ? "Réservation reprogrammée" : "Booking Rescheduled",
-      description: isFr
-        ? `Réservation déplacée au ${rescheduleDate} à ${rescheduleTime}.`
-        : `Booking moved to ${rescheduleDate} at ${rescheduleTime}.`,
-    });
-    
-    setRescheduleModalOpen(false);
-    setRescheduleDate("");
-    setRescheduleTime("");
-    setIsUpdating(false);
-  };
-
   const handleAssignProvider = async () => {
     if (!selectedBooking || !selectedProviderId) return;
     const provider = liveProviders.find((p: ApiProvider) => String(p.id) === selectedProviderId);
@@ -705,49 +712,25 @@ export default function AdminBookings() {
     }
   };
 
-  const handleAddNote = async () => {
-    if (!selectedBooking || !adminNote.trim()) return;
-    
-    setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    const existingNotes = selectedBooking.adminNotes || "";
-    const timestamp = new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-    const newNote = existingNotes 
-      ? `${existingNotes}\n\n[${timestamp}]: ${adminNote}`
-      : `[${timestamp}]: ${adminNote}`;
-
-    setSelectedBooking(prev => prev ? { ...prev, adminNotes: newNote } : null);
-    setAdminNote("");
-
-    toast({
-      title: isFr ? "Note ajoutée" : "Note Added",
-      description: isFr ? "La note admin a été enregistrée." : "Admin note has been saved.",
-    });
-    setIsUpdating(false);
-  };
-
   const handleMarkCompleted = async () => {
     if (!selectedBooking || !['confirmed', 'assigned', 'in_progress'].includes(selectedBooking.status)) return;
     setIsUpdating(true);
     const prevStatus = selectedBooking.status;
-    const prevPayoutStatus = selectedBooking.payoutStatus;
-    updateLocalBooking(selectedBooking.id, {
-      status: 'completed',
-      payoutStatus: 'due',
-      payoutDueAt: new Date().toISOString().split('T')[0],
-    });
+    // Do NOT flip payout_status locally: the backend does not set it 'due' on
+    // completion (a payout is only due once payment_status='paid'). Claiming it
+    // here would diverge from the server and the finance page.
+    updateLocalBooking(selectedBooking.id, { status: 'completed' });
     try {
       await adminApi.updateBookingStatusPut(Number(selectedBooking.id), 'completed');
       toast({
         title: isFr ? "Réservation terminée" : "Booking Completed",
         description: isFr
-          ? "La réservation est marquée comme terminée. Le paiement du prestataire est dû."
-          : "The booking has been marked as completed. Provider payout is now due.",
+          ? "La réservation est marquée comme terminée."
+          : "The booking has been marked as completed.",
         duration: 3000,
       });
     } catch (err) {
-      updateLocalBooking(selectedBooking.id, { status: prevStatus, payoutStatus: prevPayoutStatus });
+      updateLocalBooking(selectedBooking.id, { status: prevStatus });
       console.error("Failed to complete booking:", err);
       toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de terminer la réservation." : "Couldn't complete the booking.", variant: "destructive" });
     } finally {
@@ -820,14 +803,6 @@ export default function AdminBookings() {
   const openCancelModal = () => {
     setCancelReason("");
     setCancelModalOpen(true);
-  };
-
-  const openRescheduleModal = () => {
-    if (selectedBooking) {
-      setRescheduleDate(selectedBooking.date);
-      setRescheduleTime(selectedBooking.time);
-    }
-    setRescheduleModalOpen(true);
   };
 
   const openAssignModal = () => {
@@ -944,14 +919,46 @@ export default function AdminBookings() {
     }
   };
 
-  const handleSendPaymentInstructions = async () => {
+  // Explicit financial action: records that the client's payment was actually
+  // received (marks paid + confirms the booking). Confirmed via a dialog first.
+  const handleMarkPaymentReceived = async () => {
     if (!selectedBooking) return;
+    setIsUpdating(true);
+    const prevPaymentStatus = selectedBooking.paymentStatus;
+    const prevStatus = selectedBooking.status;
+    updateLocalBooking(selectedBooking.id, { paymentStatus: 'paid', status: 'confirmed' });
+    setMarkPaidConfirmOpen(false);
     try {
       await adminApi.portalConfirmPayment(Number(selectedBooking.id));
-      setPaymentInstructionsOpen(false);
-      toast({ title: isFr ? "Instructions envoyées" : "Instructions Sent" });
-    } catch {
-      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'envoyer les instructions." : "Couldn't send the instructions.", variant: "destructive" });
+      toast({ title: isFr ? "Paiement marqué comme reçu" : "Payment marked as received" });
+    } catch (err) {
+      updateLocalBooking(selectedBooking.id, { paymentStatus: prevPaymentStatus, status: prevStatus });
+      console.error("Failed to confirm payment:", err);
+      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'enregistrer le paiement." : "Couldn't record the payment.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Dispute-only: unlock the client-accepted (locked) amount. Reason required.
+  const handleUnlockAmount = async () => {
+    if (!selectedBooking || !unlockReason.trim()) return;
+    setUnlockSaving(true);
+    try {
+      await adminApi.portalUnlockAmount(Number(selectedBooking.id), unlockReason.trim());
+      setAmountLockedOverrides(prev => ({ ...prev, [selectedBooking.id]: false }));
+      setUnlockModalOpen(false);
+      setUnlockReason("");
+      toast({ title: isFr ? "Montant déverrouillé" : "Amount unlocked" });
+    } catch (err) {
+      const backendMsg = extractApiError(err);
+      toast({
+        title: isFr ? "Erreur" : "Error",
+        description: backendMsg || (isFr ? "Impossible de déverrouiller le montant." : "Couldn't unlock the amount."),
+        variant: "destructive",
+      });
+    } finally {
+      setUnlockSaving(false);
     }
   };
 
@@ -1251,10 +1258,12 @@ export default function AdminBookings() {
 
           {selectedBooking && (
             <div className="space-y-6 mt-6">
-              {/* Status Timeline */}
-              <StatusTimeline
-                currentStatus={selectedBooking.status}
-                statusHistory={selectedBooking.statusHistory}
+              {/* Real event history from the backend (replaces the hard-coded
+                  fictional timeline — see EventHistory / portalGetBookingDetail). */}
+              <EventHistory
+                events={bookingEvents}
+                loading={eventsLoading}
+                error={eventsError}
                 createdAt={selectedBooking.createdAt}
                 isFr={isFr}
               />
@@ -1413,12 +1422,32 @@ export default function AdminBookings() {
                       </p>
                     )}
 
-                    {/* Payment instructions button */}
+                    {/* Payment: two clearly separated intents.
+                        (1) Consultation — show the Mobile Money numbers, no effect.
+                        (2) Financial action — mark the money as actually received. */}
                     {isLocked && selectedBooking.paymentStatus !== 'paid' && !isClosed && (
-                      <Button variant="outline" size="sm" className="w-full"
-                        onClick={() => setPaymentInstructionsOpen(true)}>
-                        <Send className="h-3.5 w-3.5 mr-2" />
-                        {isFr ? "Envoyer instructions de paiement" : "Send payment instructions"}
+                      <div className="space-y-2">
+                        <Button variant="outline" size="sm" className="w-full"
+                          onClick={() => setPaymentInstructionsOpen(true)}>
+                          <Eye className="h-3.5 w-3.5 mr-2" />
+                          {isFr ? "Voir les instructions de paiement" : "View payment instructions"}
+                        </Button>
+                        <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                          onClick={() => setMarkPaidConfirmOpen(true)}>
+                          <Banknote className="h-3.5 w-3.5 mr-2" />
+                          {isFr ? "Marquer le paiement comme reçu" : "Mark payment as received"}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Dispute-only: unlock the client-accepted amount. Visible whenever
+                        the amount is locked. Requires a reason + explicit confirmation. */}
+                    {isLocked && (
+                      <Button variant="outline" size="sm"
+                        className="w-full border-amber-300 text-amber-700 hover:bg-amber-50"
+                        onClick={() => { setUnlockReason(""); setUnlockModalOpen(true); }}>
+                        <LockOpen className="h-3.5 w-3.5 mr-2" />
+                        {isFr ? "Déverrouiller le montant (litige)" : "Unlock amount (dispute)"}
                       </Button>
                     )}
 
@@ -1675,15 +1704,10 @@ export default function AdminBookings() {
                         ? (isFr ? 'Réassigner' : 'Reassign Provider')
                         : (isFr ? 'Assigner un prestataire' : 'Assign Provider')}
                     </Button>
-                    <Button
-                      className="w-full"
-                      onClick={() => handleStatusChange(selectedBooking.id, "confirmed")}
-                      disabled={isUpdating}
-                      data-testid="button-confirm-booking"
-                    >
-                      {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                      {isFr ? "Confirmer" : "Confirm Booking"}
-                    </Button>
+                    {/* "Confirmer" removed here: confirming a raw request would
+                        skip the whole quote → client acceptance → amount lock →
+                        assignment flow. Confirmation happens via the quote path
+                        (or "Mark payment received" once the amount is locked). */}
                     <Button
                       variant="destructive"
                       className="w-full"
@@ -1710,16 +1734,9 @@ export default function AdminBookings() {
                       <User className="h-4 w-4 mr-2" />
                       {isFr ? "Réassigner" : "Reassign Provider"}
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={openRescheduleModal}
-                      disabled={isUpdating}
-                      data-testid="button-reschedule"
-                    >
-                      <CalendarClock className="h-4 w-4 mr-2" />
-                      {isFr ? "Reprogrammer" : "Reschedule"}
-                    </Button>
+                    {/* "Reschedule" removed: no ClientBooking reschedule route
+                        exists on the backend — the old button only mutated local
+                        state (nothing persisted, client never notified). */}
                     <Button
                       className="w-full"
                       onClick={handleMarkCompleted}
@@ -1851,15 +1868,31 @@ export default function AdminBookings() {
                 {/* Assigned Actions */}
                 {selectedBooking.status === "assigned" && (
                   <div className="space-y-2">
-                    <Button
-                      className="w-full"
-                      onClick={() => handleStatusChange(selectedBooking.id, 'confirmed')}
-                      disabled={isUpdating}
-                      data-testid="button-confirm-assigned"
-                    >
-                      {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                      {isFr ? "Confirmer" : "Confirm Booking"}
-                    </Button>
+                    {selIsAfterService ? (
+                      /* after_service: paid AFTER the mission → confirming without
+                         a payment is legitimate (lets the provider start). */
+                      <Button
+                        className="w-full"
+                        onClick={() => handleStatusChange(selectedBooking.id, 'confirmed')}
+                        disabled={isUpdating}
+                        data-testid="button-confirm-assigned"
+                      >
+                        {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                        {isFr ? "Confirmer la mission (paiement après prestation)" : "Confirm mission (payment after service)"}
+                      </Button>
+                    ) : (
+                      /* prepay tiers: money must arrive BEFORE. No bare confirm —
+                         the only path to confirmed is "Mark payment received"
+                         (in the Amount & Payment section above). */
+                      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 rounded-md px-3 py-2 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                        <span>
+                          {isFr
+                            ? "Ce service exige un acompte/paiement avant intervention. Confirmez via « Marquer le paiement comme reçu »."
+                            : "This service requires a deposit/payment before service. Confirm via \"Mark payment as received\"."}
+                        </span>
+                      </div>
+                    )}
                     <Button
                       variant="outline"
                       className="w-full"
@@ -1900,27 +1933,9 @@ export default function AdminBookings() {
                   </p>
                 )}
 
-                {/* Add Note */}
-                <div className="space-y-2">
-                  <Label htmlFor="admin-note" className="text-sm">{isFr ? "Ajouter une note" : "Add Note"}</Label>
-                  <Textarea
-                    id="admin-note"
-                    value={adminNote}
-                    onChange={(e) => setAdminNote(e.target.value)}
-                    placeholder={isFr ? "Note interne…" : "Add internal note..."}
-                    rows={2}
-                    data-testid="textarea-admin-note"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleAddNote}
-                    disabled={!adminNote.trim() || isUpdating}
-                    data-testid="button-add-note"
-                  >
-                    {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <StickyNote className="h-4 w-4 mr-1" />}
-                    {isFr ? "Ajouter" : "Add Note"}
-                  </Button>
-                </div>
+                {/* "Add Note" removed: there is no backend route to persist an
+                    admin note on a ClientBooking — the old field only lived in
+                    local state and was lost on refresh. */}
               </div>
             </div>
           )}
@@ -1968,52 +1983,7 @@ export default function AdminBookings() {
         </DialogContent>
       </Dialog>
 
-      {/* Reschedule Modal */}
-      <Dialog open={rescheduleModalOpen} onOpenChange={setRescheduleModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{isFr ? "Reprogrammer la réservation" : "Reschedule Booking"}</DialogTitle>
-            <DialogDescription>
-              {isFr ? "Choisissez une nouvelle date et heure." : "Select a new date and time for this booking."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="reschedule-date">{isFr ? "Nouvelle date" : "New Date"}</Label>
-              <Input
-                id="reschedule-date"
-                type="date"
-                value={rescheduleDate}
-                onChange={(e) => setRescheduleDate(e.target.value)}
-                data-testid="input-reschedule-date"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="reschedule-time">{isFr ? "Nouvelle heure" : "New Time"}</Label>
-              <Input
-                id="reschedule-time"
-                value={rescheduleTime}
-                onChange={(e) => setRescheduleTime(e.target.value)}
-                placeholder="e.g., 2:00 PM"
-                data-testid="input-reschedule-time"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRescheduleModalOpen(false)}>
-              {isFr ? "Annuler" : "Cancel"}
-            </Button>
-            <Button
-              onClick={handleReschedule}
-              disabled={!rescheduleDate || !rescheduleTime || isUpdating}
-              data-testid="button-confirm-reschedule"
-            >
-              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {isFr ? "Reprogrammer" : "Reschedule"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Reschedule modal removed — no backend route to persist a reschedule. */}
 
       {/* Assign Provider Modal */}
       <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
@@ -2581,13 +2551,82 @@ export default function AdminBookings() {
               </div>
             )}
           </div>
+          <p className="text-xs text-muted-foreground italic pt-1">
+            {isFr
+              ? "Consultation uniquement — copiez ces numéros pour les communiquer au client. Cette fenêtre ne modifie pas la réservation."
+              : "For reference only — copy these numbers to share with the client. This window does not change the booking."}
+          </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPaymentInstructionsOpen(false)}>
               {isFr ? "Fermer" : "Close"}
             </Button>
-            <Button onClick={handleSendPaymentInstructions} disabled={isUpdating}>
-              <Send className="h-4 w-4 mr-2" />
-              {isFr ? "Envoyer via WhatsApp" : "Send via WhatsApp"}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark payment received — explicit financial confirmation */}
+      <Dialog open={markPaidConfirmOpen} onOpenChange={setMarkPaidConfirmOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-emerald-600" />
+              {isFr ? "Marquer le paiement comme reçu" : "Mark payment as received"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedBooking && (() => {
+                const amt = selectedBooking.baseAmount || selectedBooking.price || 0;
+                const amtStr = amt > 0 ? `${new Intl.NumberFormat('fr-FR').format(amt)} FCFA` : (isFr ? "le montant" : "the amount");
+                return isFr
+                  ? `Confirmez-vous avoir réellement reçu ${amtStr} de ${selectedBooking.clientName} ? La réservation sera marquée comme payée et confirmée.`
+                  : `Do you confirm you actually received ${amtStr} from ${selectedBooking.clientName}? The booking will be marked paid and confirmed.`;
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMarkPaidConfirmOpen(false)} disabled={isUpdating}>
+              {isFr ? "Annuler" : "Cancel"}
+            </Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={handleMarkPaymentReceived} disabled={isUpdating}>
+              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+              {isFr ? "Oui, paiement reçu" : "Yes, payment received"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unlock amount (dispute) — reason required + explicit confirmation */}
+      <Dialog open={unlockModalOpen} onOpenChange={setUnlockModalOpen}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
+              <LockOpen className="h-5 w-5" />
+              {isFr ? "Déverrouiller le montant (litige)" : "Unlock amount (dispute)"}
+            </DialogTitle>
+            <DialogDescription>
+              {isFr
+                ? "Le montant accepté par le client sera déverrouillé et pourra être modifié. À n'utiliser que dans le cadre d'un litige."
+                : "The amount the client accepted will be unlocked and can be changed. Use this only as part of a dispute."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>{isFr ? "Motif du déverrouillage *" : "Reason for unlocking *"}</Label>
+            <Textarea
+              value={unlockReason}
+              onChange={(e) => setUnlockReason(e.target.value)}
+              rows={3}
+              placeholder={isFr ? "Expliquez pourquoi le montant verrouillé doit être déverrouillé…" : "Explain why the locked amount must be unlocked…"}
+              data-testid="input-unlock-reason"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUnlockModalOpen(false)} disabled={unlockSaving}>
+              {isFr ? "Annuler" : "Cancel"}
+            </Button>
+            <Button className="bg-amber-600 hover:bg-amber-700 text-white"
+              onClick={handleUnlockAmount} disabled={unlockSaving || !unlockReason.trim()}>
+              {unlockSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <LockOpen className="h-4 w-4 mr-2" />}
+              {isFr ? "Déverrouiller" : "Unlock"}
             </Button>
           </DialogFooter>
         </DialogContent>
