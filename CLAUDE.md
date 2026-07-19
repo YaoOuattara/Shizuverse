@@ -120,7 +120,7 @@ Remaining work after MVP:
 
 ## Known Issues
 - Pages look minimal/unstyled on production — suspect Tailwind purge config
-- Admin login on production needs testing with password YaAllahShizu@1
+- Admin login on production needs testing (voir ADMIN_PASSWORD dans les variables d'environnement Render)
 - /bookings and /provider pages still use mock data
 
 ## Conventions
