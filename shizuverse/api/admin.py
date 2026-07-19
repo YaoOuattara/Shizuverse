@@ -76,11 +76,17 @@ def require_admin_token(f):
             return jsonify({'error': 'Missing token'}), 401
         token = auth_header[7:]
         try:
-            jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+            payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
         except jwt.ExpiredSignatureError:
             return jsonify({'error': 'Token expired'}), 401
         except jwt.InvalidTokenError:
             return jsonify({'error': 'Invalid token'}), 401
+        # All token types (client/provider/admin) are signed with the same
+        # SECRET_KEY, so a valid signature is NOT proof of admin rights.
+        # Admin tokens carry sub='admin' and no 'type'; client/provider tokens
+        # carry a numeric user-id sub and type in {'client','provider'}.
+        if payload.get('sub') != 'admin' or payload.get('type') is not None:
+            return jsonify({'error': 'Forbidden'}), 403
         return f(*args, **kwargs)
     return decorated
 
@@ -88,10 +94,13 @@ def require_admin_token(f):
 @admin_bp.route('/login', methods=['POST'])
 @limiter.limit("5 per minute")
 def admin_login():
+    import hmac
     data = request.get_json() or {}
     password = data.get('password', '')
-    expected = os.environ.get('ADMIN_PASSWORD', 'admin')
-    if password != expected:
+    expected = os.environ.get('ADMIN_PASSWORD', '')
+    # No default password: an unset ADMIN_PASSWORD can never authenticate.
+    # Constant-time compare to avoid leaking the password via timing.
+    if not expected or not hmac.compare_digest(password, expected):
         return jsonify({'error': 'Invalid password'}), 401
     return jsonify({'token': _issue_admin_token()})
 
@@ -938,25 +947,10 @@ def decline_provider_booking(booking_id):
     return jsonify({'success': True, 'status': 'cancelled'})
 
 
-@provider_bp.route('/bookings/<int:booking_id>/status', methods=['PATCH'])
-def update_provider_booking_status(booking_id):
-    """Legacy endpoint — kept for backwards compat."""
-    data = request.get_json()
-    booking = ClientBooking.query.get(booking_id)
-    if not booking:
-        appointment = Appointment.query.get_or_404(booking_id)
-        new_status = data.get('status')
-        if new_status not in ('confirmed', 'completed', 'cancelled'):
-            return jsonify({'error': 'Invalid status'}), 400
-        appointment.status = new_status
-        db.session.commit()
-        return jsonify({'success': True, 'status': appointment.status})
-    new_status = data.get('status')
-    if new_status not in ('confirmed', 'completed', 'cancelled'):
-        return jsonify({'error': 'Invalid status'}), 400
-    booking.status = new_status
-    db.session.commit()
-    return jsonify({'success': True, 'status': booking.status})
+# NOTE: The legacy unauthenticated PATCH /provider/bookings/<id>/status endpoint
+# was removed — no auth, sequential IDs, zero callers (frontend + tests).
+# Provider status transitions go through the token-guarded /accept, /decline,
+# /start and /complete endpoints above.
 
 
 @provider_bp.route('/profile', methods=['GET'])

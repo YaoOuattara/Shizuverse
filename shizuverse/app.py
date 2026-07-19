@@ -49,6 +49,13 @@ def create_app():
         print("FATAL: SECRET_KEY not set or using default. Refusing to start.", file=sys.stderr)
         sys.exit(1)
     app.config["SECRET_KEY"] = _secret or "dev-secret-key"
+
+    # Admin auth is a single shared password (no admin row in DB). In production
+    # it MUST be set explicitly — never fall back to a guessable default.
+    if os.getenv("ENV") == "production" and not os.environ.get("ADMIN_PASSWORD"):
+        import sys
+        print("FATAL: ADMIN_PASSWORD not set. Refusing to start.", file=sys.stderr)
+        sys.exit(1)
     app.config["SESSION_COOKIE_SECURE"] = True
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"

@@ -19,11 +19,16 @@ def admin_required(f):
         token = auth_header[7:]
         try:
             payload = pyjwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
-            g.admin_payload = payload
         except pyjwt.ExpiredSignatureError:
             return jsonify({'error': 'Token expired'}), 401
         except pyjwt.InvalidTokenError:
             return jsonify({'error': 'Invalid token'}), 401
+        # A valid signature is not proof of admin rights: client/provider tokens
+        # are signed with the same SECRET_KEY. Admin tokens carry sub='admin'
+        # and no 'type'; reject anything else.
+        if payload.get('sub') != 'admin' or payload.get('type') is not None:
+            return jsonify({'error': 'Forbidden'}), 403
+        g.admin_payload = payload
         return f(*args, **kwargs)
     return decorated
 

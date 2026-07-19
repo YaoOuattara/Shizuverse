@@ -230,33 +230,8 @@ def payment_declared(booking_id):
     return jsonify({"message": "Paiement déclaré — en attente de confirmation Shizu"})
 
 
-# ── PUT /api/bookings/<id>/ ───────────────────────────────────────────────────
-# Body: { status }
-@bookings_bp.route("/<int:booking_id>/", methods=["PUT"])
-def update_booking(booking_id):
-    booking = ClientBooking.query.get_or_404(booking_id)
-    data = request.get_json(silent=True) or {}
-
-    new_status = data.get("status")
-    if not new_status:
-        return jsonify({"error": "status is required"}), 400
-    if new_status not in VALID_STATUSES:
-        return jsonify({"error": f"Invalid status. Must be one of: {VALID_STATUSES}"}), 400
-
-    booking.status = new_status
-    db.session.commit()
-    return jsonify(booking.to_dict()), 200
-
-
-# ── DELETE /api/bookings/<id>/ ────────────────────────────────────────────────
-@bookings_bp.route("/<int:booking_id>/", methods=["DELETE"])
-def cancel_booking(booking_id):
-    booking = ClientBooking.query.get_or_404(booking_id)
-
-    if booking.status not in ("pending", "confirmed"):
-        return jsonify({"error": f"Cannot cancel a booking with status '{booking.status}'"}), 400
-
-    booking.status = "cancelled"
-    db.session.commit()
-    return jsonify(booking.to_dict()), 200
-
+# NOTE: The anonymous PUT /<id>/ (arbitrary status change) and DELETE /<id>/
+# (cancel) endpoints were removed — they had no auth, keyed on sequential IDs,
+# and had zero callers (frontend + tests). Booking status transitions go
+# through the authenticated admin (/api/admin/bookings/...) and provider
+# (/api/provider/bookings/...) endpoints instead.
