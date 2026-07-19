@@ -2,12 +2,12 @@ venv/
 __pycache__/
 *.pyc
 .env
-.env
-.env
-.env
+
+# SQLite databases — never track local/dev DBs
+*.db
+data/*.db
 
 # macOS
 .DS_Store
 shizuverse/.DS_Store
-.DS_Store
 instance/
