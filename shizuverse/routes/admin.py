@@ -73,6 +73,11 @@ def get_provider_detail(provider_id):
         'address': p.address,
         'bio': p.bio,
         'profile_picture': p.profile_picture,
+        # Review documents — needed to decide Gate 3 / Gate 5 with the proof in view.
+        'profile_photo_url': p.profile_photo_url,
+        'experience_photo_url': p.experience_photo_url,
+        'experience_text': p.experience_text,
+        'id_document_url': p.id_document_url,
         'verified': p.verified,
         'verification_status': p.verification_status,
         'listed_status': p.listed_status,
@@ -376,6 +381,11 @@ def get_all_providers():
             'created_at': p.created_at.isoformat() if p.created_at else None,
             'services': data['services'],
             'id_document_url': p.id_document_url,
+            # Review documents — the admin must SEE the capability proof (Gate 3)
+            # and the profile photo, not just the ID. These were missing.
+            'profile_photo_url': p.profile_photo_url,
+            'experience_photo_url': p.experience_photo_url,
+            'experience_text': p.experience_text,
         })
 
     return jsonify(result)
