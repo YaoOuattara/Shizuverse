@@ -538,6 +538,109 @@ def cancel_booking(booking_id):
     return jsonify({'message': 'Booking cancelled', 'booking_id': booking_id})
 
 
+# Slot labels for reschedule notifications (client = locale, provider = FR).
+_SLOT_LABELS = {
+    'morning':   {'fr': 'Matin 8h–12h',     'en': 'Morning 8am–12pm'},
+    'afternoon': {'fr': 'Après-midi 12h–17h','en': 'Afternoon 12pm–5pm'},
+    'evening':   {'fr': 'Soir 17h–21h',      'en': 'Evening 5pm–9pm'},
+    'anytime':   {'fr': 'Flexible',          'en': 'Anytime'},
+}
+
+
+@admin_bp.route('/bookings/<int:booking_id>/reschedule', methods=['POST'])
+@admin_required
+def reschedule_booking(booking_id):
+    """Admin-only: move a booking to a new date/slot.
+
+    Changes ONLY the date/slot — never the amount, amount_locked, or the
+    assigned provider (a reschedule is a date change, not a re-quote). The
+    lifecycle status is preserved; the reschedule is traced as a BookingEvent.
+    """
+    b = ClientBooking.query.get_or_404(booking_id)
+
+    if b.status in ('completed', 'cancelled', 'declined'):
+        return jsonify({'error': f"Impossible de reprogrammer une réservation « {b.status} »."}), 400
+
+    data = request.get_json() or {}
+    new_date_raw = (data.get('appointment_date') or '').strip()
+    reason = (data.get('reason') or '').strip()
+    new_slot = (data.get('time_slot') or data.get('time_preference') or '').strip() or None
+
+    if not new_date_raw:
+        return jsonify({'error': 'appointment_date is required (ISO 8601)'}), 400
+    if not reason:
+        return jsonify({'error': 'Un motif de reprogrammation est obligatoire.'}), 400
+
+    # Parse date — strip tz so comparison with utcnow() stays naive (mirror create_booking).
+    try:
+        new_dt = datetime.fromisoformat(new_date_raw)
+        if new_dt.tzinfo is not None:
+            from datetime import timezone
+            new_dt = new_dt.astimezone(timezone.utc).replace(tzinfo=None)
+    except ValueError:
+        return jsonify({'error': 'appointment_date invalide. Utilisez ISO 8601.'}), 400
+
+    if new_dt < datetime.utcnow():
+        return jsonify({'error': 'La nouvelle date doit être dans le futur.'}), 400
+
+    old_dt = b.appointment_date
+    old_str = old_dt.strftime('%d/%m/%Y %H:%M') if old_dt else '—'
+    new_str = new_dt.strftime('%d/%m/%Y %H:%M')
+
+    # Apply ONLY date/slot. Amount, amount_locked, provider untouched.
+    b.appointment_date = new_dt
+    if new_slot:
+        b.time_slot = new_slot
+        b.time_preference = new_slot
+
+    db.session.add(BookingEvent(
+        booking_id=b.id,
+        event_type='rescheduled',
+        from_status=b.status,
+        to_status=b.status,
+        actor_id=None,
+        note=f"Reprogrammée : {old_str} → {new_str}"
+             + (f" [{new_slot}]" if new_slot else "")
+             + f" — Motif : {reason}",
+    ))
+    db.session.commit()
+
+    # WhatsApp: client (locale) + provider if assigned (always FR). Never blocking.
+    date_only = new_dt.strftime('%d/%m/%Y')
+    try:
+        from shizuverse.utils.notifications import (
+            notify_booking_rescheduled_client,
+            notify_booking_rescheduled_provider,
+        )
+        client_slot = _SLOT_LABELS.get(new_slot, {}).get('en' if b.locale == 'en' else 'fr', '') if new_slot else ''
+        notify_booking_rescheduled_client(
+            client_name=b.client_name,
+            client_phone=b.client_phone,
+            booking_ref=str(b.id),
+            new_date=date_only,
+            new_slot=client_slot,
+            locale=b.locale,
+        )
+        if b.provider_phone:
+            provider_slot = _SLOT_LABELS.get(new_slot, {}).get('fr', '') if new_slot else ''
+            notify_booking_rescheduled_provider(
+                provider_phone=b.provider_phone,
+                booking_ref=str(b.id),
+                new_date=date_only,
+                new_slot=provider_slot,
+            )
+    except Exception as e:
+        current_app.logger.error(f"[reschedule_booking] notification error: {e}", exc_info=True)
+
+    return jsonify({
+        'success': True,
+        'id': b.id,
+        'appointment_date': b.appointment_date.isoformat(),
+        'time_slot': b.time_slot,
+        'status': b.status,
+    })
+
+
 @admin_bp.route('/bookings/<int:booking_id>/finance', methods=['POST'])
 @admin_required
 def update_finance(booking_id):
@@ -918,6 +1021,57 @@ def confirm_payment(booking_id):
         current_app.logger.error(f"[confirm_payment] Unexpected error: {e}", exc_info=True)
 
     return jsonify({'success': True, 'status': b.status, 'payment_status': b.payment_status})
+
+
+@admin_bp.route('/bookings/<int:booking_id>/send-payment-instructions', methods=['POST'])
+@admin_required
+def send_payment_instructions(booking_id):
+    """Send the payment instructions to the client via WhatsApp (in their locale).
+
+    Read-only w.r.t. the booking: never changes status, payment_status, or the
+    amount. Only sends the message and records a BookingEvent on success.
+    """
+    from shizuverse.utils.notifications import notify_payment_instructions, is_twilio_enabled
+
+    b = ClientBooking.query.get_or_404(booking_id)
+
+    if not is_twilio_enabled():
+        return jsonify({'sent': False, 'twilio_enabled': False,
+                        'error': 'WhatsApp (Twilio) non configuré.'}), 503
+
+    if b.amount_xof is None:
+        return jsonify({'sent': False, 'error': "Aucun montant de devis à envoyer."}), 400
+
+    try:
+        sent = notify_payment_instructions(
+            client_name=b.client_name,
+            client_phone=b.client_phone,
+            booking_ref=str(b.id),
+            amount=b.amount_xof,
+            service_name=b.service_name,
+            payment_tier=b.payment_tier,
+            note=b.quote_note,
+            quote_token=b.quote_token,
+            locale=b.locale,
+        )
+    except Exception as e:
+        current_app.logger.error(f"[send_payment_instructions] error: {e}", exc_info=True)
+        return jsonify({'sent': False, 'error': "Échec de l'envoi."}), 502
+
+    if not sent:
+        return jsonify({'sent': False, 'error': "Le message n'a pas pu être envoyé."}), 502
+
+    db.session.add(BookingEvent(
+        booking_id=b.id,
+        event_type='payment_instructions_sent',
+        from_status=b.status,
+        to_status=b.status,
+        actor_id=None,
+        note=f"Instructions de paiement envoyées au client ({b.locale}).",
+    ))
+    db.session.commit()
+
+    return jsonify({'sent': True})
 
 
 @admin_bp.route('/bookings/<int:booking_id>/dispute', methods=['POST'])

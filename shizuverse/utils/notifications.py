@@ -169,6 +169,14 @@ CLIENT_TEMPLATES = {
                "Thank you {client_name}! Your Shizu provider is confirmed. "
                "Enjoy your service!"),
     },
+    "booking_rescheduled_client": {
+        "fr": ("📅 Votre réservation #{booking_ref} a été reprogrammée. "
+               "Nouvelle date : {new_date}{slot_part}. "
+               "Une question ? Contactez-nous : {wa_link}"),
+        "en": ("📅 Your booking #{booking_ref} has been rescheduled. "
+               "New date: {new_date}{slot_part}. "
+               "Any question? Contact us: {wa_link}"),
+    },
     # "Reason not specified" fallback for cancellations.
     "reason_unspecified": {"fr": "Non précisée", "en": "Not specified"},
 }
@@ -276,6 +284,18 @@ def notify_booking_cancelled_client(
     msg = _render_client("booking_cancelled_client", loc,
                          booking_ref=booking_ref, reason=display_reason,
                          wa_link=_shizu_wa_link())
+    return send_whatsapp(client_phone, msg)
+
+
+def notify_booking_rescheduled_client(
+    *, client_name: str, client_phone: str, booking_ref: str,
+    new_date: str, new_slot: str = "", locale: str = "fr",
+) -> bool:
+    """Sent TO THE CLIENT when an admin reschedules the booking (locale-aware)."""
+    slot_part = f" ({new_slot})" if new_slot else ""
+    msg = _render_client("booking_rescheduled_client", locale,
+                         booking_ref=booking_ref, new_date=new_date,
+                         slot_part=slot_part, wa_link=_shizu_wa_link())
     return send_whatsapp(client_phone, msg)
 
 
@@ -416,6 +436,19 @@ def notify_review_received(
     msg = (
         f"⭐ Nouvel avis ! {client_name} vous a donné {rating}/5 : '{preview}'. "
         f"Merci pour votre excellent travail avec Shizu !"
+    )
+    return send_whatsapp(provider_phone, msg)
+
+
+def notify_booking_rescheduled_provider(
+    *, provider_phone: str, booking_ref: str, new_date: str, new_slot: str = "",
+) -> bool:
+    """Sent TO THE PROVIDER (always FR) when a mission is rescheduled."""
+    slot_part = f" ({new_slot})" if new_slot else ""
+    msg = (
+        f"📅 La mission #{booking_ref} a été reprogrammée. "
+        f"Nouvelle date : {new_date}{slot_part}. "
+        f"Merci de noter le changement."
     )
     return send_whatsapp(provider_phone, msg)
 
