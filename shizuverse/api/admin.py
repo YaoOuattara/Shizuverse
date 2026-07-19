@@ -245,9 +245,23 @@ def update_booking_status(booking_id):
     new_status = data.get('status', '').strip()
     if not new_status or new_status not in VALID:
         return jsonify({'error': f'Invalid status. Use: {VALID}'}), 400
+    prev_status = booking.status
     booking.status = new_status
     if new_status == 'under_review':
         booking.reviewed_by = 'admin'
+
+    # Trace every admin status change (previously untraced — e.g. the
+    # after_service "confirm mission" step left no BookingEvent at all).
+    if new_status != prev_status:
+        from shizuverse.models.booking_event import BookingEvent
+        db.session.add(BookingEvent(
+            booking_id=booking.id,
+            event_type='status_changed',
+            from_status=prev_status,
+            to_status=new_status,
+            actor_id=None,
+            note=f"Statut modifié par l'admin : {prev_status} → {new_status}",
+        ))
     db.session.commit()
 
     # WhatsApp: booking confirmed → notify client + provider
