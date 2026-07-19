@@ -78,12 +78,27 @@ export default function NewRequestCard({
             </div>
             <div className="min-w-0">
               <p className="font-semibold text-foreground text-sm leading-snug truncate">
-                {booking.customerName}
+                {booking.masked
+                  ? (booking.commune || (isFr ? "Nouvelle demande" : "New request"))
+                  : booking.customerName}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 truncate">
                 <Wrench className="h-3 w-3 shrink-0" />
                 {booking.serviceName}
               </p>
+              {booking.estimatedPayout != null && booking.estimatedPayout > 0 && (
+                <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mt-0.5">
+                  {new Intl.NumberFormat('fr-FR').format(booking.estimatedPayout)} FCFA
+                  <span className="text-[10px] text-muted-foreground ml-1">
+                    {isFr ? "(estimé)" : "(estimated)"}
+                  </span>
+                </p>
+              )}
+              {booking.masked && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {isFr ? "Coordonnées visibles après attribution" : "Contact details visible after assignment"}
+                </p>
+              )}
             </div>
           </div>
 

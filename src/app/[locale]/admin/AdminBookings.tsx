@@ -276,6 +276,8 @@ const EVENT_LABELS: Record<string, { fr: string; en: string }> = {
   status_changed:    { fr: "Statut modifié par l'admin",     en: "Status changed by admin" },
   rescheduled:       { fr: "Reprogrammée",                    en: "Rescheduled" },
   payment_instructions_sent: { fr: "Instructions de paiement envoyées", en: "Payment instructions sent" },
+  provider_accepted: { fr: "Mission acceptée par le prestataire", en: "Mission accepted by provider" },
+  provider_declined: { fr: "Mission refusée par le prestataire — à réassigner", en: "Mission declined by provider — reassign" },
 };
 
 function EventHistory({ events, loading, error, createdAt, isFr }: {

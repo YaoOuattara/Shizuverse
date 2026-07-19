@@ -310,7 +310,12 @@ export default function ProviderDashboard() {
       toast({ title: t("failedAcceptTitle"), description: t("failedAcceptDesc"), variant: "destructive" });
       throw new Error("Accept failed");
     }
-    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: "confirmed" as ProviderBookingStatus } : b));
+    // Accepting an assigned mission moves it to 'accepted'; the legacy open-pool
+    // accept keeps 'confirmed'. Use the server's returned status as source of truth.
+    const acceptData = await res.json().catch(() => ({})) as { status?: string };
+    const nextStatus = (acceptData?.status as ProviderBookingStatus)
+      ?? (booking?.status === "assigned" ? "accepted" : "confirmed");
+    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: nextStatus } : b));
     toast({
       title: t("acceptedTitle"),
       description: booking
@@ -332,10 +337,17 @@ export default function ProviderDashboard() {
       toast({ title: t("failedRejectTitle"), description: t("failedRejectDesc"), variant: "destructive" });
       throw new Error("Decline failed");
     }
-    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: "cancelled" as ProviderBookingStatus } : b));
+    const declineData = await res.json().catch(() => ({})) as { reassign?: boolean };
+    if (declineData?.reassign || booking?.status === "assigned" || booking?.status === "accepted") {
+      // Assigned/accepted mission declined → it left this provider (back to the
+      // admin's re-assignment pool). Remove it from the list.
+      setBookings(prev => prev.filter(b => b.id !== bookingId));
+    } else {
+      setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: "cancelled" as ProviderBookingStatus } : b));
+    }
     toast({
       title: t("rejectedTitle"),
-      description: booking ? t("rejectedDesc", { customerName: booking.customerName }) : t("rejectedFallback"),
+      description: booking ? t("rejectedDesc", { customerName: booking.customerName || booking.commune || "" }) : t("rejectedFallback"),
       variant: "destructive",
     });
   };
@@ -420,7 +432,10 @@ export default function ProviderDashboard() {
       (booking.customerEmail ?? "").toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus =
       filters.status === "all" || booking.status === filters.status ||
-      (filters.status === "pending" && booking.status === "requested");
+      // "À traiter" groups the open pool + admin-assigned missions to act on.
+      (filters.status === "pending" && (booking.status === "requested" || booking.status === "assigned")) ||
+      // "Confirmées" groups active missions (accepted / in progress).
+      (filters.status === "confirmed" && (booking.status === "accepted" || booking.status === "in_progress"));
     let matchesDateRange = true;
     if (filters.dateRange.startDate || filters.dateRange.endDate) {
       const bookingDate = new Date(booking.date);
@@ -434,8 +449,8 @@ export default function ProviderDashboard() {
 
   const statusCounts = {
     all:       bookings.length,
-    pending:   bookings.filter(b => b.status === "pending" || b.status === "requested").length,
-    confirmed: bookings.filter(b => b.status === "confirmed").length,
+    pending:   bookings.filter(b => b.status === "pending" || b.status === "requested" || b.status === "assigned").length,
+    confirmed: bookings.filter(b => b.status === "confirmed" || b.status === "accepted" || b.status === "in_progress").length,
     completed: bookings.filter(b => b.status === "completed").length,
     cancelled: bookings.filter(b => b.status === "cancelled").length,
   };
@@ -793,9 +808,9 @@ export default function ProviderDashboard() {
           </button>
         </div>
 
-        {/* 4 — Nouvelles demandes */}
+        {/* 4 — Nouvelles demandes (pool ouvert + missions assignées par l'admin) */}
         {(() => {
-          const pending = bookings.filter(b => b.status === "pending" || b.status === "requested");
+          const pending = bookings.filter(b => b.status === "pending" || b.status === "requested" || b.status === "assigned");
           return (
             <div className="mb-6" data-testid="section-new-requests">
               <div className="flex items-center gap-2 mb-3">

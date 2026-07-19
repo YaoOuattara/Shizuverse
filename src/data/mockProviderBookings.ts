@@ -1,6 +1,6 @@
 // todo: remove mock functionality - replace with API call to Flask backend
 
-export type ProviderBookingStatus = "confirmed" | "pending" | "requested" | "cancelled" | "completed" | "in_progress";
+export type ProviderBookingStatus = "confirmed" | "pending" | "requested" | "cancelled" | "completed" | "in_progress" | "assigned" | "accepted";
 
 export interface ProviderBooking {
   id: string;
@@ -21,6 +21,10 @@ export interface ProviderBooking {
   requestedAt: string;
   urgency?: string;          // urgent_2h | same_day | under_24h | normal
   time_preference?: string;  // morning | afternoon | evening | anytime
+  // Open (unassigned) requests are PII-masked by the backend until assignment.
+  masked?: boolean;
+  commune?: string;
+  estimatedPayout?: number | null;
 }
 
 // todo: remove mock functionality - replace with API data
@@ -177,5 +181,7 @@ export function getBookingCounts(): Record<ProviderBookingStatus, number> {
     completed:   mockProviderBookings.filter((b) => b.status === "completed").length,
     cancelled:   mockProviderBookings.filter((b) => b.status === "cancelled").length,
     in_progress: mockProviderBookings.filter((b) => b.status === "in_progress").length,
+    assigned:    mockProviderBookings.filter((b) => b.status === "assigned").length,
+    accepted:    mockProviderBookings.filter((b) => b.status === "accepted").length,
   };
 }

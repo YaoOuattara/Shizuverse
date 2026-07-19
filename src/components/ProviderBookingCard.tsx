@@ -31,7 +31,6 @@ import {
   Check,
   X,
   CalendarClock,
-  Mail,
   Phone,
   FileText,
   Loader2,
@@ -121,8 +120,11 @@ export default function ProviderBookingCard({
     cancelled:   "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
     completed:   "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
     in_progress: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+    assigned:    "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400",
+    accepted:    "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
   };
 
+  // Provider-facing labels are always French (providers are francophone — T-19).
   const statusLabels: Record<ProviderBookingStatus, string> = {
     confirmed:   t("status.confirmed"),
     pending:     t("status.pending"),
@@ -130,6 +132,8 @@ export default function ProviderBookingCard({
     cancelled:   t("status.cancelled"),
     completed:   t("status.completed"),
     in_progress: "En cours",
+    assigned:    "Nouvelle mission",
+    accepted:    "Acceptée",
   };
 
   const statusIcons: Record<ProviderBookingStatus, typeof CheckCircle2> = {
@@ -139,6 +143,8 @@ export default function ProviderBookingCard({
     cancelled:   XCircle,
     completed:   Check,
     in_progress: MapPin,
+    assigned:    CircleDashed,
+    accepted:    Check,
   };
 
   const handleStart = async () => {
@@ -155,9 +161,15 @@ export default function ProviderBookingCard({
 
   const StatusIcon = statusIcons[booking.status as ProviderBookingStatus] ?? CircleDashed;
   const isPending = booking.status === "pending" || booking.status === "requested";
+  const isAssigned = booking.status === "assigned";
+  const isAccepted = booking.status === "accepted";
   const isConfirmed = booking.status === "confirmed";
   const isInProgress = booking.status === "in_progress";
-  const isActionable = isPending || isConfirmed || isInProgress;
+  // Accept/refuse is offered on open requests AND on missions the admin assigned.
+  const canAcceptReject = isPending || isAssigned;
+  // Start is offered once the mission is confirmed (paid) or accepted by the provider.
+  const canStart = isConfirmed || isAccepted;
+  const isActionable = canAcceptReject || isConfirmed || isAccepted || isInProgress;
   const isAnyLoading = isAccepting || isRejecting || isRescheduling || isStarting || isCompleting;
 
   return (
@@ -177,7 +189,10 @@ export default function ProviderBookingCard({
                   {booking.serviceName}
                 </h3>
                 <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                  {booking.duration} - {formatMoney(booking.price)}
+                  {booking.duration}
+                  {booking.estimatedPayout != null && booking.estimatedPayout > 0 && (
+                    <> · {formatMoney(booking.estimatedPayout)} <span className="text-[11px]">(rémunération estimée)</span></>
+                  )}
                 </p>
               </div>
               <Badge
@@ -191,30 +206,45 @@ export default function ProviderBookingCard({
             </div>
 
             <div className="flex flex-col gap-2 pt-2 border-t">
-              <div className="flex items-center gap-2 text-foreground">
-                <User className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
-                <span
-                  className="text-sm font-medium truncate"
-                  data-testid={`text-customer-${booking.id}`}
-                >
-                  {booking.customerName}
-                </span>
-              </div>
-
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span className="text-xs sm:text-sm truncate" data-testid={`text-email-${booking.id}`}>
-                    {booking.customerEmail}
+              {booking.masked ? (
+                /* PII masked until the mission is assigned to this provider —
+                   show only the commune, never name/phone/exact address. */
+                <div className="flex items-center gap-2 text-foreground">
+                  <MapPin className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
+                  <span className="text-sm font-medium truncate">
+                    {booking.commune || booking.location || "—"}
                   </span>
+                  <Badge variant="outline" className="text-[10px] ml-1">
+                    Coordonnées visibles après attribution
+                  </Badge>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span className="text-xs sm:text-sm" data-testid={`text-phone-${booking.id}`}>
-                    {booking.customerPhone}
-                  </span>
-                </div>
-              </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 text-foreground">
+                    <User className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
+                    <span
+                      className="text-sm font-medium truncate"
+                      data-testid={`text-customer-${booking.id}`}
+                    >
+                      {booking.customerName}
+                    </span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-muted-foreground">
+                    {booking.location && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <span className="text-xs sm:text-sm truncate">{booking.location}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span className="text-xs sm:text-sm" data-testid={`text-phone-${booking.id}`}>
+                        {booking.customerPhone}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-muted-foreground pt-2 border-t">
@@ -298,8 +328,8 @@ export default function ProviderBookingCard({
               </div>
             )}
 
-            {/* "Je suis arrivé" button — shown when booking is confirmed */}
-            {isConfirmed && onStart && (
+            {/* "Je suis arrivé" button — shown when confirmed (paid) or accepted */}
+            {canStart && onStart && (
               <div className="pt-3 border-t -mx-4 sm:-mx-6 mt-3 -mb-4 sm:-mb-6 bg-amber-50/60">
                 <div className="px-4 sm:px-6 pb-4 sm:pb-6">
                   <button
@@ -334,10 +364,10 @@ export default function ProviderBookingCard({
               </div>
             )}
 
-            {isActionable && isPending && (
+            {canAcceptReject && (
               <div className="pt-3 border-t -mx-4 sm:-mx-6 mt-3 -mb-4 sm:-mb-6 bg-muted/30">
                 <div className="flex flex-col sm:flex-row gap-2 px-4 sm:px-6 pb-4 sm:pb-6">
-                  {isPending && onAccept && (
+                  {canAcceptReject && onAccept && (
                     <Button
                       onClick={handleAccept}
                       disabled={isAnyLoading}
@@ -354,7 +384,7 @@ export default function ProviderBookingCard({
                   )}
 
                   <div className="flex gap-2 w-full sm:w-auto">
-                    {isPending && onReject && (
+                    {canAcceptReject && onReject && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button
@@ -376,7 +406,7 @@ export default function ProviderBookingCard({
                             <AlertDialogTitle>{t("rejectTitle")}</AlertDialogTitle>
                             <AlertDialogDescription>
                               {t("rejectDescription", {
-                                customerName: booking.customerName,
+                                customerName: booking.customerName || booking.commune || "ce client",
                                 serviceName: booking.serviceName,
                                 date: booking.date,
                                 time: booking.time,
