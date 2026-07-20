@@ -77,23 +77,46 @@ def create_app():
         app.logger.error(f"Migration failed on startup: {e}")
         # App continues to start — existing schema still works
 
-    # One-time: normalize any malformed phone_number values left by old double-prefix bug
+    # Startup phone pass: normalize what we safely can, and — crucially — VALIDATE
+    # the result. A malformed +225 (e.g. 9 digits, a missing digit) cannot be
+    # auto-repaired (we can't guess which digit is missing), so we do NOT touch it;
+    # we LOG it loudly so it's visible in Render logs instead of failing silently at
+    # Twilio. mobile_money_number is validated on its own rule (local 10 digits) and
+    # is never normalized/prefixed (MoMo uses the local form).
     try:
         with app.app_context():
             from shizuverse.models.service_provider import ServiceProvider
-            from shizuverse.api.admin import normalize_phone
+            from shizuverse.utils.phone import normalize_phone, is_valid_e164, is_valid_ci_momo
             changed = 0
+            invalid_phone = 0
+            invalid_momo = 0
             for sp in ServiceProvider.query.all():
                 if sp.phone_number:
                     normed = normalize_phone(sp.phone_number)
                     if normed != sp.phone_number:
                         sp.phone_number = normed
                         changed += 1
-            if changed:
-                db.session.commit()
-                app.logger.info(f"[startup] Normalized {changed} ServiceProvider phone_number(s)")
+                    if not is_valid_e164(sp.phone_number):
+                        invalid_phone += 1
+                        app.logger.warning(
+                            f"[PHONE] Numéro invalide non corrigeable — provider {sp.id} "
+                            f"({sp.company_name or '—'}) : {sp.phone_number} — correction manuelle requise"
+                        )
+                if sp.mobile_money_number and not is_valid_ci_momo(sp.mobile_money_number):
+                    invalid_momo += 1
+                    app.logger.warning(
+                        f"[MOMO] Mobile Money invalide — provider {sp.id} "
+                        f"({sp.company_name or '—'}) : {sp.mobile_money_number} — "
+                        f"attendu 10 chiffres locaux — correction manuelle requise"
+                    )
+            db.session.commit()
+            app.logger.info(
+                f"[startup] Phone pass — {changed} normalisé(s), "
+                f"{invalid_phone} phone_number invalide(s), "
+                f"{invalid_momo} mobile_money_number invalide(s)"
+            )
     except Exception as e:
-        app.logger.warning(f"[startup] Phone normalization skipped: {e}")
+        app.logger.warning(f"[startup] Phone normalization/validation skipped: {e}")
 
     # One-time: remove synthetic @shizu.ci emails from provider User records
     try:

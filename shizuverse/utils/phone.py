@@ -52,3 +52,16 @@ def is_valid_e164(phone: str) -> bool:
     if phone.startswith("+225"):
         return len(digits) == 13              # 225 + 10 national digits
     return 8 <= len(digits) <= 15             # generic E.164 bound for foreign numbers
+
+
+def is_valid_ci_momo(number: str) -> bool:
+    """True if `number` is a plausible Ivorian Mobile Money number.
+
+    MoMo transfers in CI use the LOCAL 10-digit form (e.g. 0707050154), NOT
+    E.164 — so this is validated on its own terms: exactly 10 digits after
+    stripping separators. Never prefix these with +225.
+    """
+    if not number:
+        return False
+    digits = _STRIP_RE.sub("", number.strip())
+    return digits.isdigit() and len(digits) == 10
