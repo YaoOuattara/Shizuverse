@@ -54,14 +54,35 @@ def is_valid_e164(phone: str) -> bool:
     return 8 <= len(digits) <= 15             # generic E.164 bound for foreign numbers
 
 
-def is_valid_ci_momo(number: str) -> bool:
-    """True if `number` is a plausible Ivorian Mobile Money number.
+def normalize_ci_momo(number: str) -> str:
+    """Canonicalize a MoMo number to the LOCAL 10-digit form (e.g. 0545521606).
 
-    MoMo transfers in CI use the LOCAL 10-digit form (e.g. 0707050154), NOT
-    E.164 — so this is validated on its own terms: exactly 10 digits after
-    stripping separators. Never prefix these with +225.
+    Accepts the way people actually type it — +225…, 225…, 00225…, spaces,
+    dashes, dots — and converts to local. Never returns an E.164 form: MoMo
+    transfers in CI use the local number. If the input can't be reduced to a
+    10-digit local number it is returned best-effort (validation then rejects).
+
+      +2250545521606  -> 0545521606
+      2250545521606   -> 0545521606
+      00225 0545521606 -> 0545521606
+      0545521606      -> 0545521606
+    """
+    if not number:
+        return number
+    d = _STRIP_RE.sub("", number.strip()).replace("+", "")
+    if d.startswith("00225"):
+        d = d[5:]
+    elif d.startswith("225") and len(d) == 13:   # 225 + 10 local digits
+        d = d[3:]
+    return d
+
+
+def is_valid_ci_momo(number: str) -> bool:
+    """True if `number` is a valid LOCAL Ivorian Mobile Money number.
+
+    Exactly 10 digits starting with 0. Call AFTER normalize_ci_momo.
     """
     if not number:
         return False
     digits = _STRIP_RE.sub("", number.strip())
-    return digits.isdigit() and len(digits) == 10
+    return digits.isdigit() and len(digits) == 10 and digits.startswith("0")

@@ -9,7 +9,7 @@ from shizuverse.models.waitlist import Waitlist
 from datetime import datetime, timedelta, date
 from sqlalchemy import func
 from shizuverse.limiter import limiter
-from shizuverse.utils.phone import normalize_phone, is_valid_e164, is_valid_ci_momo
+from shizuverse.utils.phone import normalize_phone, is_valid_e164, normalize_ci_momo, is_valid_ci_momo
 import jwt
 import os
 
@@ -609,7 +609,7 @@ def provider_register():
     rccm_number = (data.get('rccm_number') or '').strip() or None
     # Mobile money fields — accept correct names only
     mobile_money_operator = (data.get('mobile_money_operator') or '').strip() or None
-    mobile_money_number   = (data.get('mobile_money_number') or '').strip() or None
+    mobile_money_number   = normalize_ci_momo((data.get('mobile_money_number') or '').strip()) or None
     mobile_money_name     = (data.get('mobile_money_name') or '').strip() or None
     profile_photo_url     = (data.get('profile_photo_url') or '').strip() or None
     id_document_url       = (data.get('id_doc_url') or '').strip() or None
@@ -620,9 +620,10 @@ def provider_register():
         return jsonify({'error': 'password must be at least 6 characters'}), 400
     if account_type == 'company' and not business_name:
         return jsonify({'error': 'company_name is required for company accounts'}), 400
-    # Mobile Money uses the LOCAL 10-digit form (never E.164). Validate if provided.
+    # Mobile Money uses the LOCAL 10-digit form (never E.164). Already normalized
+    # above (accepts +225/225/00225/spaces) — validate the local result.
     if mobile_money_number and not is_valid_ci_momo(mobile_money_number):
-        return jsonify({'error': 'Numéro Mobile Money invalide. Format attendu : 10 chiffres (ex. 0707050154).'}), 400
+        return jsonify({'error': 'Le numéro Mobile Money doit contenir 10 chiffres et commencer par 0 (ex. 0707050154).'}), 400
 
     canonical_phone = normalize_phone(phone)
     if not is_valid_e164(canonical_phone):
@@ -1157,9 +1158,11 @@ def update_provider_profile():
 
     # Mobile Money uses the LOCAL 10-digit form (never E.164). Validate before writing.
     if 'mobile_money_number' in data:
-        momo = (data.get('mobile_money_number') or '').strip()
+        momo = normalize_ci_momo((data.get('mobile_money_number') or '').strip())
         if momo and not is_valid_ci_momo(momo):
-            return jsonify({'error': 'Numéro Mobile Money invalide. Format attendu : 10 chiffres (ex. 0707050154).'}), 400
+            return jsonify({'error': 'Le numéro Mobile Money doit contenir 10 chiffres et commencer par 0 (ex. 0707050154).'}), 400
+        # Store the normalized (local) form, not the raw input.
+        data['mobile_money_number'] = momo
 
     # Simple text/URL fields — update only if key is present in request
     str_fields = [
