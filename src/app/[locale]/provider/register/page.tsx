@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import PhoneInput from "@/components/PhoneInput";
+import { normalizeCiMomo, isValidCiMomo } from "@/lib/momo";
 import {
   Loader2, CheckCircle, Sparkles, Droplets, Wrench, Zap, Hammer,
   Baby, Heart, Leaf, Wind, ArrowLeft, Camera, CreditCard,
@@ -232,11 +233,14 @@ export default function ProviderRegisterPage() {
 
   // ── Final submit ──────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    // Mobile Money is optional, but if provided it must be a local 10-digit number.
-    if (momoNumber && momoNumber.length !== 10) {
+    // Mobile Money is optional, but if provided it must normalize to a valid local number.
+    const momoLocal = normalizeCiMomo(momoNumber);
+    if (momoNumber.trim() && !isValidCiMomo(momoLocal)) {
       toast({
         title: isFr ? "Numéro Mobile Money invalide" : "Invalid Mobile Money number",
-        description: isFr ? "Il doit contenir 10 chiffres (ex. 0707050154)." : "It must have 10 digits (e.g. 0707050154).",
+        description: isFr
+          ? "Le numéro doit contenir 10 chiffres et commencer par 0 (ex. 0707050154)."
+          : "The number must have 10 digits and start with 0 (e.g. 0707050154).",
         variant: "destructive",
       });
       return;
@@ -261,7 +265,7 @@ export default function ProviderRegisterPage() {
       id_doc_type: idDocType || undefined,
       id_doc_url: idDocUrl || undefined,
       mobile_money_operator: momoOperator || undefined,
-      mobile_money_number: momoNumber.trim() || undefined,
+      mobile_money_number: momoLocal || undefined,
       mobile_money_name: momoName.trim() || undefined,
       verification_status: "submitted",
     };
@@ -921,21 +925,26 @@ export default function ProviderRegisterPage() {
               </div>
               {momoOperator && (
                 <div className="space-y-2">
-                  {/* Mobile Money uses the LOCAL 10-digit form (0707050154), NOT E.164. */}
+                  {/* Free input — normalized to LOCAL 10 digits (never E.164). */}
                   <input
                     type="tel"
-                    inputMode="numeric"
+                    inputMode="tel"
                     value={momoNumber}
-                    onChange={(e) => setMomoNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                    placeholder={isFr ? "Numéro Mobile Money (10 chiffres)" : "Mobile Money number (10 digits)"}
-                    aria-invalid={momoNumber.length > 0 && momoNumber.length !== 10}
+                    onChange={(e) => setMomoNumber(e.target.value.slice(0, 20))}
+                    placeholder="0707050154"
+                    aria-invalid={momoNumber.trim().length > 0 && !isValidCiMomo(normalizeCiMomo(momoNumber))}
                     className={inputCls}
                   />
-                  {momoNumber.length > 0 && momoNumber.length !== 10 && (
+                  <p className="text-xs text-gray-500">
+                    {isFr
+                      ? "Numéro Mobile Money au format local (10 chiffres)."
+                      : "Mobile Money number in local format (10 digits)."}
+                  </p>
+                  {momoNumber.trim().length > 0 && !isValidCiMomo(normalizeCiMomo(momoNumber)) && (
                     <p className="text-xs text-red-600">
                       {isFr
-                        ? "Le numéro Mobile Money doit contenir 10 chiffres (ex. 0707050154)."
-                        : "The Mobile Money number must have 10 digits (e.g. 0707050154)."}
+                        ? "Le numéro doit contenir 10 chiffres et commencer par 0 (ex. 0707050154)."
+                        : "The number must have 10 digits and start with 0 (e.g. 0707050154)."}
                     </p>
                   )}
                   <input

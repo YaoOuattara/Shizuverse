@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
+import { normalizeCiMomo, isValidCiMomo } from '@/lib/momo'
 import {
   Dialog,
   DialogContent,
@@ -381,7 +382,8 @@ export default function ProviderProfilePage() {
     profile.id_document_url.trim() !== ''
 
   const momoInvalid =
-    profile.mobile_money_number.length > 0 && profile.mobile_money_number.length !== 10
+    profile.mobile_money_number.trim().length > 0 &&
+    !isValidCiMomo(normalizeCiMomo(profile.mobile_money_number))
 
   const handleSave = async () => {
     if (isSaving) return
@@ -725,21 +727,26 @@ export default function ProviderProfilePage() {
             <label className="block text-xs text-muted-foreground mb-1">
               {isFr ? 'Numéro' : 'Number'}
             </label>
-            {/* Mobile Money uses the LOCAL 10-digit form (0707050154), NOT E.164. */}
+            {/* Free input — normalized to LOCAL 10 digits (never E.164). */}
             <input
               type="tel"
-              inputMode="numeric"
+              inputMode="tel"
               value={profile.mobile_money_number}
-              onChange={e => set('mobile_money_number', e.target.value.replace(/\D/g, '').slice(0, 10))}
-              placeholder={isFr ? '0707050154' : '0707050154'}
-              aria-invalid={profile.mobile_money_number.length > 0 && profile.mobile_money_number.length !== 10}
+              onChange={e => set('mobile_money_number', e.target.value.slice(0, 20))}
+              placeholder="0707050154"
+              aria-invalid={momoInvalid}
               className="w-full rounded-lg border border-input bg-background text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring"
             />
-            {profile.mobile_money_number.length > 0 && profile.mobile_money_number.length !== 10 && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {isFr
+                ? 'Numéro Mobile Money au format local (10 chiffres).'
+                : 'Mobile Money number in local format (10 digits).'}
+            </p>
+            {momoInvalid && (
               <p className="mt-1 text-xs text-red-600">
                 {isFr
-                  ? 'Le numéro Mobile Money doit contenir 10 chiffres (ex. 0707050154).'
-                  : 'The Mobile Money number must have 10 digits (e.g. 0707050154).'}
+                  ? 'Le numéro doit contenir 10 chiffres et commencer par 0 (ex. 0707050154).'
+                  : 'The number must have 10 digits and start with 0 (e.g. 0707050154).'}
               </p>
             )}
           </div>
