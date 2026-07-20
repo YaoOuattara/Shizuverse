@@ -232,6 +232,15 @@ export default function ProviderRegisterPage() {
 
   // ── Final submit ──────────────────────────────────────────────────────────
   const handleSubmit = async () => {
+    // Mobile Money is optional, but if provided it must be a local 10-digit number.
+    if (momoNumber && momoNumber.length !== 10) {
+      toast({
+        title: isFr ? "Numéro Mobile Money invalide" : "Invalid Mobile Money number",
+        description: isFr ? "Il doit contenir 10 chiffres (ex. 0707050154)." : "It must have 10 digits (e.g. 0707050154).",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsSubmitting(true);
     const payload = {
       ...account,
@@ -912,13 +921,23 @@ export default function ProviderRegisterPage() {
               </div>
               {momoOperator && (
                 <div className="space-y-2">
-                  <PhoneInput
-                    defaultValue={momoNumber}
-                    onChange={setMomoNumber}
-                    placeholder={isFr ? "Numéro Mobile Money" : "Mobile Money number"}
-                    selectClassName="rounded-l-md border-gray-300 bg-gray-50 text-gray-500 focus:ring-[#0F3A7A]/30"
-                    inputClassName="rounded-none rounded-r-md border-gray-300 bg-white py-2 focus:ring-[#0F3A7A]/30 focus:border-[#0F3A7A]"
+                  {/* Mobile Money uses the LOCAL 10-digit form (0707050154), NOT E.164. */}
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    value={momoNumber}
+                    onChange={(e) => setMomoNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                    placeholder={isFr ? "Numéro Mobile Money (10 chiffres)" : "Mobile Money number (10 digits)"}
+                    aria-invalid={momoNumber.length > 0 && momoNumber.length !== 10}
+                    className={inputCls}
                   />
+                  {momoNumber.length > 0 && momoNumber.length !== 10 && (
+                    <p className="text-xs text-red-600">
+                      {isFr
+                        ? "Le numéro Mobile Money doit contenir 10 chiffres (ex. 0707050154)."
+                        : "The Mobile Money number must have 10 digits (e.g. 0707050154)."}
+                    </p>
+                  )}
                   <input
                     type="text"
                     placeholder={isFr ? "Nom du titulaire du compte" : "Account holder name"}

@@ -6,7 +6,6 @@ import {
   Loader2, Sparkles, Save, CheckCircle2, XCircle,
   ShieldCheck, ShieldAlert, ShieldX, Clock, Upload, Eye, Star, Lock, ChevronDown, Trash2,
 } from 'lucide-react'
-import PhoneInput from '@/components/PhoneInput'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -381,8 +380,19 @@ export default function ProviderProfilePage() {
     profile.bio.trim() !== '' &&
     profile.id_document_url.trim() !== ''
 
+  const momoInvalid =
+    profile.mobile_money_number.length > 0 && profile.mobile_money_number.length !== 10
+
   const handleSave = async () => {
     if (isSaving) return
+    if (momoInvalid) {
+      toast({
+        title: isFr ? 'Numéro Mobile Money invalide' : 'Invalid Mobile Money number',
+        description: isFr ? 'Il doit contenir 10 chiffres (ex. 0707050154).' : 'It must have 10 digits (e.g. 0707050154).',
+        variant: 'destructive',
+      })
+      return
+    }
     setIsSaving(true)
     try {
       const token = localStorage.getItem('provider_token')
@@ -430,6 +440,14 @@ export default function ProviderProfilePage() {
 
   const handleSubmit = async () => {
     if (!requiredFilled || isSubmitting) return
+    if (momoInvalid) {
+      toast({
+        title: isFr ? 'Numéro Mobile Money invalide' : 'Invalid Mobile Money number',
+        description: isFr ? 'Il doit contenir 10 chiffres (ex. 0707050154).' : 'It must have 10 digits (e.g. 0707050154).',
+        variant: 'destructive',
+      })
+      return
+    }
     setIsSubmitting(true)
     try {
       const token = localStorage.getItem('provider_token')
@@ -707,12 +725,23 @@ export default function ProviderProfilePage() {
             <label className="block text-xs text-muted-foreground mb-1">
               {isFr ? 'Numéro' : 'Number'}
             </label>
-            <PhoneInput
-              defaultValue={profile.mobile_money_number}
-              onChange={v => set('mobile_money_number', v)}
-              selectClassName="rounded-l-lg border-input bg-muted text-muted-foreground text-sm"
-              inputClassName="rounded-r-lg border-input bg-background text-sm"
+            {/* Mobile Money uses the LOCAL 10-digit form (0707050154), NOT E.164. */}
+            <input
+              type="tel"
+              inputMode="numeric"
+              value={profile.mobile_money_number}
+              onChange={e => set('mobile_money_number', e.target.value.replace(/\D/g, '').slice(0, 10))}
+              placeholder={isFr ? '0707050154' : '0707050154'}
+              aria-invalid={profile.mobile_money_number.length > 0 && profile.mobile_money_number.length !== 10}
+              className="w-full rounded-lg border border-input bg-background text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring"
             />
+            {profile.mobile_money_number.length > 0 && profile.mobile_money_number.length !== 10 && (
+              <p className="mt-1 text-xs text-red-600">
+                {isFr
+                  ? 'Le numéro Mobile Money doit contenir 10 chiffres (ex. 0707050154).'
+                  : 'The Mobile Money number must have 10 digits (e.g. 0707050154).'}
+              </p>
+            )}
           </div>
         </div>
         <label className="block text-xs text-muted-foreground mt-3 mb-1">
