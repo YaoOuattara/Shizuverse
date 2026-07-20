@@ -235,31 +235,69 @@ def run_anomaly_check() -> dict:
 
     anomalies = detect_anomalies()
     if not anomalies:
-        return {'detected': 0, 'alert_sent': False, 'anomalies': []}
+        return {'detected': 0, 'alert_sent': False, 'notified': 0, 'anomalies': []}
 
-    alert = generate_anomaly_alert(anomalies)
+    now = datetime.utcnow()
+    REMINDER = timedelta(hours=6)           # re-notify a persisting anomaly at most every 6h
+    RANK = {'info': 0, 'warning': 1, 'critical': 2}
 
-    # Fall back to the public Shizu WhatsApp number when the dedicated admin
-    # number is unset — consistent with bookings.py so alerts still reach someone.
+    # ── Dedup + decide what to notify ─────────────────────────────────────────
+    # One row per ONGOING anomaly (same type + booking + provider, unresolved).
+    # Each run updates that row instead of creating a duplicate. We notify only
+    # on: first detection, severity escalation, or a due 6h reminder.
+    to_notify_rows = []   # AnomalyLog rows to mark as notified (only if the send succeeds)
+    to_notify_anoms = []  # the anomaly dicts that will go into the WhatsApp alert
+    for a in anomalies:
+        existing = AnomalyLog.query.filter_by(
+            anomaly_type=a['type'],
+            booking_id=a.get('booking_id'),
+            provider_id=a.get('provider_id'),
+            resolved_at=None,
+        ).first()
+
+        if existing is None:
+            row = AnomalyLog(
+                anomaly_type=a['type'],
+                severity=a['severity'],
+                description=a['description'],
+                booking_id=a.get('booking_id'),
+                provider_id=a.get('provider_id'),
+                detected_at=now,
+                last_seen_at=now,
+                occurrence_count=1,
+            )
+            db.session.add(row)
+            to_notify_rows.append(row)       # first detection → notify
+            to_notify_anoms.append(a)
+        else:
+            existing.last_seen_at = now
+            existing.occurrence_count = (existing.occurrence_count or 1) + 1
+            existing.description = a['description']
+            escalated = RANK.get(a['severity'], 0) > RANK.get(existing.severity, 0)
+            existing.severity = a['severity']
+            due = (existing.last_notified_at is None
+                   or (now - existing.last_notified_at) >= REMINDER)
+            if escalated or due:             # aggravation OR 6h reminder → notify
+                to_notify_rows.append(existing)
+                to_notify_anoms.append(a)
+
+    # ── Alert only for the notifiable subset (never every run) ────────────────
     admin_phone = (os.environ.get('SHIZU_ADMIN_PHONE')
                    or os.environ.get('NEXT_PUBLIC_SHIZU_WHATSAPP')
                    or '').strip()
     alert_sent = False
-    if admin_phone:
-        alert_sent = send_whatsapp(admin_phone, alert)
-    else:
-        logger.warning("Neither SHIZU_ADMIN_PHONE nor NEXT_PUBLIC_SHIZU_WHATSAPP set — WhatsApp alert skipped")
+    if to_notify_anoms:
+        alert = generate_anomaly_alert(to_notify_anoms)
+        if admin_phone:
+            alert_sent = send_whatsapp(admin_phone, alert)
+            if alert_sent:
+                # Stamp last_notified_at only on a successful send, so a failed
+                # send retries next run instead of going silent for 6h.
+                for row in to_notify_rows:
+                    row.last_notified_at = now
+        else:
+            logger.warning("Neither SHIZU_ADMIN_PHONE nor NEXT_PUBLIC_SHIZU_WHATSAPP set — WhatsApp alert skipped")
 
-    # Persist to anomaly_log
-    for a in anomalies:
-        db.session.add(AnomalyLog(
-            anomaly_type=a['type'],
-            severity=a['severity'],
-            description=a['description'],
-            booking_id=a.get('booking_id'),
-            provider_id=a.get('provider_id'),
-            detected_at=datetime.utcnow(),
-        ))
     try:
         db.session.commit()
     except Exception as exc:
@@ -267,7 +305,8 @@ def run_anomaly_check() -> dict:
         db.session.rollback()
 
     return {
-        'detected':    len(anomalies),
-        'alert_sent':  alert_sent,
-        'anomalies':   anomalies,
+        'detected':   len(anomalies),
+        'alert_sent': alert_sent,
+        'notified':   len(to_notify_anoms),
+        'anomalies':  anomalies,
     }
