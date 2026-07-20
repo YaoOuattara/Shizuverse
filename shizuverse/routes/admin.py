@@ -91,6 +91,21 @@ def get_provider_detail(provider_id):
     })
 
 
+def _sync_provider_rows(user_id, **fields):
+    """Apply status fields to ALL ServiceProvider rows of a user.
+
+    A provider has one row per service offered; verification / listing /
+    activation must stay consistent across them (same principle already used by
+    update_provider_profile and update_provider_availability). Approving/rejecting
+    only the clicked row left the sibling service rows out of sync.
+    """
+    rows = ServiceProvider.query.filter_by(user_id=user_id).all()
+    for row in rows:
+        for key, value in fields.items():
+            setattr(row, key, value)
+    return rows
+
+
 @admin_bp.route('/providers/<int:provider_id>/approve', methods=['POST'])
 @limiter.limit("20 per minute")
 @admin_required
@@ -111,12 +126,15 @@ def approve_provider(provider_id):
     if is_beauty and not p.id_document_url:
         return jsonify({'error': 'Les prestataires beauté doivent télécharger une pièce d\'identité avant approbation.'}), 422
 
-    p.verification_status = 'approved'
-    p.listed_status = 'listed'
-    p.provider_status = 'active'
-    p.verified = True
-    p.reviewed_at = datetime.utcnow()
-    p.reviewed_by = None
+    _sync_provider_rows(
+        p.user_id,
+        verification_status='approved',
+        listed_status='listed',
+        provider_status='active',
+        verified=True,
+        reviewed_at=datetime.utcnow(),
+        reviewed_by=None,
+    )
 
     notification = Notification(
         user_id=p.user_id,
@@ -150,11 +168,14 @@ def reject_provider(provider_id):
     if not reason:
         return jsonify({'error': 'Rejection reason is required'}), 400
 
-    p.verification_status = 'rejected'
-    p.rejection_reason = reason
-    p.rejection_note = note if note else None
-    p.reviewed_at = datetime.utcnow()
-    p.reviewed_by = None
+    _sync_provider_rows(
+        p.user_id,
+        verification_status='rejected',
+        rejection_reason=reason,
+        rejection_note=note if note else None,
+        reviewed_at=datetime.utcnow(),
+        reviewed_by=None,
+    )
 
     notification = Notification(
         user_id=p.user_id,
@@ -186,9 +207,12 @@ def suspend_provider(provider_id):
     data = request.get_json()
     reason = data.get('reason', '').strip()
 
-    p.verification_status = 'suspended'
-    p.listed_status = 'unlisted'
-    p.provider_status = 'paused'
+    _sync_provider_rows(
+        p.user_id,
+        verification_status='suspended',
+        listed_status='unlisted',
+        provider_status='paused',
+    )
 
     notification = Notification(
         user_id=p.user_id,
@@ -205,9 +229,12 @@ def suspend_provider(provider_id):
 @admin_required
 def reinstate_provider(provider_id):
     p = ServiceProvider.query.get_or_404(provider_id)
-    p.verification_status = 'approved'
-    p.listed_status = 'listed'
-    p.provider_status = 'active'
+    _sync_provider_rows(
+        p.user_id,
+        verification_status='approved',
+        listed_status='listed',
+        provider_status='active',
+    )
 
     notification = Notification(
         user_id=p.user_id,
@@ -232,10 +259,11 @@ def toggle_listing(provider_id):
     if p.verification_status != 'approved':
         return jsonify({'error': 'Provider must be approved to change listing'}), 400
 
-    p.listed_status = 'listed' if action == 'list' else 'unlisted'
+    new_listed = 'listed' if action == 'list' else 'unlisted'
+    _sync_provider_rows(p.user_id, listed_status=new_listed)
     db.session.commit()
 
-    return jsonify({'message': f'Provider {action}ed', 'listed_status': p.listed_status})
+    return jsonify({'message': f'Provider {action}ed', 'listed_status': new_listed})
 
 
 @admin_bp.route('/providers/<int:provider_id>/activation', methods=['POST'])
@@ -248,10 +276,11 @@ def toggle_activation(provider_id):
     if action not in ('activate', 'pause'):
         return jsonify({'error': 'action must be activate or pause'}), 400
 
-    p.provider_status = 'active' if action == 'activate' else 'paused'
+    new_status = 'active' if action == 'activate' else 'paused'
+    _sync_provider_rows(p.user_id, provider_status=new_status)
     db.session.commit()
 
-    return jsonify({'message': f'Provider {action}d', 'provider_status': p.provider_status})
+    return jsonify({'message': f'Provider {action}d', 'provider_status': new_status})
 
 
 # ── Provider Service List Edit ────────────────────────────────

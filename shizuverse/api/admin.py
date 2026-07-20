@@ -9,7 +9,7 @@ from shizuverse.models.waitlist import Waitlist
 from datetime import datetime, timedelta, date
 from sqlalchemy import func
 from shizuverse.limiter import limiter
-from shizuverse.utils.phone import normalize_phone, is_valid_e164
+from shizuverse.utils.phone import normalize_phone, is_valid_e164, is_valid_ci_momo
 import jwt
 import os
 
@@ -620,6 +620,9 @@ def provider_register():
         return jsonify({'error': 'password must be at least 6 characters'}), 400
     if account_type == 'company' and not business_name:
         return jsonify({'error': 'company_name is required for company accounts'}), 400
+    # Mobile Money uses the LOCAL 10-digit form (never E.164). Validate if provided.
+    if mobile_money_number and not is_valid_ci_momo(mobile_money_number):
+        return jsonify({'error': 'Numéro Mobile Money invalide. Format attendu : 10 chiffres (ex. 0707050154).'}), 400
 
     canonical_phone = normalize_phone(phone)
     if not is_valid_e164(canonical_phone):
@@ -1151,6 +1154,12 @@ def update_provider_profile():
     sp = ServiceProvider.query.get_or_404(provider_id)
 
     data = request.get_json() or {}
+
+    # Mobile Money uses the LOCAL 10-digit form (never E.164). Validate before writing.
+    if 'mobile_money_number' in data:
+        momo = (data.get('mobile_money_number') or '').strip()
+        if momo and not is_valid_ci_momo(momo):
+            return jsonify({'error': 'Numéro Mobile Money invalide. Format attendu : 10 chiffres (ex. 0707050154).'}), 400
 
     # Simple text/URL fields — update only if key is present in request
     str_fields = [
