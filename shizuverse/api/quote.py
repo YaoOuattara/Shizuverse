@@ -4,6 +4,8 @@ Access is gated solely by the unguessable per-booking token. Each response
 exposes ONLY the target booking's quote data — never other bookings nor
 private provider data.
 """
+import os
+import logging
 from datetime import datetime
 
 from flask import Blueprint, request, jsonify
@@ -13,9 +15,24 @@ from shizuverse.models.client_booking import ClientBooking
 from shizuverse.models.booking_event import BookingEvent
 from shizuverse.limiter import limiter
 
+logger = logging.getLogger(__name__)
+
 quote_bp = Blueprint("quote", __name__)
 
 DECLINE_REASONS = {"trop_cher", "plus_disponible", "trouve_ailleurs", "autre"}
+
+
+def _payment_methods() -> dict:
+    """Shizu's Mobile Money numbers from env — ONLY the keys that are actually
+    set. In production these vars exist but are currently EMPTY, so an empty
+    dict is the nominal case (the client is told to contact Shizu). No hardcoded
+    numbers, no fake fallback."""
+    raw = {
+        "wave":   os.environ.get("SHIZU_WAVE_NUMBER", "").strip(),
+        "orange": os.environ.get("SHIZU_ORANGE_NUMBER", "").strip(),
+        "mtn":    os.environ.get("SHIZU_MTN_NUMBER", "").strip(),
+    }
+    return {k: v for k, v in raw.items() if v}
 
 
 def _is_decided(b) -> bool:
@@ -28,6 +45,29 @@ def _is_decided(b) -> bool:
 def _decision(b) -> str:
     """Which terminal decision was taken (for the client 'already handled' UI)."""
     return "declined" if b.status == "declined" else "accepted"
+
+
+def _already_decided_response(b):
+    """The 409 body for an already-decided quote — single source of truth shared
+    by GET and POST /accept. When the decision was ACCEPTED, re-expose the same
+    payment instructions the client saw at acceptance (the link stays
+    consultable; double-clicks on a slow connection land here too). DECLINED
+    stays minimal and unchanged."""
+    decision = _decision(b)
+    payload = {"error": "already_decided", "decision": decision}
+    if decision == "accepted":
+        apt = b.appointment_date
+        payload.update({
+            "amount_xof": b.amount_xof,
+            "payment_tier": b.payment_tier,
+            "deposit_amount": b.deposit_amount,
+            "payment_methods": _payment_methods(),
+            "service_name": b.service_name,
+            "appointment_date": apt.isoformat() if apt else None,
+            "time_slot": b.time_slot or b.time_preference,
+            "commune": (b.client_location or "").split(",")[0].strip(),
+        })
+    return jsonify(payload), 409
 
 
 def _resolve(token: str):
@@ -48,7 +88,10 @@ def get_quote(token):
     if err:
         return err
     if _is_decided(b):
-        return jsonify({"error": "already_decided", "decision": _decision(b)}), 409
+        # After acceptance the client can no longer reload the live quote, so the
+        # one-time payment instructions would be lost. The shared helper re-exposes
+        # them (declined stays untouched).
+        return _already_decided_response(b)
 
     apt = b.appointment_date
     return jsonify({
@@ -71,7 +114,10 @@ def accept_quote(token):
     if err:
         return err
     if _is_decided(b):
-        return jsonify({"error": "already_decided", "decision": _decision(b)}), 409
+        # Double-click on a slow connection lands here — return the full payment
+        # instructions too (same payload as GET), it's exactly when the client
+        # is waiting for them.
+        return _already_decided_response(b)
 
     prev = b.status
     # Move to under_review (not 'accepted'): this is the status the admin UI can
@@ -95,7 +141,25 @@ def accept_quote(token):
         ))
 
     db.session.commit()
-    return jsonify({"success": True, "status": b.status, "amount_locked": b.amount_locked})
+
+    # Payment instructions travel back with the acceptance so the client sees
+    # them immediately. An empty methods dict is nominal today; only warn when
+    # money IS due (any tier other than after_service) yet no number is set —
+    # never let this block the acceptance.
+    methods = _payment_methods()
+    if not methods and b.payment_tier != "after_service":
+        logger.warning("[quote] devis %s accepté sans moyen de paiement "
+                       "configuré (SHIZU_WAVE/ORANGE/MTN vides)", b.id)
+
+    return jsonify({
+        "success": True,
+        "status": b.status,
+        "amount_locked": b.amount_locked,
+        "payment_tier": b.payment_tier,
+        "amount_xof": b.amount_xof,
+        "deposit_amount": b.deposit_amount,
+        "payment_methods": methods,
+    })
 
 
 @quote_bp.route("/<token>/decline", methods=["POST"])
