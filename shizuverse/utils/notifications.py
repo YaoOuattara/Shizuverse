@@ -22,6 +22,8 @@ def is_twilio_enabled() -> bool:
 
 # Single source of truth lives in utils.phone (kept as an alias for callers here).
 from shizuverse.utils.phone import normalize_phone as _normalize_phone
+# Payment-tier thresholds live in payment_rules — never re-implement them here.
+from shizuverse.utils.payment_rules import get_payment_tier as _get_payment_tier
 
 
 def send_whatsapp(to_phone: str, message: str) -> bool:
@@ -312,6 +314,12 @@ def notify_payment_instructions(
         svc_part=svc_part, amount=_fmt_amount(amount),
     )]
 
+    # A payment tier must always be shown — an empty Meta variable fails the
+    # send. When the caller didn't pass one, derive it from the amount using
+    # the canonical thresholds (never re-implemented here).
+    if not payment_tier:
+        payment_tier = _get_payment_tier(amount)
+
     tier_label = _TIER_LABELS[loc].get(payment_tier)
     if tier_label:
         parts.append(tier_label)
@@ -345,11 +353,11 @@ def notify_payment_instructions(
 # ═════════════════════════════════════════════════════════════════════════════
 
 def notify_booking_confirmed_provider(
-    *, provider_phone: str, client_name: str,
+    *, provider_phone: str, booking_ref: str, client_name: str,
     service: str, date: str, time: str, commune: str,
 ) -> bool:
     msg = (
-        f"🔔 Nouvelle mission confirmée ! "
+        f"🔔 Nouvelle mission confirmée ! Réf: #{booking_ref}. "
         f"Client: {client_name}. Service: {service}. "
         f"Date: {date} à {time}. Commune: {commune}. "
         f"Contactez le client si besoin."
@@ -357,11 +365,13 @@ def notify_booking_confirmed_provider(
     return send_whatsapp(provider_phone, msg)
 
 
-def notify_provider_approved(*, provider_phone: str) -> bool:
+def notify_provider_approved(
+    *, provider_phone: str, provider_name: str, approved_date: str,
+) -> bool:
     msg = (
-        "🎉 Félicitations ! Votre profil Shizu a été approuvé. "
-        "Vous pouvez maintenant recevoir des demandes. "
-        "Connectez-vous: www.shizu.pro/fr/provider"
+        f"🎉 Félicitations {provider_name} ! Votre profil Shizu a été approuvé "
+        f"le {approved_date}. Vous pouvez maintenant recevoir des demandes. "
+        f"Connectez-vous: www.shizu.pro/fr/provider"
     )
     return send_whatsapp(provider_phone, msg)
 
@@ -397,7 +407,7 @@ def notify_payout_sent(*, provider_phone: str, provider_payout: int) -> bool:
 
 
 def notify_provider_new_mission(
-    *, provider_phone: str, service_name: str,
+    *, provider_phone: str, booking_ref: str, service_name: str,
     date: str, commune: str,
     time_slot: str = None, provider_payout: int = None,
 ) -> bool:
@@ -405,7 +415,7 @@ def notify_provider_new_mission(
     Includes their payout (85% of the quote) when the amount is known."""
     when = date + (f" ({time_slot})" if time_slot else "")
     parts = [
-        f"🧰 Nouvelle mission Shizu : {service_name} le {when} à {commune}."
+        f"🧰 Nouvelle mission Shizu #{booking_ref} : {service_name} le {when} à {commune}."
     ]
     if provider_payout:
         parts.append(f"Votre rémunération : {_fmt_amount(provider_payout)} FCFA.")

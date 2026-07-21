@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, date
 from sqlalchemy import func
 from shizuverse.limiter import limiter
 from shizuverse.utils.phone import normalize_phone, is_valid_e164, normalize_ci_momo, is_valid_ci_momo
+from shizuverse.utils.booking_ref import booking_ref as make_booking_ref
 import jwt
 import os
 
@@ -179,7 +180,7 @@ def assign_booking(booking_id):
         notify_provider_assigned(
             client_name=booking.client_name,
             client_phone=booking.client_phone,
-            booking_ref=str(booking.id),
+            booking_ref=make_booking_ref(booking),
             provider_name=provider_name,
             date=apt.strftime('%d/%m/%Y') if apt else '',
             commune=commune,
@@ -198,6 +199,7 @@ def assign_booking(booking_id):
             payout = round(booking.amount_xof * 0.85) if booking.amount_xof else None
             notify_provider_new_mission(
                 provider_phone=provider_phone,
+                booking_ref=make_booking_ref(booking),
                 service_name=booking.service_name,
                 date=apt.strftime('%d/%m/%Y') if apt else '',
                 commune=commune,
@@ -245,26 +247,19 @@ def update_booking_status(booking_id):
     # WhatsApp: booking confirmed → notify client + provider
     if new_status == 'confirmed':
         try:
-            from shizuverse.utils.notifications import (
-                notify_booking_confirmed_client,
-                notify_booking_confirmed_provider,
-            )
+            # The CLIENT confirmation is sent once, when the provider accepts
+            # (accept_provider_booking). This admin → 'confirmed' transition
+            # must NOT re-send it, or the client gets the same message twice.
+            # Here we only notify the PROVIDER (different recipient).
+            from shizuverse.utils.notifications import notify_booking_confirmed_provider
             apt = booking.appointment_date
             date_str = apt.strftime('%d/%m/%Y') if apt else ''
             time_str = apt.strftime('%Hh%M') if apt else ''
             commune = (booking.client_location or '').split(',')[0].strip()
-            notify_booking_confirmed_client(
-                client_name=booking.client_name,
-                client_phone=booking.client_phone,
-                booking_ref=str(booking.id),
-                provider_name=booking.provider_name or 'Shizu',
-                date=date_str,
-                time=time_str,
-                locale=booking.locale,
-            )
             if booking.provider_phone:
                 notify_booking_confirmed_provider(
                     provider_phone=booking.provider_phone,
+                    booking_ref=make_booking_ref(booking),
                     client_name=booking.client_name,
                     service=booking.service_name,
                     date=date_str,
@@ -1004,19 +999,27 @@ def accept_provider_booking(booking_id):
     ))
     db.session.commit()
 
-    # WhatsApp: confirm to client
+    # WhatsApp: confirm to client — only when we actually have a provider name.
+    # We never announce "Prestataire : Shizu"; if the name is missing we skip
+    # the send rather than mislead the client (point 5).
     try:
-        from shizuverse.utils.notifications import notify_booking_confirmed_client
-        apt = booking.appointment_date
-        notify_booking_confirmed_client(
-            client_name=booking.client_name,
-            client_phone=booking.client_phone,
-            booking_ref=str(booking.id),
-            provider_name=booking.provider_name or 'Shizu',
-            date=apt.strftime('%d/%m/%Y') if apt else '',
-            time=apt.strftime('%Hh%M') if apt else '',
-            locale=booking.locale,
-        )
+        if booking.provider_name:
+            from shizuverse.utils.notifications import notify_booking_confirmed_client
+            apt = booking.appointment_date
+            notify_booking_confirmed_client(
+                client_name=booking.client_name,
+                client_phone=booking.client_phone,
+                booking_ref=make_booking_ref(booking),
+                provider_name=booking.provider_name,
+                date=apt.strftime('%d/%m/%Y') if apt else '',
+                time=apt.strftime('%Hh%M') if apt else '',
+                locale=booking.locale,
+            )
+        else:
+            current_app.logger.warning(
+                "[accept_provider_booking] booking %s has no provider_name — "
+                "client confirmation skipped", booking.id,
+            )
     except Exception as e:
         current_app.logger.error(f"[accept_provider_booking] Unexpected error: {e}", exc_info=True)
 

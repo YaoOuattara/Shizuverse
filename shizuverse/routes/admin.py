@@ -148,7 +148,11 @@ def approve_provider(provider_id):
     try:
         from shizuverse.utils.notifications import notify_provider_approved
         if p.phone_number:
-            notify_provider_approved(provider_phone=p.phone_number)
+            notify_provider_approved(
+                provider_phone=p.phone_number,
+                provider_name=p.company_name or 'prestataire',
+                approved_date=datetime.utcnow().strftime('%d/%m/%Y'),
+            )
     except Exception as e:
         current_app.logger.error(f"[approve_provider] Unexpected error: {e}", exc_info=True)
 
@@ -1045,17 +1049,26 @@ def confirm_payment(booking_id):
     db.session.commit()
 
     try:
-        from shizuverse.utils.notifications import notify_booking_confirmed_client
-        apt = b.appointment_date
-        notify_booking_confirmed_client(
-            client_name=b.client_name,
-            client_phone=b.client_phone,
-            booking_ref=str(b.id),
-            provider_name=b.provider_name or 'Shizu',
-            date=apt.strftime('%d/%m/%Y') if apt else '',
-            time=apt.strftime('%Hh%M') if apt else '',
-            locale=b.locale,
-        )
+        # This endpoint confirms PAYMENT, so it must send the payment-confirmation
+        # message (shizu_payment_confirmed_fr/en) — NOT the "booking confirmed"
+        # message the client already received when the provider accepted.
+        # amount_xof is the client-accepted, locked quote (what was paid); if it
+        # is missing we skip rather than announce "0 FCFA".
+        from shizuverse.utils.notifications import notify_payment_confirmed
+        from shizuverse.utils.booking_ref import booking_ref as make_booking_ref
+        if b.amount_xof is not None:
+            notify_payment_confirmed(
+                client_name=b.client_name,
+                client_phone=b.client_phone,
+                booking_ref=make_booking_ref(b),
+                amount=b.amount_xof,
+                locale=b.locale,
+            )
+        else:
+            current_app.logger.warning(
+                "[confirm_payment] booking %s has no amount_xof — "
+                "payment confirmation skipped", b.id,
+            )
     except Exception as e:
         current_app.logger.error(f"[confirm_payment] Unexpected error: {e}", exc_info=True)
 
