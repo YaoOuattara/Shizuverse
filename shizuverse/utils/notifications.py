@@ -91,9 +91,13 @@ def _fmt_amount(amount) -> str:
 
 
 def _shizu_wa_link() -> str:
-    """Best-effort wa.me link to Shizu support from env, with a safe fallback."""
+    """wa.me link to Shizu support from env. Returns '' when the number is
+    unset — an absent link is safer than a wrong number sent to real clients."""
     shizu_wa = os.environ.get("NEXT_PUBLIC_SHIZU_WHATSAPP", "").replace("+", "").strip()
-    return f"wa.me/{shizu_wa}" if shizu_wa else "wa.me/2250700000000"
+    if not shizu_wa:
+        logger.error("NEXT_PUBLIC_SHIZU_WHATSAPP is unset — no Shizu support link available")
+        return ""
+    return f"wa.me/{shizu_wa}"
 
 
 # ── Client-facing templates: {message_id: {locale: format_string}} ────────────
@@ -176,13 +180,11 @@ _TIER_LABELS = {
     "fr": {
         "after_service": "Paiement à la fin de la prestation.",
         "deposit_30":    "Acompte de 30% à la confirmation, solde à la fin.",
-        "deposit_40":    "Acompte de 40% à la confirmation, solde à la fin.",
         "full_prepay":   "Paiement intégral avant le début de la prestation.",
     },
     "en": {
         "after_service": "Payment once the service is completed.",
         "deposit_30":    "30% deposit on confirmation, balance on completion.",
-        "deposit_40":    "40% deposit on confirmation, balance on completion.",
         "full_prepay":   "Full payment before the service begins.",
     },
 }

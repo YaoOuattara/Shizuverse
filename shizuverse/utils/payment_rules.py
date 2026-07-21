@@ -7,7 +7,6 @@ All functions are deterministic given their inputs.
 Tiers:
   after_service  — pay after the work is done (low-value bookings)
   deposit_30     — 30% deposit upfront, remainder after service
-  deposit_40     — 40% deposit upfront, remainder after service
   full_prepay    — 100% paid before service (reserved for future use)
 
 Cancellation policies:
@@ -26,7 +25,7 @@ def get_payment_tier(quoted_price, client_booking_count=0):
                               (reserved for future trust-scaling logic)
 
     Returns:
-        'after_service' | 'deposit_30' | 'deposit_40' | 'full_prepay'
+        'after_service' | 'deposit_30' | 'full_prepay'
     """
     if quoted_price is None or quoted_price < 15000:
         return 'after_service'
@@ -34,8 +33,6 @@ def get_payment_tier(quoted_price, client_booking_count=0):
         return 'deposit_30'    # 30% deposit required
     else:
         return 'full_prepay'   # >=50000 → 100% paid before service
-    # NOTE: 'deposit_40' is no longer returned by this function; the tier
-    # constant and its label are kept for backward compatibility only.
 
 
 def get_deposit_amount(quoted_price, tier):
@@ -45,8 +42,6 @@ def get_deposit_amount(quoted_price, tier):
     """
     if tier == 'deposit_30':
         return round(quoted_price * 0.30)
-    elif tier == 'deposit_40':
-        return round(quoted_price * 0.40)
     elif tier == 'full_prepay':
         return quoted_price
     return 0
@@ -79,7 +74,6 @@ def get_cancellation_policy(tier, hours_before_appointment):
 TIER_LABELS = {
     'after_service': {'fr': 'Paiement après service', 'en': 'Pay after service'},
     'deposit_30':    {'fr': 'Acompte 30%',            'en': '30% deposit'},
-    'deposit_40':    {'fr': 'Acompte 40%',            'en': '40% deposit'},
     'full_prepay':   {'fr': 'Prépaiement intégral',   'en': 'Full prepayment'},
 }
 
