@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { timeSlotLabel } from "@/lib/timeSlots";
 import {
   Loader2, CheckCircle, XCircle, ShieldCheck, MessageCircle,
-  Calendar, MapPin, Sparkles,
+  Calendar, MapPin, Sparkles, Copy, Check,
 } from "lucide-react";
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
@@ -56,6 +56,130 @@ function fmtDate(iso: string | null, isFr: boolean): string {
   }
 }
 
+// ── Payment instructions (shown only after acceptance) ──────────────────────
+interface PaymentInfo {
+  payment_tier: string | null;
+  amount_xof: number | null;
+  deposit_amount: number | null;
+  payment_methods: Record<string, string>;
+}
+
+const METHOD_LABELS: Record<string, string> = {
+  wave: "Wave",
+  orange: "Orange Money",
+  mtn: "MTN MoMo",
+};
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mt-6 w-full rounded-2xl border border-gray-200 bg-white p-5 text-left">
+      <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: BLUE }}>{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function CopyRow({ label, value, isFr }: { label: string; value: string; isFr: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable — the number stays visible for manual entry */
+    }
+  };
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
+      <div className="min-w-0">
+        <p className="text-xs text-gray-400">{label}</p>
+        <p className="text-base font-semibold text-gray-900 tabular-nums truncate">{value}</p>
+      </div>
+      <button
+        onClick={copy}
+        aria-label={isFr ? `Copier le numéro ${label}` : `Copy ${label} number`}
+        className="shrink-0 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors"
+        style={copied ? { backgroundColor: "#16a34a", color: "#fff" } : { backgroundColor: `${BLUE}0D`, color: BLUE }}>
+        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+        {copied ? (isFr ? "Copié" : "Copied") : (isFr ? "Copier" : "Copy")}
+      </button>
+    </div>
+  );
+}
+
+function PaymentInstructions({ info, isFr, waUrl }: { info: PaymentInfo; isFr: boolean; waUrl: string }) {
+  const title = isFr ? "Comment payer" : "How to pay";
+  const tier = info.payment_tier;
+  const methods = info.payment_methods || {};
+  const methodKeys = Object.keys(methods).filter((k) => methods[k]);
+
+  // after_service: nothing is due now — never surface any number.
+  if (tier === "after_service") {
+    return (
+      <Section title={title}>
+        <p className="text-sm text-gray-700 leading-relaxed">
+          {isFr
+            ? "Rien à régler maintenant. Vous paierez à la fin de la prestation."
+            : "Nothing to pay now. You'll pay at the end of the service."}
+        </p>
+      </Section>
+    );
+  }
+
+  // Lead sentence + which amount matters, per tier (deposit_40 == deposit_30).
+  let lead: string;
+  if (tier === "deposit_30" || tier === "deposit_40") {
+    lead = isFr
+      ? `Acompte de ${fmtMoney(info.deposit_amount)} à régler pour confirmer votre réservation.`
+      : `Deposit of ${fmtMoney(info.deposit_amount)} to confirm your booking.`;
+  } else if (tier === "full_prepay") {
+    lead = isFr
+      ? `Montant de ${fmtMoney(info.amount_xof)} à régler avant le début de la prestation.`
+      : `Amount of ${fmtMoney(info.amount_xof)} to pay before the service begins.`;
+  } else {
+    // null / unknown tier: show the amount, no tier phrasing.
+    lead = isFr
+      ? `Montant à régler : ${fmtMoney(info.amount_xof)}.`
+      : `Amount to pay: ${fmtMoney(info.amount_xof)}.`;
+  }
+
+  return (
+    <Section title={title}>
+      <p className="text-sm text-gray-700 leading-relaxed">{lead}</p>
+
+      {methodKeys.length > 0 ? (
+        <>
+          <div className="mt-3 space-y-2">
+            {methodKeys.map((k) => (
+              <CopyRow key={k} label={METHOD_LABELS[k] ?? k} value={methods[k]} isFr={isFr} />
+            ))}
+          </div>
+          <p className="mt-3 flex items-start gap-1.5 text-xs text-gray-500 leading-relaxed">
+            <ShieldCheck className="h-3.5 w-3.5 text-green-500 shrink-0 mt-0.5" />
+            {isFr
+              ? "Shizu ne demande jamais de paiement directement à un prestataire. Tout règlement passe par les numéros ci-dessus."
+              : "Shizu never asks you to pay a provider directly. All payments go through the numbers above."}
+          </p>
+        </>
+      ) : (
+        <div className="mt-3">
+          <p className="text-sm text-gray-700 leading-relaxed">
+            {isFr
+              ? "Pour régler votre prestation, contactez Shizu."
+              : "To pay for your service, contact Shizu."}
+          </p>
+          <a href={waUrl} target="_blank" rel="noopener noreferrer"
+             className="mt-3 w-full inline-flex items-center justify-center gap-2 bg-green-600 text-white text-sm font-semibold py-3 rounded-xl hover:bg-green-700 transition-colors">
+            <MessageCircle className="h-4 w-4" />
+            {isFr ? "Contacter Shizu sur WhatsApp" : "Contact Shizu on WhatsApp"}
+          </a>
+        </div>
+      )}
+    </Section>
+  );
+}
+
 export default function QuotePage() {
   const params = useParams();
   const locale = (params?.locale as string) || "fr";
@@ -66,6 +190,7 @@ export default function QuotePage() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [errKind, setErrKind] = useState<"none" | "not_found" | "expired" | "already" | "network">("none");
   const [alreadyStatus, setAlreadyStatus] = useState<string | null>(null);
+  const [payInfo, setPayInfo] = useState<PaymentInfo | null>(null);
 
   const [declineMode, setDeclineMode] = useState(false);
   const [reason, setReason] = useState<DeclineReason | null>(null);
@@ -76,6 +201,16 @@ export default function QuotePage() {
   const waNumber = (process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "2250700000000").replace("+", "");
   const waUrl = `https://wa.me/${waNumber}`;
 
+  // PaymentInstructions renders its OWN WhatsApp button ONLY in the "no number
+  // available" case (money is due but SHIZU_WAVE/ORANGE/MTN are empty). Only
+  // then do we drop the generic ContactShizu to avoid two identical buttons —
+  // when numbers show (or for after_service) the pay block has no help link, so
+  // the client keeps ContactShizu for any non-payment question.
+  const payBlockCarriesWhatsApp =
+    !!payInfo &&
+    payInfo.payment_tier !== "after_service" &&
+    Object.keys(payInfo.payment_methods ?? {}).length === 0;
+
   useEffect(() => {
     if (!token) return;
     fetch(`${FLASK_API}/api/quote/${token}`)
@@ -85,7 +220,16 @@ export default function QuotePage() {
         else if (res.status === 410) setErrKind("expired");
         else if (res.status === 409) {
           const b = await res.json().catch(() => ({}));
-          setAlreadyStatus(b?.decision ?? b?.status ?? null);
+          const decision = b?.decision ?? b?.status ?? null;
+          setAlreadyStatus(decision);
+          if (decision === "accepted") {
+            setPayInfo({
+              payment_tier: b?.payment_tier ?? null,
+              amount_xof: b?.amount_xof ?? null,
+              deposit_amount: b?.deposit_amount ?? null,
+              payment_methods: b?.payment_methods ?? {},
+            });
+          }
           setErrKind("already");
         } else setErrKind("network");
       })
@@ -102,10 +246,19 @@ export default function QuotePage() {
         body: JSON.stringify(body ?? {}),
       });
       if (res.ok) {
+        if (path === "accept") {
+          const b = await res.json().catch(() => ({}));
+          setPayInfo({
+            payment_tier: b?.payment_tier ?? quote?.payment_tier ?? null,
+            amount_xof: b?.amount_xof ?? quote?.amount_xof ?? null,
+            deposit_amount: b?.deposit_amount ?? quote?.deposit_amount ?? null,
+            payment_methods: b?.payment_methods ?? {},
+          });
+        }
         setDone(path === "accept" ? "accepted" : "declined");
       } else if (res.status === 409) {
         const b = await res.json().catch(() => ({}));
-        setAlreadyStatus(b?.status ?? null);
+        setAlreadyStatus(b?.decision ?? b?.status ?? null);
         setErrKind("already");
       } else if (res.status === 410) {
         setErrKind("expired");
@@ -166,7 +319,12 @@ export default function QuotePage() {
           </div>
           <h1 className="text-xl font-bold text-gray-900">{title}</h1>
           <p className="text-gray-500 text-sm mt-2 leading-relaxed">{body}</p>
-          <ContactShizu />
+          {errKind === "already" && alreadyStatus === "accepted" && payInfo && (
+            <PaymentInstructions info={payInfo} isFr={isFr} waUrl={waUrl} />
+          )}
+          {!(errKind === "already" && alreadyStatus === "accepted" && payInfo && payBlockCarriesWhatsApp) && (
+            <ContactShizu />
+          )}
         </div>
       </Shell>
     );
@@ -190,6 +348,10 @@ export default function QuotePage() {
               : (isFr ? "Merci pour votre retour, il nous aide à nous améliorer." : "Thank you for your feedback — it helps us improve.")}
           </p>
 
+          {accepted && payInfo && (
+            <PaymentInstructions info={payInfo} isFr={isFr} waUrl={waUrl} />
+          )}
+
           {accepted && (
             <div className="mt-6 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left flex items-start gap-2.5">
               <Sparkles className="h-4 w-4 shrink-0 mt-0.5" style={{ color: BLUE }} />
@@ -203,7 +365,9 @@ export default function QuotePage() {
               </div>
             </div>
           )}
-          <ContactShizu />
+          {/* Keep the generic help link, except when the pay block already
+              carries its own WhatsApp (the no-number-available case). */}
+          {!(accepted && payInfo && payBlockCarriesWhatsApp) && <ContactShizu />}
         </div>
       </Shell>
     );
