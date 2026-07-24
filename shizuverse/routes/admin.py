@@ -414,6 +414,9 @@ def get_all_providers():
             'submitted_at': p.submitted_at.isoformat() if p.submitted_at else None,
             'created_at': p.created_at.isoformat() if p.created_at else None,
             'services': data['services'],
+            # Provider-DECLARED rates (T-14: not Shizu pricing). Same value on
+            # every row of the provider, so the canonical row carries it.
+            'service_rates': p.service_rates,
             'id_document_url': p.id_document_url,
             # Review documents — the admin must SEE the capability proof (Gate 3)
             # and the profile photo, not just the ID. These were missing.
