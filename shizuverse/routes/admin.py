@@ -1056,7 +1056,6 @@ def confirm_payment(booking_id):
         # amount_xof is the client-accepted, locked quote (what was paid); if it
         # is missing we skip rather than announce "0 FCFA".
         from shizuverse.utils.notifications import notify_payment_confirmed
-        from shizuverse.utils.booking_ref import booking_ref as make_booking_ref
         if b.amount_xof is not None:
             notify_payment_confirmed(
                 client_name=b.client_name,
