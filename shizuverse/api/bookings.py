@@ -144,10 +144,11 @@ def create_booking():
     # WhatsApp: notify client their request was received
     try:
         from shizuverse.utils.notifications import notify_booking_created
+        from shizuverse.utils.booking_ref import booking_ref as make_booking_ref
         notify_booking_created(
             client_name=booking.client_name,
             client_phone=booking.client_phone,
-            booking_ref=str(booking.id),
+            booking_ref=make_booking_ref(booking),
             locale=booking.locale,
         )
     except Exception as e:

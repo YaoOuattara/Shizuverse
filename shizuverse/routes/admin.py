@@ -7,6 +7,7 @@ from shizuverse.models.booking_event import BookingEvent
 from shizuverse.models.service_models import Service
 from shizuverse.models.review import Review
 from shizuverse.limiter import limiter
+from shizuverse.utils.booking_ref import booking_ref as make_booking_ref
 
 admin_bp = Blueprint('admin_portal', __name__, url_prefix='/admin')
 
@@ -510,7 +511,7 @@ def set_booking_quote(booking_id):
         notify_payment_instructions(
             client_name=b.client_name,
             client_phone=b.client_phone,
-            booking_ref=str(b.id),
+            booking_ref=make_booking_ref(b),
             amount=amt,
             service_name=b.service_name,
             payment_tier=tier,
@@ -564,7 +565,7 @@ def cancel_booking(booking_id):
         notify_booking_cancelled_client(
             client_name=b.client_name,
             client_phone=b.client_phone,
-            booking_ref=str(b.id),
+            booking_ref=make_booking_ref(b),
             reason=reason or '',
             locale=b.locale,
         )
@@ -572,7 +573,7 @@ def cancel_booking(booking_id):
             apt = b.appointment_date
             notify_booking_cancelled_provider(
                 provider_phone=b.provider_phone,
-                booking_ref=str(b.id),
+                booking_ref=make_booking_ref(b),
                 date=apt.strftime('%d/%m/%Y') if apt else '',
             )
     except Exception as e:
@@ -659,7 +660,7 @@ def reschedule_booking(booking_id):
         notify_booking_rescheduled_client(
             client_name=b.client_name,
             client_phone=b.client_phone,
-            booking_ref=str(b.id),
+            booking_ref=make_booking_ref(b),
             new_date=date_only,
             new_slot=client_slot,
             locale=b.locale,
@@ -668,7 +669,7 @@ def reschedule_booking(booking_id):
             provider_slot = _SLOT_LABELS.get(new_slot, {}).get('fr', '') if new_slot else ''
             notify_booking_rescheduled_provider(
                 provider_phone=b.provider_phone,
-                booking_ref=str(b.id),
+                booking_ref=make_booking_ref(b),
                 new_date=date_only,
                 new_slot=provider_slot,
             )
@@ -759,7 +760,7 @@ def update_finance(booking_id):
         eff_payout = b.provider_payout or (
             round((b.final_amount or b.amount_xof or 0) * 0.85)
         )
-        booking_ref = str(b.id)
+        booking_ref = make_booking_ref(b)
         if payment == 'paid' and b.provider_phone and eff_payout:
             notify_payment_recorded(
                 provider_phone=b.provider_phone,
@@ -1098,7 +1099,7 @@ def send_payment_instructions(booking_id):
         sent = notify_payment_instructions(
             client_name=b.client_name,
             client_phone=b.client_phone,
-            booking_ref=str(b.id),
+            booking_ref=make_booking_ref(b),
             amount=b.amount_xof,
             service_name=b.service_name,
             payment_tier=b.payment_tier,
