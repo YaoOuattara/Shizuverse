@@ -131,8 +131,8 @@ function PaymentInstructions({ info, isFr, waUrl }: { info: PaymentInfo; isFr: b
   let lead: string;
   if (tier === "deposit_30" || tier === "deposit_40") {
     lead = isFr
-      ? `Acompte de ${fmtMoney(info.deposit_amount)} à régler pour confirmer votre réservation.`
-      : `Deposit of ${fmtMoney(info.deposit_amount)} to confirm your booking.`;
+      ? `Acompte de ${fmtMoney(info.deposit_amount)} à régler à la confirmation.`
+      : `Deposit of ${fmtMoney(info.deposit_amount)} due on confirmation.`;
   } else if (tier === "full_prepay") {
     lead = isFr
       ? `Montant de ${fmtMoney(info.amount_xof)} à régler avant le début de la prestation.`

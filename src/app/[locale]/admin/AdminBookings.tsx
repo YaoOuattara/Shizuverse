@@ -322,7 +322,9 @@ function EventHistory({ events, loading, error, createdAt, isFr }: {
           <div className="absolute -left-[9px] w-4 h-4 rounded-full bg-muted border-2 border-background" />
           <div className="text-sm">
             <span className="font-medium">{isFr ? "Créé" : "Created"}</span>
-            <span className="text-xs text-muted-foreground ml-2">{createdAt}</span>
+            <span className="text-xs text-muted-foreground ml-2">
+              {createdAt ? format(parseISO(createdAt), "MMM d, yyyy HH:mm") : ""}
+            </span>
           </div>
         </div>
         {events.length === 0 ? (
