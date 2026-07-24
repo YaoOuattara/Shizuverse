@@ -1036,46 +1036,86 @@ def unlock_booking_amount(booking_id):
 @admin_bp.route('/bookings/<int:booking_id>/confirm-payment', methods=['POST'])
 @admin_required
 def confirm_payment(booking_id):
-    """Admin confirms client payment received — activates the booking."""
-    b = ClientBooking.query.get_or_404(booking_id)
-    prev_status = b.status
-    b.payment_status = 'paid'
-    b.status = 'confirmed'
+    """Record a client payment (deposit OR balance).
 
-    event = BookingEvent(
+    Payments ACCUMULATE into amount_collected — the single source of truth for
+    how much was collected. The booking is confirmed on the FIRST payment (a
+    deposit engages the client, T-15). Overpayment (tip / MoMo rounding) is
+    accepted, never refused. unpaid/partial/paid are derived, not stored here.
+    """
+    b = ClientBooking.query.get_or_404(booking_id)
+    data = request.get_json() or {}
+
+    # The amount received now. Omitting it means "settle the full remaining
+    # balance" (keeps the simple one-click full-payment action working).
+    raw = data.get('amount')
+    if raw is None:
+        amount = b.amount_due
+    else:
+        try:
+            amount = int(raw)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'amount must be a positive integer'}), 400
+    if amount <= 0:
+        return jsonify({'error': 'amount must be a positive integer'}), 400
+
+    prev_collected = b.amount_collected or 0
+    prev_status = b.status
+    due_total = b.amount_due_total
+
+    b.amount_collected = prev_collected + amount
+    # A recorded payment resolves any prior unverified client claim.
+    if b.payment_status == 'pending':
+        b.payment_status = 'open'
+    # Confirm on the first payment (a deposit engages the booking, T-15).
+    if prev_collected == 0:
+        b.status = 'confirmed'
+
+    now_full = due_total <= 0 or b.amount_collected >= due_total
+    kind = 'Solde' if now_full else 'Acompte'
+    db.session.add(BookingEvent(
         booking_id=b.id,
-        event_type='payment_confirmed',
+        event_type='payment_recorded',
         from_status=prev_status,
-        to_status='confirmed',
-        note='Paiement confirmé par admin',
-    )
-    db.session.add(event)
+        to_status=b.status,
+        note=f"{kind} {amount} FCFA reçu (encaissé {b.amount_collected}/{due_total} FCFA)",
+    ))
     db.session.commit()
 
+    # WhatsApp: full → "payment received, confirmed"; partial → the DISTINCT
+    # deposit-received message (never announce full payment on a deposit).
     try:
-        # This endpoint confirms PAYMENT, so it must send the payment-confirmation
-        # message (shizu_payment_confirmed_fr/en) — NOT the "booking confirmed"
-        # message the client already received when the provider accepted.
-        # amount_xof is the client-accepted, locked quote (what was paid); if it
-        # is missing we skip rather than announce "0 FCFA".
-        from shizuverse.utils.notifications import notify_payment_confirmed
-        if b.amount_xof is not None:
+        if now_full:
+            from shizuverse.utils.notifications import notify_payment_confirmed
             notify_payment_confirmed(
                 client_name=b.client_name,
                 client_phone=b.client_phone,
                 booking_ref=make_booking_ref(b),
-                amount=b.amount_xof,
+                amount=b.amount_collected,
                 locale=b.locale,
             )
         else:
-            current_app.logger.warning(
-                "[confirm_payment] booking %s has no amount_xof — "
-                "payment confirmation skipped", b.id,
+            from shizuverse.utils.notifications import notify_deposit_received
+            notify_deposit_received(
+                client_name=b.client_name,
+                client_phone=b.client_phone,
+                booking_ref=make_booking_ref(b),
+                amount=amount,
+                amount_due=b.amount_due,
+                locale=b.locale,
             )
     except Exception as e:
         current_app.logger.error(f"[confirm_payment] Unexpected error: {e}", exc_info=True)
 
-    return jsonify({'success': True, 'status': b.status, 'payment_status': b.payment_status})
+    return jsonify({
+        'success': True,
+        'status': b.status,
+        'payment_status': b.payment_status,
+        'amount_collected': b.amount_collected,
+        'amount_due': b.amount_due,
+        'collection_status': b.collection_status,
+        'overpaid': b.overpaid,
+    })
 
 
 @admin_bp.route('/bookings/<int:booking_id>/send-payment-instructions', methods=['POST'])

@@ -3,6 +3,12 @@ from datetime import datetime
 
 VALID_STATUSES = ['requested', 'accepted', 'declined', 'in_progress', 'completed', 'cancelled', 'disputed', 'pending_payment']
 
+# payment_status is a DOSSIER FLAG only — it never carries an amount. How much
+# was collected lives in amount_collected (single source of truth), from which
+# unpaid/partial/paid are DERIVED. 'open' is the neutral default (chosen over
+# 'none' to avoid the 'none'-vs-None truthiness trap in Python).
+VALID_PAYMENT_STATUSES = ('open', 'pending', 'refunded')
+
 
 class ClientBooking(db.Model):
     __tablename__ = "client_bookings"
@@ -28,14 +34,20 @@ class ClientBooking(db.Model):
     time_slot        = db.Column(db.String(20), nullable=True)   # morning | afternoon | evening
     status           = db.Column(db.String(20), default="requested", nullable=False)
     notes            = db.Column(db.Text, nullable=True)
-    payment_status = db.Column(
-        db.Enum('unpaid', 'pending', 'paid', 'refunded', name='payment_status_enum'),
-        default='unpaid', nullable=False)
+    # Dossier flag only (see VALID_PAYMENT_STATUSES): 'open' | 'pending' |
+    # 'refunded'. Plain VARCHAR (not a PG enum) — this set has already changed
+    # once and will again; app-level validation avoids costly enum surgery.
+    payment_status = db.Column(db.String(20), default='open', server_default='open', nullable=False)
     payout_status = db.Column(
         db.Enum('not_due', 'due', 'sent', 'failed', name='payout_status_enum'),
         default='not_due', nullable=False)
     amount_xof = db.Column(db.Integer, nullable=True)
     final_amount = db.Column(db.Integer, nullable=True)
+    # Single source of truth for HOW MUCH has actually been collected (sum of
+    # every recorded payment: deposits + balance). unpaid/partial/paid are
+    # DERIVED from it, never stored. Overpayment (tip / MoMo rounding) is
+    # allowed, so it may exceed the amount due.
+    amount_collected = db.Column(db.Integer, default=0, server_default='0', nullable=False)
     shizu_commission = db.Column(db.Integer, nullable=True)
     provider_payout = db.Column(db.Integer, nullable=True)
     decline_reason = db.Column(db.Text, nullable=True)
@@ -69,6 +81,35 @@ class ClientBooking(db.Model):
 
     service = db.relationship("Service", backref="client_bookings", lazy="joined")
 
+    # ── Derived collection state (never stored — computed from amount_collected) ──
+    @property
+    def amount_due_total(self) -> int:
+        """Total the client owes: the recorded final amount if set, else the
+        accepted quote — coalesce(final_amount, amount_xof). A justified overrun
+        (final_amount > quote) is therefore owed by the client (decision C)."""
+        return self.final_amount if self.final_amount is not None else (self.amount_xof or 0)
+
+    @property
+    def amount_due(self) -> int:
+        """Remaining balance, never negative (surplus surfaces via `overpaid`)."""
+        return max(0, self.amount_due_total - (self.amount_collected or 0))
+
+    @property
+    def overpaid(self) -> int:
+        """Amount collected beyond what's due (tip / Mobile Money rounding)."""
+        return max(0, (self.amount_collected or 0) - self.amount_due_total)
+
+    @property
+    def collection_status(self) -> str:
+        """Derived money state: 'unpaid' | 'partial' | 'paid'."""
+        collected = self.amount_collected or 0
+        total = self.amount_due_total
+        if collected <= 0:
+            return 'unpaid'
+        if total > 0 and collected < total:
+            return 'partial'
+        return 'paid'
+
     def to_dict(self):
         return {
             "id":                   self.id,
@@ -93,6 +134,11 @@ class ClientBooking(db.Model):
             "payout_status":        self.payout_status,
             "amount_xof":           self.amount_xof,
             "final_amount":         self.final_amount,
+            # Collection (amount_collected is the single source; the rest derive)
+            "amount_collected":     self.amount_collected or 0,
+            "amount_due":           self.amount_due,
+            "collection_status":    self.collection_status,
+            "overpaid":             self.overpaid,
             "shizu_commission":     self.shizu_commission,
             "provider_payout":      self.provider_payout,
             "decline_reason":       self.decline_reason,

@@ -412,6 +412,34 @@ def notify_payment_confirmed(
                                   variables, log_body=body)
 
 
+def notify_deposit_received(
+    *, client_name: str, client_phone: str, booking_ref: str,
+    amount: int, amount_due: int, locale: str = "fr",
+) -> bool:
+    """Sent when a PARTIAL payment (deposit) is recorded — distinct from
+    notify_payment_confirmed. Announcing "payment received, service confirmed"
+    on a partial deposit would be a button that lies (decision D).
+
+    TODO: awaiting the approved Meta template text/SID (shizu_deposit_received_{loc}).
+    Until it's registered, send_whatsapp_template logs and returns False safely.
+    Positional variables: {1} name, {2} booking_ref, {3} amount received,
+    {4} remaining balance."""
+    loc = _norm_locale(locale)
+    amount_fmt = _fmt_amount(amount)
+    due_fmt = _fmt_amount(amount_due)
+    variables = {"1": client_name, "2": booking_ref, "3": amount_fmt, "4": due_fmt}
+    # Provisional log body until the approved wording is provided.
+    body = (
+        f"Bonjour {client_name}, nous avons reçu votre acompte de {amount_fmt} FCFA "
+        f"pour la réservation {booking_ref}. Solde restant : {due_fmt} FCFA."
+        if loc == "fr" else
+        f"Hello {client_name}, we have received your deposit of {amount_fmt} FCFA "
+        f"for booking {booking_ref}. Remaining balance: {due_fmt} FCFA."
+    )
+    return send_whatsapp_template(client_phone, f"shizu_deposit_received_{loc}",
+                                  variables, log_body=body)
+
+
 def notify_payment_instructions(
     *, client_name: str, client_phone: str,
     booking_ref: str, amount: int,
