@@ -1049,6 +1049,42 @@ export default function AdminProviders() {
                 )}
               </div>
 
+              {/* Declared rates — provider-entered, NOT Shizu pricing (T-14).
+                  Hidden entirely when the provider declared none. */}
+              {(() => {
+                const raw = apiProviders.find((ap) => String(ap.id) === selectedProvider.id)?.service_rates;
+                // Drop entries where BOTH bounds are 0: the registration form does
+                // Number(r.min) || 0, so an EMPTY field becomes 0 — showing "0 CFA"
+                // would present missing data as a declaration of "free", which is
+                // false. If nothing survives, render nothing (same as no rates).
+                const entries = (raw ? Object.entries(raw) : []).filter(
+                  ([, r]) => (Number(r?.min) || 0) !== 0 || (Number(r?.max) || 0) !== 0
+                );
+                if (entries.length === 0) return null;
+                return (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm text-muted-foreground">
+                      {isFr ? "Tarifs déclarés" : "Declared rates"}
+                    </h4>
+                    <p className="text-xs text-muted-foreground italic">
+                      {isFr
+                        ? "Indiqués par le prestataire, hors tarification Shizu."
+                        : "Stated by the provider, not Shizu pricing."}
+                    </p>
+                    <div className="space-y-1.5">
+                      {entries.map(([category, r]) => (
+                        <div key={category} className="flex items-center justify-between gap-3 text-sm">
+                          <span className="text-muted-foreground">{category}</span>
+                          <span className="font-medium tabular-nums whitespace-nowrap">
+                            {formatMoney(Number(r?.min) || 0).replace(/ CFA$/, "")} – {formatMoney(Number(r?.max) || 0)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Zones */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">

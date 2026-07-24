@@ -65,6 +65,9 @@ export interface ApiProvider {
   address?: string;
   zones?: string[];
   services?: string[];
+  // Provider-declared rates, keyed by localized category name (T-14: NOT Shizu
+  // pricing). e.g. { "Climatisation et électroménager": { min: 10000, max: 40000 } }
+  service_rates?: Record<string, { min: number; max: number }> | null;
   // Old endpoint fields (kept for backwards compat)
   name?: string;
   email?: string;
