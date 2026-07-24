@@ -140,8 +140,13 @@ export const adminApi = {
   // Dispute-only: unlock the client-accepted amount. Backend requires a reason (400 without).
   portalUnlockAmount: (bookingId: number, reason: string) =>
     adminFetch(`/admin/bookings/${bookingId}/unlock-amount`, { method: "POST", body: JSON.stringify({ reason }) }),
-  portalConfirmPayment: (bookingId: number) =>
-    adminFetch(`/admin/bookings/${bookingId}/confirm-payment`, { method: "POST", body: JSON.stringify({}) }),
+  // Record a client payment (deposit OR balance). Omit `amount` to settle the
+  // full remaining balance; pass an amount to record a partial deposit.
+  portalConfirmPayment: (bookingId: number, amount?: number) =>
+    adminFetch(`/admin/bookings/${bookingId}/confirm-payment`, {
+      method: "POST",
+      body: JSON.stringify(amount != null ? { amount } : {}),
+    }),
   // Sends the payment instructions to the client via WhatsApp. Read-only w.r.t.
   // the booking (no status/payment/amount change).
   portalSendPaymentInstructions: (bookingId: number) =>

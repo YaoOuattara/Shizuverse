@@ -28,6 +28,7 @@ interface ApiBooking {
   amount_xof: number | null;
   final_amount: number | null;
   payment_status: string;
+  collection_status?: string | null;
   created_at: string | null;
   notes: string | null;
   client_location?: string | null;
@@ -487,7 +488,7 @@ export default function BookingsPage() {
                   {(b.final_amount != null || b.amount_xof != null) && (() => {
                     const effectiveAmt = b.final_amount ?? b.amount_xof!;
                     const fmt = new Intl.NumberFormat("fr-FR").format(effectiveAmt) + " FCFA";
-                    const isPaid = b.payment_status === "paid";
+                    const isPaid = (b.collection_status ?? b.payment_status) === "paid";
                     return (
                       <p className="text-sm text-muted-foreground">
                         {isPaid

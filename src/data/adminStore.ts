@@ -40,7 +40,13 @@ export interface StatusHistoryEntry {
   actor?: string;
 }
 
-export type PaymentStatus = 'unpaid' | 'pending' | 'paid' | 'refunded';
+// Two orthogonal axes now (partial-payment model):
+//  - PaymentStatus  = DOSSIER flag (the backend stores 'open'|'pending'|'refunded').
+//    'unpaid'/'paid' are kept ONLY so the legacy mock data below still type-checks;
+//    real API rows never carry them (they're derived → CollectionStatus).
+//  - CollectionStatus = money state DERIVED from amount_collected vs amount due.
+export type PaymentStatus = 'open' | 'pending' | 'refunded' | 'unpaid' | 'paid';
+export type CollectionStatus = 'unpaid' | 'partial' | 'paid';
 export type PayoutStatus = 'not_due' | 'due' | 'sent' | 'failed';
 export type TransactionType = 'customer_payment' | 'refund' | 'provider_payout' | 'adjustment';
 export type TransactionDirection = 'in' | 'out';
@@ -99,6 +105,11 @@ export interface AdminBooking {
   providerPayoutAmount: number;
   paymentStatus: PaymentStatus;
   payoutStatus: PayoutStatus;
+  // Collection axis (from the API; optional so the mock rows need no change).
+  collectionStatus?: CollectionStatus;
+  amountCollected?: number;
+  amountDue?: number;
+  overpaid?: number;
   paidAt?: string;
   payoutDueAt?: string;
   payoutSentAt?: string;

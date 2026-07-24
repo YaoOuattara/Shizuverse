@@ -25,9 +25,14 @@ export interface ApiBooking {
   provider_name: string | null;
   provider_phone: string | null;
   created_at: string | null;
-  payment_status: string;
+  payment_status: string;   // dossier flag: open | pending | refunded
   payout_status: string;
   amount_xof: number | null;
+  // Collection axis (derived server-side from amount_collected).
+  amount_collected?: number | null;
+  amount_due?: number | null;
+  collection_status?: 'unpaid' | 'partial' | 'paid' | null;
+  overpaid?: number | null;
   decline_reason: string | null;
   cancellation_reason: string | null;
   time_slot?: string;

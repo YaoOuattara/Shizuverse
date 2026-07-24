@@ -179,6 +179,8 @@ const CANCELLATION_LABELS: Record<string, string> = {
 
 const paymentColors: Record<string, string> = {
   unpaid: "bg-amber-100/50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400",
+  partial: "bg-orange-100/60 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400",
+  open: "bg-gray-100/60 text-gray-600 dark:bg-gray-900/20 dark:text-gray-400",
   pending: "bg-amber-100/50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400",
   paid: "bg-emerald-100/50 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400",
   refunded: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
@@ -192,8 +194,10 @@ const payoutColors: Record<string, string> = {
 };
 
 const getPaymentStatusLabels = (isFr: boolean): Record<string, string> => ({
-  unpaid:   isFr ? 'Non payé'           : 'Unpaid',
-  pending:  isFr ? 'Paiement en attente': 'Payment Pending',
+  unpaid:   isFr ? 'Non payé'            : 'Unpaid',
+  partial:  isFr ? 'Partiel'            : 'Partial',
+  open:     isFr ? 'À encaisser'        : 'To collect',
+  pending:  isFr ? 'Paiement en attente' : 'Payment Pending',
   paid:     isFr ? 'Payé'               : 'Paid',
   refunded: isFr ? 'Remboursé'          : 'Refunded',
 });
@@ -271,6 +275,7 @@ const EVENT_LABELS: Record<string, { fr: string; en: string }> = {
   final_amount_set:  { fr: "Montant final enregistré",       en: "Final amount recorded" },
   amount_unlocked:   { fr: "Montant déverrouillé (litige)",  en: "Amount unlocked (dispute)" },
   payment_confirmed: { fr: "Paiement confirmé",              en: "Payment confirmed" },
+  payment_recorded:  { fr: "Versement enregistré",           en: "Payment recorded" },
   dispute_opened:    { fr: "Litige ouvert",                  en: "Dispute opened" },
   dispute_resolved:  { fr: "Litige résolu",                  en: "Dispute resolved" },
   status_changed:    { fr: "Statut modifié par l'admin",     en: "Status changed by admin" },
@@ -407,8 +412,12 @@ export default function AdminBookings() {
     providerPayoutAmount: b.provider_payout ?? 0,
     urgency: b.urgency as import("@/utils/pricingEngine").UrgencyLevel | undefined,
     timePreference: b.time_preference as import("@/utils/pricingEngine").TimePreference | undefined,
-    paymentStatus: (b.payment_status as AdminBooking["paymentStatus"]) || "unpaid",
+    paymentStatus: (b.payment_status as AdminBooking["paymentStatus"]) || "open",
     payoutStatus: (b.payout_status as AdminBooking["payoutStatus"]) || "not_due",
+    collectionStatus: (b.collection_status as AdminBooking["collectionStatus"]) ?? undefined,
+    amountCollected: b.amount_collected ?? undefined,
+    amountDue: b.amount_due ?? undefined,
+    overpaid: b.overpaid ?? undefined,
     address: b.client_location || "",
     // Zone slug derived from the commune in client_location (fixes the quote
     // engine always falling back to the default zone multiplier).
@@ -470,7 +479,6 @@ export default function AdminBookings() {
   // Payment confirmation modal state
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [finalAmountInput, setFinalAmountInput] = useState("");
-  const [discrepancyReason, setDiscrepancyReason] = useState("");
 
   // Raw API row for the selected booking — carries amount_xof / amount_locked
   // which the mapped AdminBooking type doesn't expose.
@@ -478,7 +486,6 @@ export default function AdminBookings() {
     ? apiBookings.find((x) => String(x.id) === selectedBooking.id)
     : undefined;
   const selAmountXof = rawSelected?.amount_xof ?? null;
-  const selAmountLocked = !!rawSelected?.amount_locked;
   // Payment tier decides whether "assigned" may be confirmed without payment.
   // after_service (< 15 000) is paid AFTER the mission → a bare confirm is
   // legitimate. deposit_30 / full_prepay must be paid BEFORE → confirmation
@@ -488,11 +495,6 @@ export default function AdminBookings() {
   const selIsAfterService = selTier
     ? selTier === 'after_service'
     : (selAmountXof != null && selAmountXof < 15000);
-  const paymentNeedsReason =
-    selAmountLocked &&
-    selAmountXof != null &&
-    Math.round(Number(finalAmountInput) || 0) > 0 &&
-    Math.round(Number(finalAmountInput)) !== selAmountXof;
 
   // Amount lock state
   const [lockAmountInput, setLockAmountInput] = useState("");
@@ -792,53 +794,55 @@ export default function AdminBookings() {
   };
 
   const openPaymentModal = () => {
-    if (!selectedBooking || selectedBooking.status === 'cancelled' || selectedBooking.paymentStatus === 'paid') return;
+    if (!selectedBooking || selectedBooking.status === 'cancelled' || (selectedBooking.collectionStatus ?? selectedBooking.paymentStatus) === 'paid') return;
     // Pre-fill: final_amount (if already set) → baseAmount (= amount_xof quoted price) → 0
-    const prefill = selectedBooking.baseAmount > 0
-      ? selectedBooking.baseAmount
-      : selectedBooking.price > 0
-        ? selectedBooking.price
-        : 0;
+    // Pre-fill with the remaining balance due (falls back to the booking amount
+    // for legacy rows that don't expose amountDue).
+    const prefill = selectedBooking.amountDue
+      ?? (selectedBooking.baseAmount > 0
+        ? selectedBooking.baseAmount
+        : selectedBooking.price > 0 ? selectedBooking.price : 0);
     setFinalAmountInput(prefill > 0 ? String(prefill) : "");
-    setDiscrepancyReason("");
     setPaymentModalOpen(true);
   };
 
   const handleConfirmPayment = async () => {
     if (!selectedBooking || !finalAmountInput || Number(finalAmountInput) <= 0) return;
-    // Locked amount diverging from the accepted quote requires a motif — the
-    // backend enforces this too; guarding here avoids a needless 400 round-trip.
-    if (paymentNeedsReason && !discrepancyReason.trim()) return;
-    const finalAmt = Math.round(Number(finalAmountInput));
-    const commission = Math.round(finalAmt * 0.15);
-    const payout = finalAmt - commission;
+    const amount = Math.round(Number(finalAmountInput));
     setIsUpdating(true);
-    const prevPaymentStatus = selectedBooking.paymentStatus;
+    const prevCollected = selectedBooking.amountCollected ?? 0;
+    const prevStatus = selectedBooking.status;
+    const prevCollectionStatus = selectedBooking.collectionStatus;
+    // Optimistic: reflect the added amount now; the response is authoritative.
     updateLocalBooking(selectedBooking.id, {
-      paymentStatus: 'paid',
-      paidAt: new Date().toISOString().split('T')[0],
-      paymentMethod: 'cash',
-      price: finalAmt,
-      baseAmount: finalAmt,
-      platformFeeAmount: commission,
-      providerPayoutAmount: payout,
+      amountCollected: prevCollected + amount,
+      ...(prevCollected === 0 ? { status: 'confirmed' as AdminBooking['status'] } : {}),
     });
     setPaymentModalOpen(false);
     try {
-      await adminApi.portalUpdateFinance(selectedBooking.id, {
-        payment_status: 'paid',
-        final_amount: finalAmt,
-        ...(discrepancyReason.trim() ? { reason: discrepancyReason.trim() } : {}),
+      const res: {
+        amount_collected?: number; amount_due?: number; overpaid?: number;
+        collection_status?: string; status?: string; payment_status?: string;
+      } = await adminApi.portalConfirmPayment(Number(selectedBooking.id), amount);
+      updateLocalBooking(selectedBooking.id, {
+        amountCollected: res?.amount_collected ?? prevCollected + amount,
+        amountDue: res?.amount_due,
+        collectionStatus: res?.collection_status as AdminBooking['collectionStatus'],
+        overpaid: res?.overpaid,
+        status: (res?.status as AdminBooking['status']) ?? selectedBooking.status,
+        paymentStatus: (res?.payment_status as AdminBooking['paymentStatus']) ?? selectedBooking.paymentStatus,
       });
       toast({
-        title: isFr ? "Paiement enregistré" : "Payment Recorded",
+        title: isFr ? "Versement enregistré" : "Payment Recorded",
         description: isFr
-          ? `Paiement de ${formatMoney(finalAmt, 'XOF')} enregistré.`
-          : `Payment of ${formatMoney(finalAmt, 'XOF')} has been recorded.`,
+          ? `Versement de ${formatMoney(amount, 'XOF')} enregistré.`
+          : `Payment of ${formatMoney(amount, 'XOF')} has been recorded.`,
         duration: 3000,
       });
     } catch (err) {
-      updateLocalBooking(selectedBooking.id, { paymentStatus: prevPaymentStatus });
+      updateLocalBooking(selectedBooking.id, {
+        amountCollected: prevCollected, status: prevStatus, collectionStatus: prevCollectionStatus,
+      });
       console.error("Failed to record payment:", err);
       // Re-open the modal so the admin can act on the backend's message.
       setPaymentModalOpen(true);
@@ -1272,8 +1276,8 @@ export default function AdminBookings() {
                         <Badge className={`text-xs ${statusColors[booking.status] || statusColors.pending}`}>
                           {statusLabels[booking.status] || booking.status}
                         </Badge>
-                        <Badge className={`text-xs ${paymentColors[booking.paymentStatus]}`}>
-                          {paymentStatusLabels[booking.paymentStatus]}
+                        <Badge className={`text-xs ${paymentColors[booking.collectionStatus ?? booking.paymentStatus]}`}>
+                          {paymentStatusLabels[booking.collectionStatus ?? booking.paymentStatus]}
                         </Badge>
                       </div>
                     </div>
@@ -1400,8 +1404,8 @@ export default function AdminBookings() {
                     </div>
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-muted-foreground">{isFr ? "Paiement\u00a0:" : "Payment:"}</span>
-                      <Badge className={`${paymentColors[selectedBooking.paymentStatus]}`}>
-                        {paymentStatusLabels[selectedBooking.paymentStatus]}
+                      <Badge className={`${paymentColors[selectedBooking.collectionStatus ?? selectedBooking.paymentStatus]}`}>
+                        {paymentStatusLabels[selectedBooking.collectionStatus ?? selectedBooking.paymentStatus]}
                       </Badge>
                     </div>
                     {selectedBooking.status === 'completed' && (
@@ -1597,7 +1601,7 @@ export default function AdminBookings() {
                     {/* Payment: two clearly separated intents.
                         (1) Consultation — show the Mobile Money numbers, no effect.
                         (2) Financial action — mark the money as actually received. */}
-                    {isLocked && selectedBooking.paymentStatus !== 'paid' && !isClosed && (
+                    {isLocked && (selectedBooking.collectionStatus ?? selectedBooking.paymentStatus) !== 'paid' && !isClosed && (
                       <div className="space-y-2">
                         <Button variant="outline" size="sm" className="w-full"
                           onClick={() => setPaymentInstructionsOpen(true)}>
@@ -1849,7 +1853,7 @@ export default function AdminBookings() {
                 )}
 
                 {/* Payment Actions - show for unpaid non-cancelled bookings with accepted quote */}
-                {selectedBooking.paymentStatus === 'unpaid' && selectedBooking.status !== 'cancelled' && (selectedBooking.quoteStatus === 'accepted' || selectedBooking.status === 'confirmed' || selectedBooking.status === 'completed') && (
+                {(selectedBooking.collectionStatus ?? selectedBooking.paymentStatus) !== 'paid' && selectedBooking.status !== 'cancelled' && (selectedBooking.quoteStatus === 'accepted' || selectedBooking.status === 'confirmed' || selectedBooking.status === 'completed') && (
                   <div className="space-y-2">
                     <Button
                       variant="outline"
@@ -2483,79 +2487,75 @@ export default function AdminBookings() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Banknote className="h-5 w-5 text-emerald-600" />
-              {isFr ? "Confirmer le paiement" : "Confirm Payment"}
+              {isFr ? "Enregistrer un versement" : "Record a Payment"}
             </DialogTitle>
             <DialogDescription>
               {isFr
-                ? "Saisissez le montant final encaissé. La commission et le versement seront calculés automatiquement."
-                : "Enter the final amount collected. Commission and payout will be calculated automatically."}
+                ? "Saisissez le montant reçu. Les acomptes s'additionnent ; la réservation est confirmée au premier versement."
+                : "Enter the amount received. Deposits accumulate; the booking is confirmed on the first payment."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            {/* Context: quoted price */}
-            {(selectedBooking?.price ?? 0) > 0 && (
-              <div className="flex justify-between items-center text-sm bg-muted/40 rounded-md px-3 py-2">
-                <span className="text-muted-foreground">{isFr ? "Devis initial" : "Quoted Price"}</span>
-                <span className="font-medium">{new Intl.NumberFormat('fr-FR').format(selectedBooking!.price)} FCFA</span>
-              </div>
-            )}
-            {/* Editable final amount */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">
-                {isFr ? "Montant final encaissé (FCFA) *" : "Final Amount Collected (FCFA) *"}
-              </label>
-              <div className="flex gap-2 items-center">
-                <Input
-                  type="number"
-                  value={finalAmountInput}
-                  onChange={(e) => setFinalAmountInput(e.target.value)}
-                  placeholder="0"
-                  min={1}
-                  autoFocus
-                  data-testid="input-final-amount"
-                />
-                <span className="text-sm text-muted-foreground whitespace-nowrap">FCFA</span>
-              </div>
-            </div>
-            {/* Motif — only when the final amount diverges from a locked,
-                client-accepted quote (otherwise it just clutters the form). */}
-            {paymentNeedsReason && (
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-amber-700 dark:text-amber-500">
-                  {isFr ? "Motif de l'écart *" : "Reason for discrepancy *"}
-                </label>
-                <Textarea
-                  value={discrepancyReason}
-                  onChange={(e) => setDiscrepancyReason(e.target.value)}
-                  rows={2}
-                  placeholder={
-                    isFr
-                      ? `Ce montant diffère du devis accepté par le client (${new Intl.NumberFormat('fr-FR').format(selAmountXof!)} FCFA). Expliquez la raison.`
-                      : `This amount differs from the quote the client accepted (${new Intl.NumberFormat('fr-FR').format(selAmountXof!)} FCFA). Explain why.`
-                  }
-                  data-testid="input-discrepancy-reason"
-                />
-              </div>
-            )}
-            {/* Live commission breakdown */}
-            {Number(finalAmountInput) > 0 && (() => {
-              const fa = Math.round(Number(finalAmountInput));
-              const commission = Math.round(fa * 0.15);
-              const payout = fa - commission;
-              return (
-                <div className="rounded-md border bg-muted/30 p-3 space-y-1.5 text-sm">
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>{isFr ? "Commission Shizu (15%)" : "Shizu Commission (15%)"}</span>
-                    <span className="font-medium text-foreground">{new Intl.NumberFormat('fr-FR').format(commission)} FCFA</span>
+          {(() => {
+            const collected = selectedBooking?.amountCollected ?? 0;
+            const due = selectedBooking?.amountDue ?? 0;
+            const dueTotal = collected + due;
+            const received = Math.round(Number(finalAmountInput) || 0);
+            const newCollected = collected + Math.max(0, received);
+            const surplus = Math.max(0, newCollected - dueTotal);
+            const fmt = (n: number) => new Intl.NumberFormat('fr-FR').format(Math.round(n || 0)) + ' FCFA';
+            return (
+              <div className="space-y-4">
+                {/* Collected / due / remaining */}
+                <div className="rounded-md bg-muted/40 px-3 py-2 space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{isFr ? "Déjà encaissé" : "Collected"}</span>
+                    <span className="font-medium">{fmt(collected)}</span>
                   </div>
-                  <div className="flex justify-between font-semibold pt-1 border-t">
-                    <span>{isFr ? "Versement prestataire (85%)" : "Provider Payout (85%)"}</span>
-                    <span className="text-emerald-700">{new Intl.NumberFormat('fr-FR').format(payout)} FCFA</span>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{isFr ? "Montant dû" : "Amount due"}</span>
+                    <span className="font-medium">{fmt(dueTotal)}</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-1">
+                    <span className="text-muted-foreground">{isFr ? "Solde restant" : "Remaining"}</span>
+                    <span className="font-semibold">{fmt(due)}</span>
                   </div>
                 </div>
-              );
-            })()}
-          </div>
+                {/* Amount received now */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">
+                    {isFr ? "Montant reçu (FCFA) *" : "Amount received (FCFA) *"}
+                  </label>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      type="number"
+                      value={finalAmountInput}
+                      onChange={(e) => setFinalAmountInput(e.target.value)}
+                      placeholder="0"
+                      min={1}
+                      autoFocus
+                      data-testid="input-payment-amount"
+                    />
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">FCFA</span>
+                  </div>
+                </div>
+                {/* Preview: new collected total + surplus (tip/rounding accepted) */}
+                {received > 0 && (
+                  <div className="rounded-md border bg-muted/30 p-3 space-y-1.5 text-sm">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>{isFr ? "Nouveau total encaissé" : "New total collected"}</span>
+                      <span className="font-medium text-foreground">{fmt(newCollected)}</span>
+                    </div>
+                    {surplus > 0 && (
+                      <div className="flex justify-between text-amber-700">
+                        <span>{isFr ? "Surplus (pourboire / arrondi)" : "Surplus (tip / rounding)"}</span>
+                        <span className="font-medium">{fmt(surplus)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           <DialogFooter>
             <Button variant="outline" onClick={() => setPaymentModalOpen(false)}>
               {isFr ? "Annuler" : "Cancel"}
@@ -2563,16 +2563,11 @@ export default function AdminBookings() {
             <Button
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={handleConfirmPayment}
-              disabled={
-                !finalAmountInput ||
-                Number(finalAmountInput) <= 0 ||
-                isUpdating ||
-                (paymentNeedsReason && !discrepancyReason.trim())
-              }
-              data-testid="button-confirm-payment"
+              disabled={!finalAmountInput || Number(finalAmountInput) <= 0 || isUpdating}
+              data-testid="button-record-payment"
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-              {isFr ? "Confirmer le paiement" : "Confirm Payment"}
+              {isFr ? "Enregistrer le versement" : "Record Payment"}
             </Button>
           </DialogFooter>
         </DialogContent>

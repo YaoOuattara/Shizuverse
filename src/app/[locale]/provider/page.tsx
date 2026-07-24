@@ -64,6 +64,7 @@ interface ProviderProfileData {
 function computeEarnings(bookings: ProviderBooking[]) {
   type R = ProviderBooking & {
     payment_status?: string;
+    collection_status?: string;
     payout_status?: string;
     amount_xof?: number | null;
     final_amount?: number | null;
@@ -75,9 +76,9 @@ function computeEarnings(bookings: ProviderBooking[]) {
     const base = b.final_amount ?? b.amount_xof ?? (typeof b.price === "number" ? b.price : 0);
     const effPayout = b.provider_payout != null ? b.provider_payout : Math.round(base * 0.85);
     if (!base) continue;
-    if (b.status === "completed" && b.payment_status === "paid") gagne += effPayout;
+    if (b.status === "completed" && (b.collection_status ?? b.payment_status) === "paid") gagne += effPayout;
     if (b.payout_status === "sent") verse += effPayout;
-    if (["confirmed", "accepted", "assigned"].includes(b.status as string) && b.payment_status !== "paid") enAttente += base;
+    if (["confirmed", "accepted", "assigned"].includes(b.status as string) && (b.collection_status ?? b.payment_status) !== "paid") enAttente += base;
   }
   return { gagne, verse, enAttente, prochainVersement: enAttente };
 }

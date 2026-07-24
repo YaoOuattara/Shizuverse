@@ -72,6 +72,10 @@ interface PaymentBooking {
   status: string;
   paymentStatus: string;
   payoutStatus: string;
+  collectionStatus?: import("@/data/adminStore").CollectionStatus;
+  amountCollected?: number;
+  amountDue?: number;
+  overpaid?: number;
   price: number;
   baseAmount: number;
   platformFeeAmount: number;
@@ -121,6 +125,10 @@ function toPaymentBooking(b: ApiBooking): PaymentBooking {
     status: b.status,
     paymentStatus: b.payment_status,
     payoutStatus: b.payout_status,
+    collectionStatus: (b.collection_status as import("@/data/adminStore").CollectionStatus | undefined) ?? undefined,
+    amountCollected: b.amount_collected ?? undefined,
+    amountDue: b.amount_due ?? undefined,
+    overpaid: b.overpaid ?? undefined,
     price: finalAmt,
     baseAmount: finalAmt,
     platformFeeAmount: commission,
@@ -135,6 +143,8 @@ function toPaymentBooking(b: ApiBooking): PaymentBooking {
 
 const paymentStatusColors: Record<string, string> = {
   unpaid: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+  partial: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
+  open: "bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400",
   pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
   paid: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
   refunded: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
@@ -148,10 +158,12 @@ const payoutStatusColors: Record<string, string> = {
 };
 
 const PAYMENT_STATUS_LABELS: Record<string, { fr: string; en: string }> = {
-  unpaid:   { fr: 'Non payé',   en: 'Unpaid'    },
-  pending:  { fr: 'En attente', en: 'Pending'   },
-  paid:     { fr: 'Payé',       en: 'Paid'      },
-  refunded: { fr: 'Remboursé',  en: 'Refunded'  },
+  unpaid:   { fr: 'Non payé',    en: 'Unpaid'     },
+  partial:  { fr: 'Partiel',     en: 'Partial'    },
+  open:     { fr: 'À encaisser', en: 'To collect' },
+  pending:  { fr: 'En attente',  en: 'Pending'    },
+  paid:     { fr: 'Payé',        en: 'Paid'       },
+  refunded: { fr: 'Remboursé',   en: 'Refunded'   },
 };
 
 const PAYOUT_STATUS_LABELS: Record<string, { fr: string; en: string }> = {
@@ -191,7 +203,6 @@ export default function AdminPayments() {
   const [payoutModalOpen, setPayoutModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [finalAmountInput, setFinalAmountInput] = useState("");
-  const [discrepancyReason, setDiscrepancyReason] = useState("");
 
   // Payment form state
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'mobile_money' | 'bank_transfer'>('cash');
@@ -216,13 +227,13 @@ export default function AdminPayments() {
         b.serviceName.toLowerCase().includes(searchLower) ||
         b.providerName.toLowerCase().includes(searchLower) ||
         b.id.includes(searchLower);
-      const matchesStatus = paymentStatusFilter === "all" || b.paymentStatus === paymentStatusFilter;
+      const matchesStatus = paymentStatusFilter === "all" || (b.collectionStatus ?? b.paymentStatus) === paymentStatusFilter;
       return matchesSearch && matchesStatus;
     });
   }, [bookings, searchQuery, paymentStatusFilter]);
 
   const payoutsBookings = useMemo(() => {
-    return bookings.filter(b => b.status === 'completed' && b.paymentStatus === 'paid').filter(b => {
+    return bookings.filter(b => b.status === 'completed' && (b.collectionStatus ?? b.paymentStatus) === 'paid').filter(b => {
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch = !searchQuery ||
         b.providerName.toLowerCase().includes(searchLower) ||
@@ -234,41 +245,38 @@ export default function AdminPayments() {
   }, [bookings, searchQuery, payoutStatusFilter]);
 
   const openPaymentModal = () => {
-    // Pre-fill: price is already final_amount ?? amount_xof ?? 0 from toPaymentBooking
-    const prefill = selectedBooking?.price ?? 0;
+    // Pre-fill with the remaining balance due (falls back to price for legacy rows).
+    const prefill = selectedBooking?.amountDue ?? selectedBooking?.price ?? 0;
     setFinalAmountInput(prefill > 0 ? String(prefill) : "");
     setPaymentMethod('cash');
     setPaymentReference('');
     setPaymentNote('');
-    setDiscrepancyReason('');
     setPaymentModalOpen(true);
   };
 
   const handleRecordPayment = async (bookingId: string) => {
-    const finalAmt = Math.round(Number(finalAmountInput) || selectedBooking?.price || 0);
-    if (!finalAmt) return;
-    const commission = Math.round(finalAmt * 0.15);
-    const payout = finalAmt - commission;
+    const amount = Math.round(Number(finalAmountInput) || selectedBooking?.price || 0);
+    if (!amount) return;
     setIsUpdating(true);
     try {
-      await adminApi.portalUpdateFinance(bookingId, {
-        payment_status: 'paid',
-        final_amount: finalAmt,
-        ...(discrepancyReason.trim() ? { reason: discrepancyReason.trim() } : {}),
-      });
+      // Record the payment (accumulates into amount_collected server-side).
+      const res: {
+        amount_collected?: number; amount_due?: number; overpaid?: number;
+        collection_status?: string; status?: string; payment_status?: string;
+      } = await adminApi.portalConfirmPayment(Number(bookingId), amount);
       updateLocalBooking(bookingId, {
-        paymentStatus: 'paid',
+        amountCollected: res?.amount_collected,
+        amountDue: res?.amount_due,
+        collectionStatus: res?.collection_status as import("@/data/adminStore").CollectionStatus,
+        overpaid: res?.overpaid,
+        status: (res?.status as import("@/data/adminStore").AdminBooking['status']) ?? selectedBooking?.status,
         paidAt: new Date().toISOString().split('T')[0],
         paymentMethod,
-        price: finalAmt,
-        baseAmount: finalAmt,
-        platformFeeAmount: commission,
-        providerPayoutAmount: payout,
       });
       toast({
-        title: isFr ? "Paiement enregistré" : "Payment Recorded",
+        title: isFr ? "Versement enregistré" : "Payment Recorded",
         description: isFr
-          ? `Paiement via ${paymentMethod.replace('_', ' ')} enregistré.`
+          ? `Versement via ${paymentMethod.replace('_', ' ')} enregistré.`
           : `Payment for booking ${bookingId} recorded via ${paymentMethod.replace('_', ' ')}.`,
         duration: 3000,
       });
@@ -461,7 +469,7 @@ export default function AdminPayments() {
                   </div>
                   
                   <div className="flex gap-1 flex-wrap">
-                    {['all', 'unpaid', 'paid', 'refunded'].map((status) => (
+                    {['all', 'unpaid', 'partial', 'paid', 'refunded'].map((status) => (
                       <Button
                         key={status}
                         variant={paymentStatusFilter === status ? "default" : "outline"}
@@ -512,8 +520,8 @@ export default function AdminPayments() {
                             <p className="text-xs text-muted-foreground">ID: {booking.id}</p>
                           </div>
                           <div className="flex items-center gap-2 sm:justify-end">
-                            <Badge className={`text-xs ${paymentStatusColors[booking.paymentStatus]}`}>
-                              {paymentStatusLabels[booking.paymentStatus]}
+                            <Badge className={`text-xs ${paymentStatusColors[booking.collectionStatus ?? booking.paymentStatus]}`}>
+                              {paymentStatusLabels[booking.collectionStatus ?? booking.paymentStatus]}
                             </Badge>
                           </div>
                         </div>
@@ -637,8 +645,8 @@ export default function AdminPayments() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground">{isFr ? "Paiement :" : "Payment:"}</span>
-                    <Badge className={`${paymentStatusColors[selectedBooking.paymentStatus]}`}>
-                      {paymentStatusLabels[selectedBooking.paymentStatus]}
+                    <Badge className={`${paymentStatusColors[selectedBooking.collectionStatus ?? selectedBooking.paymentStatus]}`}>
+                      {paymentStatusLabels[selectedBooking.collectionStatus ?? selectedBooking.paymentStatus]}
                     </Badge>
                   </div>
                   {selectedBooking.payoutStatus && (
@@ -710,7 +718,7 @@ export default function AdminPayments() {
                 <h4 className="font-medium text-sm text-muted-foreground">Actions</h4>
                 
                 {/* Record Payment - for unpaid bookings that are past the pending stage */}
-                {selectedBooking.paymentStatus === 'unpaid' &&
+                {(selectedBooking.collectionStatus ?? selectedBooking.paymentStatus) !== 'paid' &&
                  !['cancelled', 'pending', 'requested'].includes(selectedBooking.status) && (
                   <Button
                     className="w-full"
@@ -724,14 +732,14 @@ export default function AdminPayments() {
                 )}
 
                 {/* Pending bookings need confirmation first */}
-                {selectedBooking.paymentStatus === 'unpaid' && ['pending', 'requested'].includes(selectedBooking.status) && (
+                {(selectedBooking.collectionStatus ?? selectedBooking.paymentStatus) !== 'paid' && ['pending', 'requested'].includes(selectedBooking.status) && (
                   <p className="text-sm text-muted-foreground text-center py-2">
                     {isFr ? "Confirmez la réservation avant d'enregistrer le paiement." : "Confirm the booking before recording payment."}
                   </p>
                 )}
 
                 {/* Issue Refund - only for paid bookings (not refunded, not already processing payout) */}
-                {selectedBooking.paymentStatus === 'paid' && selectedBooking.payoutStatus !== 'sent' && (
+                {(selectedBooking.collectionStatus ?? selectedBooking.paymentStatus) === 'paid' && selectedBooking.payoutStatus !== 'sent' && (
                   <Button
                     variant="outline"
                     className="w-full"
@@ -745,7 +753,7 @@ export default function AdminPayments() {
                 )}
 
                 {/* Mark Payout Sent - only for due payouts with paid status */}
-                {selectedBooking.payoutStatus === 'due' && selectedBooking.paymentStatus === 'paid' && (
+                {selectedBooking.payoutStatus === 'due' && (selectedBooking.collectionStatus ?? selectedBooking.paymentStatus) === 'paid' && (
                   <Button
                     className="w-full bg-emerald-600 hover:bg-emerald-700"
                     onClick={openPayoutModal}
@@ -805,71 +813,43 @@ export default function AdminPayments() {
                 </div>
               )}
 
-              {/* Editable final amount */}
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">
-                  {isFr ? "Montant final encaissé (FCFA) *" : "Final Amount Collected (FCFA) *"}
-                </label>
-                <div className="flex gap-2 items-center">
-                  <Input
-                    type="number"
-                    value={finalAmountInput}
-                    onChange={(e) => setFinalAmountInput(e.target.value)}
-                    placeholder="0"
-                    min={1}
-                    autoFocus
-                    data-testid="input-final-amount"
-                  />
-                  <span className="text-sm text-muted-foreground whitespace-nowrap">FCFA</span>
-                </div>
-              </div>
-
-              {/* Motif — only when the final amount diverges from a locked,
-                  client-accepted quote (otherwise it just clutters the form). */}
+              {/* Collected / due summary + amount received (accumulates). */}
               {(() => {
-                const fa = Math.round(Number(finalAmountInput) || 0);
-                const showReason =
-                  selectedBooking.amountLocked &&
-                  selectedBooking.amountXof != null &&
-                  fa > 0 &&
-                  fa !== selectedBooking.amountXof;
-                if (!showReason) return null;
+                const collected = selectedBooking.amountCollected ?? 0;
+                const due = selectedBooking.amountDue ?? 0;
+                const dueTotal = collected + due;
+                const received = Math.round(Number(finalAmountInput) || 0);
+                const surplus = Math.max(0, collected + Math.max(0, received) - dueTotal);
+                const fmt = (n: number) => new Intl.NumberFormat('fr-FR').format(Math.round(n || 0)) + ' FCFA';
                 return (
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-amber-700 dark:text-amber-500">
-                      {isFr ? "Motif de l'écart *" : "Reason for discrepancy *"}
-                    </label>
-                    <Textarea
-                      value={discrepancyReason}
-                      onChange={(e) => setDiscrepancyReason(e.target.value)}
-                      rows={2}
-                      placeholder={
-                        isFr
-                          ? `Ce montant diffère du devis accepté par le client (${new Intl.NumberFormat('fr-FR').format(selectedBooking.amountXof!)} FCFA). Expliquez la raison.`
-                          : `This amount differs from the quote the client accepted (${new Intl.NumberFormat('fr-FR').format(selectedBooking.amountXof!)} FCFA). Explain why.`
-                      }
-                      data-testid="input-discrepancy-reason"
-                    />
-                  </div>
-                );
-              })()}
-
-              {/* Live commission breakdown */}
-              {Number(finalAmountInput) > 0 && (() => {
-                const fa = Math.round(Number(finalAmountInput));
-                const commission = Math.round(fa * 0.15);
-                const payout = fa - commission;
-                return (
-                  <div className="rounded-md border bg-muted/30 p-3 space-y-1.5 text-sm">
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>{isFr ? "Commission Shizu (15%)" : "Shizu Commission (15%)"}</span>
-                      <span className="font-medium text-foreground">{new Intl.NumberFormat('fr-FR').format(commission)} FCFA</span>
+                  <>
+                    <div className="rounded-md bg-muted/40 px-3 py-2 space-y-1 text-sm">
+                      <div className="flex justify-between"><span className="text-muted-foreground">{isFr ? "Déjà encaissé" : "Collected"}</span><span className="font-medium">{fmt(collected)}</span></div>
+                      <div className="flex justify-between border-t pt-1"><span className="text-muted-foreground">{isFr ? "Solde restant" : "Remaining"}</span><span className="font-semibold">{fmt(due)}</span></div>
                     </div>
-                    <div className="flex justify-between font-semibold pt-1 border-t">
-                      <span>{isFr ? "Versement prestataire (85%)" : "Provider Payout (85%)"}</span>
-                      <span className="text-emerald-700">{new Intl.NumberFormat('fr-FR').format(payout)} FCFA</span>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">
+                        {isFr ? "Montant reçu (FCFA) *" : "Amount received (FCFA) *"}
+                      </label>
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          type="number"
+                          value={finalAmountInput}
+                          onChange={(e) => setFinalAmountInput(e.target.value)}
+                          placeholder="0"
+                          min={1}
+                          autoFocus
+                          data-testid="input-payment-amount"
+                        />
+                        <span className="text-sm text-muted-foreground whitespace-nowrap">FCFA</span>
+                      </div>
                     </div>
-                  </div>
+                    {surplus > 0 && (
+                      <p className="text-xs text-amber-700">
+                        {isFr ? `Surplus accepté (pourboire / arrondi) : ${fmt(surplus)}` : `Surplus accepted (tip / rounding): ${fmt(surplus)}`}
+                      </p>
+                    )}
+                  </>
                 );
               })()}
 
@@ -919,19 +899,11 @@ export default function AdminPayments() {
             <Button
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={() => selectedBooking && handleRecordPayment(selectedBooking.id)}
-              disabled={
-                isUpdating ||
-                !Number(finalAmountInput) ||
-                (!!selectedBooking &&
-                  selectedBooking.amountLocked &&
-                  selectedBooking.amountXof != null &&
-                  Math.round(Number(finalAmountInput)) !== selectedBooking.amountXof &&
-                  !discrepancyReason.trim())
-              }
-              data-testid="button-confirm-payment"
+              disabled={isUpdating || !Number(finalAmountInput)}
+              data-testid="button-record-payment"
             >
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-              {isFr ? "Confirmer le paiement" : "Confirm Payment"}
+              {isFr ? "Enregistrer le versement" : "Record Payment"}
             </Button>
           </DialogFooter>
         </DialogContent>
