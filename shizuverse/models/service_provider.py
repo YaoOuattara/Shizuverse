@@ -32,6 +32,12 @@ class ServiceProvider(db.Model):
     mobile_money_number = db.Column(db.String(30))
     mobile_money_name = db.Column(db.String(120))
     mobile_money_operator = db.Column(db.String(50))
+    # Rates entered by the provider at registration, stored verbatim (no
+    # exploitation yet). Sent by the frontend keyed by localized category name:
+    # {"Ménage": {"min": 5000, "max": 15000}, ...}. Nullable — never breaks an
+    # existing row or a registration that omits it. db.JSON (not JSONB) so the
+    # SQLite test DB keeps working.
+    service_rates = db.Column(db.JSON, nullable=True)
     verified = db.Column(db.Boolean, default=False)
 
     verification_status = db.Column(

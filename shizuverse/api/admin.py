@@ -630,6 +630,9 @@ def provider_register():
     mobile_money_name     = (data.get('mobile_money_name') or '').strip() or None
     profile_photo_url     = (data.get('profile_photo_url') or '').strip() or None
     id_document_url       = (data.get('id_doc_url') or '').strip() or None
+    # Provider-entered rates ({category_name: {min, max}}). Stored verbatim, no
+    # exploitation yet — previously this payload was silently dropped.
+    service_rates         = data.get('service_rates') or None
 
     if not full_name or not phone or not password:
         return jsonify({'error': 'full_name, phone, and password are required'}), 400
@@ -705,6 +708,7 @@ def provider_register():
             mobile_money_name=mobile_money_name,
             profile_photo_url=profile_photo_url,
             id_document_url=id_document_url,
+            service_rates=service_rates,
         )
         db.session.add(sp_row)
         if i == 0:
