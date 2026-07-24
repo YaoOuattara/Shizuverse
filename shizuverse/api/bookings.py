@@ -154,41 +154,45 @@ def create_booking():
     except Exception as e:
         current_app.logger.error(f"[create_booking] Unexpected error: {e}", exc_info=True)
 
-    # WhatsApp: ping approved active providers in the matching commune
-    try:
-        from shizuverse.utils.notifications import notify_new_booking_request
-        from shizuverse.models.service_provider import ServiceProvider
-        commune = (booking.client_location or '').split(',')[0].strip()
-        apt = booking.appointment_date
-        date_str = apt.strftime('%d/%m/%Y') if apt else ''
-
-        candidates = ServiceProvider.query.filter(
-            ServiceProvider.verification_status == 'approved',
-            ServiceProvider.provider_status == 'active',
-        ).all()
-
-        seen_users: set = set()
-        zone_matched = []
-        all_active = []
-        for sp in candidates:
-            if sp.user_id in seen_users or not sp.phone_number:
-                continue
-            seen_users.add(sp.user_id)
-            if commune and sp.address and commune.lower() in sp.address.lower():
-                zone_matched.append(sp)
-            else:
-                all_active.append(sp)
-
-        for sp in (zone_matched or all_active):
-            notify_new_booking_request(
-                provider_phone=sp.phone_number,
-                service_type=booking.service_name,
-                commune=commune,
-                date=date_str,
-                time_preference=booking.time_preference or '',
-            )
-    except Exception as e:
-        current_app.logger.error(f"[create_booking] Unexpected error: {e}", exc_info=True)
+    # T-26 — un prestataire n'est notifié qu'à l'assignation
+    # (notify_provider_new_mission). Plus de diffusion au pool ouvert.
+    # Bloc legacy désactivé : il notifiait tous les prestataires approuvés/actifs
+    # à chaque réservation (court-circuit permettant l'auto-acceptation en
+    # sautant le flux devis).
+    # try:
+    #     from shizuverse.utils.notifications import notify_new_booking_request
+    #     from shizuverse.models.service_provider import ServiceProvider
+    #     commune = (booking.client_location or '').split(',')[0].strip()
+    #     apt = booking.appointment_date
+    #     date_str = apt.strftime('%d/%m/%Y') if apt else ''
+    #
+    #     candidates = ServiceProvider.query.filter(
+    #         ServiceProvider.verification_status == 'approved',
+    #         ServiceProvider.provider_status == 'active',
+    #     ).all()
+    #
+    #     seen_users: set = set()
+    #     zone_matched = []
+    #     all_active = []
+    #     for sp in candidates:
+    #         if sp.user_id in seen_users or not sp.phone_number:
+    #             continue
+    #         seen_users.add(sp.user_id)
+    #         if commune and sp.address and commune.lower() in sp.address.lower():
+    #             zone_matched.append(sp)
+    #         else:
+    #             all_active.append(sp)
+    #
+    #     for sp in (zone_matched or all_active):
+    #         notify_new_booking_request(
+    #             provider_phone=sp.phone_number,
+    #             service_type=booking.service_name,
+    #             commune=commune,
+    #             date=date_str,
+    #             time_preference=booking.time_preference or '',
+    #         )
+    # except Exception as e:
+    #     current_app.logger.error(f"[create_booking] Unexpected error: {e}", exc_info=True)
 
     return jsonify(booking.to_dict()), 201
 
