@@ -631,6 +631,8 @@ export default function AdminBookings() {
       status: newStatus as AdminBooking['status'],
       ...(extra?.provider_name ? { providerName: extra.provider_name, providerPhone: extra.provider_phone } : {}),
     };
+    // Snapshot the fields the optimistic patch touches, to roll back on failure.
+    const prevBooking = bookings.find((b) => b.id === bookingId);
     updateLocalBooking(bookingId, patch);
     try {
       if (newStatus === 'assigned' && extra?.provider_name) {
@@ -643,8 +645,25 @@ export default function AdminBookings() {
       setInlineProviderPhone("");
       toast({ title: isFr ? "Statut mis à jour" : "Status Updated", description: `→ ${statusLabels[newStatus] || newStatus}` });
     } catch (err) {
+      // Roll back the optimistic patch — status always, plus the provider fields
+      // when the inline-assign path set them.
+      if (prevBooking) {
+        updateLocalBooking(bookingId, {
+          status: prevBooking.status,
+          ...(extra?.provider_name
+            ? { providerName: prevBooking.providerName, providerPhone: prevBooking.providerPhone }
+            : {}),
+        });
+      }
       console.error("handleStatusChange error:", err);
-      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de mettre à jour le statut." : "Couldn't update the status.", variant: "destructive" });
+      // Any transition (assigned / confirmed / completed …) — show the backend's
+      // explicit reason when it sends one, generic message otherwise.
+      const backendMsg = extractApiError(err);
+      toast({
+        title: isFr ? "Erreur" : "Error",
+        description: backendMsg || (isFr ? "Impossible de mettre à jour le statut." : "Couldn't update the status."),
+        variant: "destructive",
+      });
     }
   };
 
@@ -696,7 +715,15 @@ export default function AdminBookings() {
     } catch (err) {
       updateLocalBooking(selectedBooking.id, { status: prevStatus, providerName: prevProviderName });
       console.error("Failed to assign provider:", err);
-      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'assigner le prestataire." : "Couldn't assign the provider.", variant: "destructive" });
+      // Surface the backend's explicit reason (invalid phone, provider not found
+      // / not approved) instead of a silent no-op — same pattern as the other
+      // handlers via extractApiError.
+      const backendMsg = extractApiError(err);
+      toast({
+        title: isFr ? "Erreur" : "Error",
+        description: backendMsg || (isFr ? "Impossible d'assigner le prestataire." : "Couldn't assign the provider."),
+        variant: "destructive",
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -724,7 +751,15 @@ export default function AdminBookings() {
     } catch (err) {
       updateLocalBooking(selectedBooking.id, { status: prevStatus, providerName: prevProviderName });
       console.error("Failed to assign provider:", err);
-      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'assigner le prestataire." : "Couldn't assign the provider.", variant: "destructive" });
+      // Surface the backend's explicit reason (invalid phone, provider not found
+      // / not approved) instead of a silent no-op — same pattern as the other
+      // handlers via extractApiError.
+      const backendMsg = extractApiError(err);
+      toast({
+        title: isFr ? "Erreur" : "Error",
+        description: backendMsg || (isFr ? "Impossible d'assigner le prestataire." : "Couldn't assign the provider."),
+        variant: "destructive",
+      });
     } finally {
       setIsUpdating(false);
     }
