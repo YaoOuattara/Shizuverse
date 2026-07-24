@@ -247,6 +247,15 @@ def update_booking_status(booking_id):
     new_status = data.get('status', '').strip()
     if not new_status or new_status not in VALID:
         return jsonify({'error': f'Invalid status. Use: {VALID}'}), 400
+    # Assignment must go through PUT /bookings/<id>/assign, which validates the
+    # phone (E.164), provider existence + approval (T-20) and writes the
+    # provider_assigned event. This endpoint can't set provider_name/phone, so
+    # allowing 'assigned' here would produce an unvalidated, event-less
+    # half-assignment (the closed bypass).
+    if new_status == 'assigned':
+        return jsonify({'error': "Transition vers 'assigned' interdite ici : "
+                                 "utilisez PUT /api/admin/bookings/<id>/assign "
+                                 "(validation du numéro et de l'approbation du prestataire)."}), 400
     prev_status = booking.status
     booking.status = new_status
     if new_status == 'under_review':
