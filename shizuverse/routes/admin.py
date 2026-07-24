@@ -3,6 +3,7 @@ from functools import wraps
 from datetime import datetime
 import jwt as pyjwt
 from shizuverse.models import db, User, ServiceProvider, ClientBooking, Notification
+from shizuverse.models.client_booking import VALID_PAYMENT_STATUSES
 from shizuverse.models.booking_event import BookingEvent
 from shizuverse.models.service_models import Service
 from shizuverse.models.review import Review
@@ -437,12 +438,23 @@ def get_all_bookings():
     q = ClientBooking.query
 
     status = request.args.get('status')
-    payment = request.args.get('payment_status')
+    payment = request.args.get('payment_status')       # dossier flag: open|pending|refunded
     payout = request.args.get('payout_status')
+    collection = request.args.get('collection_status')  # derived: unpaid|partial|paid
 
     if status: q = q.filter_by(status=status)
     if payment: q = q.filter_by(payment_status=payment)
     if payout: q = q.filter_by(payout_status=payout)
+    if collection:
+        from sqlalchemy import func
+        due = func.coalesce(ClientBooking.final_amount, ClientBooking.amount_xof, 0)
+        col = func.coalesce(ClientBooking.amount_collected, 0)
+        if collection == 'unpaid':
+            q = q.filter(col <= 0)
+        elif collection == 'paid':
+            q = q.filter(col > 0, col >= due)
+        elif collection == 'partial':
+            q = q.filter(col > 0, col < due)
 
     bookings = q.order_by(ClientBooking.created_at.desc()).all()
     return jsonify([b.to_dict() for b in bookings])
@@ -700,15 +712,20 @@ def update_finance(booking_id):
     final_amount = data.get('final_amount')
     reason = (data.get('reason') or '').strip()
 
-    valid_payment = ('unpaid', 'pending', 'paid', 'refunded')
+    # payment_status is a dossier flag now (open/pending/refunded). 'paid'/'unpaid'
+    # are DERIVED from amount_collected and must NOT be written here — accepting
+    # them would silently corrupt the flag. Money is recorded via confirm-payment.
+    valid_payment = VALID_PAYMENT_STATUSES  # ('open', 'pending', 'refunded')
     valid_payout = ('not_due', 'due', 'sent', 'failed')
 
     if payment and payment not in valid_payment:
-        return jsonify({'error': f'Invalid payment_status: {payment}'}), 400
+        return jsonify({'error': f'Invalid payment_status: {payment}. '
+                                 f'Le paiement encaissé se gère via confirm-payment.'}), 400
     if payout and payout not in valid_payout:
         return jsonify({'error': f'Invalid payout_status: {payout}'}), 400
-    if payout == 'due' and b.payment_status != 'paid':
-        return jsonify({'error': 'Cannot set payout to due until payment_status is paid'}), 400
+    # Payout can only become due once the client has FULLY paid (derived).
+    if payout == 'due' and b.collection_status != 'paid':
+        return jsonify({'error': 'Cannot set payout to due until the client has fully paid'}), 400
 
     if final_amount is not None:
         # Validate before touching the row: a non-numeric or non-positive value
@@ -757,19 +774,14 @@ def update_finance(booking_id):
 
     db.session.commit()
 
-    # WhatsApp: payment recorded → notify provider; payout sent → notify provider
+    # WhatsApp: payout sent → notify provider. (Payment recording — and its
+    # provider notification — now lives in confirm-payment, not here; the old
+    # `payment == 'paid'` branch is gone since 'paid' is no longer written here.)
     try:
-        from shizuverse.utils.notifications import notify_payment_recorded, notify_payout_sent
+        from shizuverse.utils.notifications import notify_payout_sent
         eff_payout = b.provider_payout or (
             round((b.final_amount or b.amount_xof or 0) * 0.85)
         )
-        booking_ref = make_booking_ref(b)
-        if payment == 'paid' and b.provider_phone and eff_payout:
-            notify_payment_recorded(
-                provider_phone=b.provider_phone,
-                booking_ref=booking_ref,
-                provider_payout=eff_payout,
-            )
         if payout == 'sent' and b.provider_phone and eff_payout:
             notify_payout_sent(
                 provider_phone=b.provider_phone,
@@ -785,6 +797,10 @@ def update_finance(booking_id):
         'final_amount': b.final_amount,
         'shizu_commission': b.shizu_commission,
         'provider_payout': b.provider_payout,
+        'amount_collected': b.amount_collected,
+        'amount_due': b.amount_due,
+        'collection_status': b.collection_status,
+        'overpaid': b.overpaid,
     })
 
 
@@ -889,28 +905,32 @@ def get_overview():
         eff_amt - eff_amt * 15 / 100
     )
 
+    # "Fully paid" is DERIVED (payment_status no longer stores it): the client
+    # has collected money AND reached the amount due (coalesce(final, quote)).
+    fully_paid = (ClientBooking.amount_collected > 0) & (ClientBooking.amount_collected >= eff_amt)
+
     # ── GMV ───────────────────────────────────────────────────
     gmv_total = db.session.query(
         func.coalesce(func.sum(eff_amt), 0)
-    ).filter(ClientBooking.payment_status == 'paid').scalar()
+    ).filter(fully_paid).scalar()
 
     gmv_month = db.session.query(
         func.coalesce(func.sum(eff_amt), 0)
     ).filter(
-        ClientBooking.payment_status == 'paid',
+        fully_paid,
         ClientBooking.created_at >= first_of_month
     ).scalar()
 
     # ── Revenue Shizu (15% commission) ────────────────────────
     revenue_shizu = db.session.query(
         func.coalesce(func.sum(eff_commission), 0)
-    ).filter(ClientBooking.payment_status == 'paid').scalar()
+    ).filter(fully_paid).scalar()
 
     # ── Provider payouts ──────────────────────────────────────
     payouts_due = db.session.query(
         func.coalesce(func.sum(eff_payout), 0)
     ).filter(
-        ClientBooking.payment_status == 'paid',
+        fully_paid,
         ClientBooking.payout_status != 'sent'
     ).scalar()
 
@@ -1258,12 +1278,17 @@ def get_admin_config():
 def finance_summary():
     from sqlalchemy import func
     eff_amt = func.coalesce(ClientBooking.final_amount, ClientBooking.amount_xof, 0)
+    collected = func.coalesce(ClientBooking.amount_collected, 0)
     completed   = db.session.query(func.count(ClientBooking.id)).filter_by(status='completed').scalar()
-    total_paid  = db.session.query(func.coalesce(func.sum(eff_amt), 0)).filter(ClientBooking.payment_status == 'paid').scalar()
+    # Real cash in: sum of what was actually collected (deposits included), not a
+    # count of fully-paid rows.
+    total_paid  = db.session.query(func.coalesce(func.sum(collected), 0)).scalar()
     payouts_due_count = db.session.query(func.count(ClientBooking.id)).filter_by(payout_status='due').scalar()
     payouts_due_value = db.session.query(func.coalesce(func.sum(eff_amt), 0)).filter(ClientBooking.payout_status == 'due').scalar()
     failed_payouts = db.session.query(func.count(ClientBooking.id)).filter_by(payout_status='failed').scalar()
-    unpaid_completed = db.session.query(func.count(ClientBooking.id)).filter_by(status='completed', payment_status='unpaid').scalar()
+    # Completed but nothing collected yet (derived 'unpaid').
+    unpaid_completed = db.session.query(func.count(ClientBooking.id)).filter(
+        ClientBooking.status == 'completed', collected == 0).scalar()
 
     return jsonify({
         'completed_bookings': completed,

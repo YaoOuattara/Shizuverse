@@ -203,7 +203,7 @@ def create_booking():
 def payment_declared(booking_id):
     booking = ClientBooking.query.get_or_404(booking_id)
 
-    if booking.payment_status == 'paid':
+    if booking.collection_status == 'paid':
         return jsonify({"error": "Paiement déjà confirmé pour cette réservation"}), 400
 
     booking.payment_status = 'pending'   # 'pending' = awaiting admin confirmation
