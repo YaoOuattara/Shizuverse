@@ -148,6 +148,28 @@ def assign_booking(booking_id):
     provider_phone = normalize_phone(data.get('provider_phone', '').strip())
     if not provider_name:
         return jsonify({'error': 'provider_name required'}), 400
+
+    # T-22/T-23 — the phone must be a valid CI number (+225 + 10 digits). We
+    # detect and refuse; we never guess a correction (a 9-digit number is
+    # rejected, not padded). Reuses the shared is_valid_e164 helper.
+    if not is_valid_e164(provider_phone):
+        return jsonify({'error': "Numéro de téléphone invalide : format attendu +225 suivi de 10 chiffres. "
+                                 "Corrigez le numéro avant d'assigner."}), 400
+
+    # T-20 — the provider must exist and the PERSON (user_id) must be approved:
+    # approval is per person, not per service line. The frontend never sends a
+    # provider_id, so we match on the (already-normalized) phone number.
+    sp = ServiceProvider.query.filter_by(phone_number=provider_phone).first()
+    if sp is None:
+        return jsonify({'error': "Prestataire introuvable pour ce numéro. "
+                                 "Vérifiez qu'il est bien inscrit sur Shizu."}), 400
+    is_person_approved = ServiceProvider.query.filter_by(
+        user_id=sp.user_id, verification_status='approved',
+    ).first() is not None
+    if not is_person_approved:
+        return jsonify({'error': "Ce prestataire n'est pas approuvé. "
+                                 "Seuls les prestataires validés peuvent être assignés."}), 400
+
     if not booking.amount_locked:
         return jsonify({'error': "Veuillez confirmer le montant avant d'assigner un prestataire"}), 400
 
