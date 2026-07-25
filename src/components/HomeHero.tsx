@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useLocale } from "next-intl";
 import { useEffect, useState } from "react";
-import { CheckCircle, Search, Zap, CalendarCheck } from "lucide-react";
+import { CheckCircle, Search, Zap, CalendarCheck, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
@@ -26,7 +26,9 @@ const CONTENT = {
     urgentBtn: "Besoin urgent — 2h",
     planBtn: "Planifier un service",
     browseAll: "Parcourir toutes les catégories →",
-    becomeProvider: "Devenir prestataire →",
+    // Libellé du bouton prestataire — sujet à arbitrage (Marie-Paule), ne
+    // changer QUE cette valeur.
+    becomeProvider: "Devenir prestataire",
     trust: ["Prestataires vérifiés", "Réponse en 2h", "Support 7j/7"],
     availability: "Disponible aujourd'hui dans plusieurs quartiers d'Abidjan",
   },
@@ -40,7 +42,9 @@ const CONTENT = {
     urgentBtn: "Urgent — within 2h",
     planBtn: "Plan a service",
     browseAll: "Browse all categories →",
-    becomeProvider: "Become a provider →",
+    // Provider button label — pending arbitration (Marie-Paule), change ONLY
+    // this value.
+    becomeProvider: "Become a provider",
     trust: ["Verified providers", "Response within 2h", "7-day support"],
     availability: "Available today across multiple Abidjan neighbourhoods",
   },
@@ -161,7 +165,7 @@ export default function HomeHero() {
           </Link>
         </div>
 
-        {/* ── Secondary browse link ──────────────────────────────────── */}
+        {/* ── Secondary browse link (end of the client path) ─────────── */}
         <p className="mt-2">
           <Link
             href={`/${locale}/services`}
@@ -171,20 +175,23 @@ export default function HomeHero() {
           </Link>
         </p>
 
-        {/* ── Provider links ─────────────────────────────────────────── */}
-        <div className="mt-3 flex flex-col items-center gap-1">
+        {/* ── Provider block (secondary button — recruitment sprint) ─── */}
+        <div className="mt-4 max-w-lg mx-auto">
           <Link
             href={`/${locale}/provider/register`}
-            className="text-white/50 hover:text-white/80 text-sm transition-colors"
+            className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 border border-white/30 text-white font-semibold px-5 py-3 rounded-xl transition-colors text-sm"
           >
+            <Wrench className="h-4 w-4 shrink-0" />
             {c.becomeProvider}
           </Link>
-          <Link
-            href={`/${locale}/provider/login`}
-            className="text-white/35 hover:text-white/60 text-xs transition-colors"
-          >
-            {locale === "fr" ? "Déjà prestataire ? → Accéder à mon espace" : "Already a provider? → My account"}
-          </Link>
+          <p className="mt-2">
+            <Link
+              href={`/${locale}/provider/login`}
+              className="text-white/35 hover:text-white/60 text-xs transition-colors"
+            >
+              {locale === "fr" ? "Déjà prestataire ? → Accéder à mon espace" : "Already a provider? → My account"}
+            </Link>
+          </p>
         </div>
 
         {/* ── Trust chips ────────────────────────────────────────────── */}
