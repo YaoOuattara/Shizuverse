@@ -28,7 +28,7 @@ const CONTENT = {
     browseAll: "Parcourir toutes les catégories →",
     // Libellé du bouton prestataire — sujet à arbitrage (Marie-Paule), ne
     // changer QUE cette valeur.
-    becomeProvider: "Devenir prestataire",
+    becomeProvider: "Proposer mes services",
     trust: ["Prestataires vérifiés", "Réponse en 2h", "Support 7j/7"],
     availability: "Disponible aujourd'hui dans plusieurs quartiers d'Abidjan",
   },
@@ -44,7 +44,7 @@ const CONTENT = {
     browseAll: "Browse all categories →",
     // Provider button label — pending arbitration (Marie-Paule), change ONLY
     // this value.
-    becomeProvider: "Become a provider",
+    becomeProvider: "Offer my services",
     trust: ["Verified providers", "Response within 2h", "7-day support"],
     availability: "Available today across multiple Abidjan neighbourhoods",
   },
