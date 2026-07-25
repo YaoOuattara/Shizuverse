@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useLocale } from "next-intl";
 import { useEffect, useState } from "react";
-import { CheckCircle, Search, Zap, CalendarCheck, Wrench } from "lucide-react";
+import { Search, Zap, CalendarCheck, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
@@ -32,8 +32,8 @@ const CONTENT = {
     // Libellé du bouton prestataire — sujet à arbitrage (Marie-Paule), ne
     // changer QUE cette valeur.
     becomeProvider: "Proposer mes services",
-    trust: ["Prestataires vérifiés", "Réponse en 2h", "Support 7j/7"],
-    availability: "Disponible aujourd'hui dans plusieurs quartiers d'Abidjan",
+    moreChips: (n: number) => `+ ${n} autres`,
+    trust: ["Prestataires vérifiés", "Confirmé sous 2h", "Joignables 7j/7"],
   },
   en: {
     badge: "Abidjan · Côte d'Ivoire",
@@ -48,8 +48,8 @@ const CONTENT = {
     // Provider button label — pending arbitration (Marie-Paule), change ONLY
     // this value.
     becomeProvider: "Offer my services",
-    trust: ["Verified providers", "Response within 2h", "7-day support"],
-    availability: "Available today across multiple Abidjan neighbourhoods",
+    moreChips: (n: number) => `+ ${n} more`,
+    trust: ["Vetted professionals", "Confirmed within 2h", "Reachable 7/7"],
   },
 };
 
@@ -88,36 +88,29 @@ export default function HomeHero() {
     return `/${locale}/booking/demande?desc=${encodeURIComponent(label)}`;
   };
 
-  // Show up to 8 chips so the row doesn't overflow on mobile
-  const chips = categories.slice(0, 8);
+  // 4 chips + "+ N autres" → the CTAs climb back above the fold (design lot).
+  const chips = categories.slice(0, 4);
+  const moreCount = Math.max(0, categories.length - 4);
 
   // Skeleton widths mirror the natural spread of real category name lengths
-  const SKELETON_WIDTHS = ["w-16", "w-20", "w-24", "w-14", "w-20", "w-18", "w-16", "w-22"];
+  const SKELETON_WIDTHS = ["w-16", "w-20", "w-24", "w-14", "w-16"];
 
   return (
-    <section
-      id="hero-section"
-      className="bg-[#0F3A7A] relative overflow-hidden"
-      style={{
-        backgroundImage:
-          "radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)",
-        backgroundSize: "28px 28px",
-      }}
-    >
+    <section id="hero-section" className="bg-[#EDF4FC]">
       <div className="max-w-2xl mx-auto px-6 py-16 md:py-20 text-center">
 
         {/* Location badge */}
-        <span className="inline-block rounded-full bg-white/10 text-white/80 text-xs px-3 py-1 mb-6">
+        <span className="inline-block rounded-full bg-white border border-[#B5D4F4] text-[#185FA5] text-xs px-3 py-1 mb-6">
           {c.badge}
         </span>
 
         {/* Headline */}
-        <h1 className="text-4xl md:text-5xl font-bold leading-tight text-white">
+        <h1 className="text-4xl md:text-5xl font-bold leading-tight text-[#0D2B6B]">
           {c.headline}
         </h1>
 
         {/* Sub-headline */}
-        <p className="text-white/70 text-lg mt-4 max-w-xl mx-auto leading-relaxed">
+        <p className="text-[#185FA5] text-lg mt-4 max-w-xl mx-auto leading-relaxed">
           {c.subtext}
         </p>
 
@@ -131,7 +124,7 @@ export default function HomeHero() {
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
               placeholder={c.searchPlaceholder}
-              className="w-full pl-9 pr-4 py-3 rounded-xl text-sm text-gray-800 placeholder:text-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-white/50"
+              className="w-full pl-9 pr-4 py-3 rounded-xl text-sm text-gray-800 placeholder:text-gray-400 bg-white border border-[#B5D4F4] focus:outline-none focus:ring-2 focus:ring-[#B5D4F4]"
             />
           </div>
           <button
@@ -142,24 +135,36 @@ export default function HomeHero() {
           </button>
         </form>
 
-        {/* ── Category chips (from API) ──────────────────────────────── */}
+        {/* ── Category chips: 4 + "+ N autres" (fold discipline) ─────── */}
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           {chipsLoading
             ? SKELETON_WIDTHS.map((w, i) => (
                 <span
                   key={i}
-                  className={`${w} h-7 rounded-full bg-white/20 animate-pulse`}
+                  className={`${w} h-7 rounded-full bg-[#B5D4F4]/40 animate-pulse`}
                 />
               ))
-            : chips.map((cat) => (
-                <Link
-                  key={cat.id}
-                  href={chipHref(cat)}
-                  className="inline-flex items-center px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors border border-white/20"
-                >
-                  {locale === "fr" ? (cat.name_fr || cat.name) : (cat.name_en || cat.name)}
-                </Link>
-              ))}
+            : (
+              <>
+                {chips.map((cat) => (
+                  <Link
+                    key={cat.id}
+                    href={chipHref(cat)}
+                    className="inline-flex items-center px-3 py-1.5 rounded-full bg-white hover:bg-[#E8F0FB] text-[#0F3A7A] text-xs font-medium transition-colors border border-[#B5D4F4]"
+                  >
+                    {locale === "fr" ? (cat.name_fr || cat.name) : (cat.name_en || cat.name)}
+                  </Link>
+                ))}
+                {moreCount > 0 && (
+                  <Link
+                    href={`/${locale}/services`}
+                    className="inline-flex items-center px-3 py-1.5 rounded-full bg-white hover:bg-[#E8F0FB] text-[#0F3A7A] text-xs font-medium transition-colors border border-[#B5D4F4]"
+                  >
+                    {c.moreChips(moreCount)}
+                  </Link>
+                )}
+              </>
+            )}
         </div>
 
         {/* ── Two urgency paths ──────────────────────────────────────── */}
@@ -184,17 +189,18 @@ export default function HomeHero() {
         <p className="mt-2">
           <Link
             href={`/${locale}/services`}
-            className="text-white/50 hover:text-white/80 text-sm transition-colors"
+            className="text-[#185FA5] hover:text-[#0D2B6B] text-sm transition-colors"
           >
             {c.browseAll}
           </Link>
         </p>
 
-        {/* ── Provider block (secondary button — recruitment sprint) ─── */}
+        {/* ── Provider block (secondary button — recruitment sprint) ───
+            Dark-on-light outline of the design system (cf. ProviderCTAButton). */}
         <div className="mt-4 max-w-lg mx-auto">
           <Link
             href={`/${locale}/provider/register`}
-            className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 border border-white/30 text-white font-semibold px-5 py-3 rounded-xl transition-colors text-sm"
+            className="w-full flex items-center justify-center gap-2 bg-white hover:bg-[#0F3A7A] border border-[#0F3A7A] text-[#0F3A7A] hover:text-white font-semibold px-5 py-3 rounded-xl transition-colors text-sm"
           >
             <Wrench className="h-4 w-4 shrink-0" />
             {c.becomeProvider}
@@ -202,32 +208,27 @@ export default function HomeHero() {
           <p className="mt-2">
             <Link
               href={`/${locale}/provider/login`}
-              className="text-white/35 hover:text-white/60 text-xs transition-colors"
+              className="text-[#888780] hover:text-[#0D2B6B] text-xs transition-colors"
             >
               {locale === "fr" ? "Déjà prestataire ? → Accéder à mon espace" : "Already a provider? → My account"}
             </Link>
           </p>
         </div>
 
-        {/* ── Trust chips ────────────────────────────────────────────── */}
-        <div className="flex flex-wrap justify-center gap-3 mt-10">
-          {c.trust.map((item) => (
-            <span
-              key={item}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white/80"
-            >
-              <CheckCircle className="h-3 w-3 text-green-400 shrink-0" />
+      </div>
+
+      {/* ── Trust band — the ONLY dark moment of the hero (authority).
+          Full width, replaces the old trust chips + availability line
+          (dropped: documented cosmetic toggle). */}
+      <div className="bg-[#0D2B6B] py-3 px-4">
+        <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-[#B5D4F4] text-center">
+          {c.trust.map((item, i) => (
+            <span key={item} className="inline-flex items-center gap-2">
+              {i > 0 && <span aria-hidden="true">·</span>}
               {item}
             </span>
           ))}
-        </div>
-
-        {/* ── Availability signal ────────────────────────────────────── */}
-        <p className="mt-3 flex items-center justify-center gap-2 text-xs text-white/50">
-          <span className="inline-block h-2 w-2 rounded-full bg-green-400 shrink-0 animate-pulse" />
-          {c.availability}
         </p>
-
       </div>
     </section>
   );

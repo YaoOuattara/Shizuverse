@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import Link from "next/link";
 import {
   Sparkles,
@@ -9,6 +8,9 @@ import {
   Scissors,
   ChefHat,
   Leaf,
+  MessageCircle,
+  UserCheck,
+  Home,
   type LucideIcon,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -21,26 +23,22 @@ import Footer from "@/components/Footer";
 
 function HowItWorks({ locale }: { locale: string }) {
   const isFr = locale === "fr";
-  const STEPS = [
+  // 3 warm cards (design conciergerie) — the numbered-notice layout is gone.
+  const STEPS: { icon: LucideIcon; title: string; desc: string }[] = [
     {
-      n: 1,
-      title: isFr ? "Choisissez un service"  : "Choose a service",
-      desc:  isFr ? "Parcourez notre catalogue de services professionnels." : "Browse our catalogue of professional services.",
+      icon: MessageCircle,
+      title: isFr ? "Dites-nous ce qu'il vous faut" : "Tell us what you need",
+      desc:  isFr ? "Une fuite, un ménage, une panne — décrivez, c'est tout." : "A leak, a cleaning, a breakdown — just describe it.",
     },
     {
-      n: 2,
-      title: isFr ? "Réservez en ligne"      : "Book online",
-      desc:  isFr ? "Sélectionnez une date et un créneau qui vous convient." : "Pick a date and time slot that works for you.",
+      icon: UserCheck,
+      title: isFr ? "On choisit le bon professionnel" : "We pick the right professional",
+      desc:  isFr ? "Vérifié par nos soins, confirmé sous 2h sur WhatsApp." : "Vetted by our team, confirmed within 2h on WhatsApp.",
     },
     {
-      n: 3,
-      title: isFr ? "Confirmez les détails"  : "Confirm the details",
-      desc:  isFr ? "Recevez une confirmation et les coordonnées du prestataire." : "Receive confirmation and your provider's contact info.",
-    },
-    {
-      n: 4,
-      title: isFr ? "Le prestataire arrive"  : "Provider arrives",
-      desc:  isFr ? "Profitez d'un service de qualité à domicile." : "Enjoy quality service at your doorstep.",
+      icon: Home,
+      title: isFr ? "Il arrive. Vous êtes tranquille." : "They arrive. You relax.",
+      desc:  isFr ? "Vous suivez tout, on reste joignables 7j/7." : "You track everything, we stay reachable 7/7.",
     },
   ];
 
@@ -49,36 +47,26 @@ function HowItWorks({ locale }: { locale: string }) {
   const ctaClass = "bg-green-600 text-white font-semibold px-8 py-3 rounded-xl hover:bg-green-700 transition-colors";
 
   return (
-    <section id="how-it-works" className="bg-white py-10 md:py-16 px-6">
+    <section id="how-it-works" className="bg-[#E8F0FB] py-10 md:py-16 px-6">
       <div className="max-w-5xl mx-auto">
-        <h2 className="text-2xl font-bold text-gray-900 text-center mb-6 md:mb-12">
-          {isFr ? "Comment ça marche" : "How It Works"}
-        </h2>
+        <div className="text-center mb-6 md:mb-12">
+          <h2 className="text-2xl font-bold text-[#0D2B6B]">
+            {isFr ? "Comment ça marche" : "How It Works"}
+          </h2>
+          <p className="text-[#185FA5] mt-2">
+            {isFr ? "Vous demandez. On gère." : "You ask. We handle it."}
+          </p>
+        </div>
 
-        <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-8">
-          {STEPS.map((step, i) => (
-            <Fragment key={step.n}>
-              {/* Step card */}
-              <div className="w-full md:flex-1 relative grid grid-cols-[2.5rem_1fr] gap-x-3 gap-y-0.5 md:flex md:flex-col md:items-start">
-                {/* Dashed connector — desktop only */}
-                {i < STEPS.length - 1 && (
-                  <div className="hidden md:block absolute top-5 left-10 right-0 border-t-2 border-dashed border-gray-200" />
-                )}
-                {/* Number circle */}
-                <div className="w-10 h-10 rounded-full bg-[#0F3A7A] text-white flex items-center justify-center font-bold text-sm z-10 shrink-0">
-                  {step.n}
-                </div>
-                {/* Title — same row as icon on mobile, below on desktop */}
-                <p className="font-semibold text-gray-800 text-sm self-center md:self-auto md:mt-4 col-start-2 md:col-auto">
-                  {step.title}
-                </p>
-                {/* Description — below title, indented on mobile */}
-                <p className="text-xs text-gray-400 mt-0.5 col-start-2 md:col-auto md:mt-1">
-                  {step.desc}
-                </p>
+        <div className="grid md:grid-cols-3 gap-4 md:gap-6">
+          {STEPS.map((step) => (
+            <div key={step.title} className="bg-white rounded-2xl p-6 text-left">
+              <div className="w-12 h-12 rounded-xl bg-[#E8F0FB] flex items-center justify-center mb-4">
+                <step.icon className="h-6 w-6 text-[#0F3A7A]" />
               </div>
-
-            </Fragment>
+              <p className="font-semibold text-[#0D2B6B]">{step.title}</p>
+              <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">{step.desc}</p>
+            </div>
           ))}
         </div>
 
