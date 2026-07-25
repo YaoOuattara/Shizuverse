@@ -478,6 +478,51 @@ def get_booking_detail(booking_id):
     return jsonify(data)
 
 
+@admin_bp.route('/bookings/<int:booking_id>/service', methods=['PATCH'])
+@admin_required
+def classify_booking_service(booking_id):
+    """Classify a FREE request (service_id NULL) into a real service.
+
+    AI-suggested, admin-verified: the client submits in natural language, the
+    admin picks the service here. Reclassifying an already-categorized booking
+    is out of scope — refused. Assignment is blocked until this runs (guard in
+    assign_booking)."""
+    b = ClientBooking.query.get_or_404(booking_id)
+    if b.service_id is not None:
+        return jsonify({'error': "Cette réservation est déjà classée "
+                                 f"({b.service_name}). Reclasser un dossier catégorisé est hors périmètre."}), 400
+
+    data = request.get_json() or {}
+    service_id = data.get('service_id')
+    if not service_id:
+        return jsonify({'error': 'service_id is required'}), 400
+    service = Service.query.get(service_id)
+    if service is None:
+        return jsonify({'error': 'Service not found'}), 404
+
+    prev_name = b.service_name
+    b.service_id = service.id
+    b.service_name = service.name
+    # The free-entry slug ('demande') no longer describes the booking.
+    b.service_slug = None
+
+    db.session.add(BookingEvent(
+        booking_id=b.id,
+        event_type='service_classified',
+        from_status=b.status,
+        to_status=b.status,
+        actor_id=None,
+        note=f"Demande classée : {prev_name} → {service.name}",
+    ))
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'service_id': b.service_id,
+        'service_name': b.service_name,
+    })
+
+
 @admin_bp.route('/bookings/<int:booking_id>/quote', methods=['POST'])
 @admin_required
 def set_booking_quote(booking_id):

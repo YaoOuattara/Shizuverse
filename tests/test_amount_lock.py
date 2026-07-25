@@ -31,7 +31,9 @@ if not hasattr(_werkzeug, "__version__"):
 
 from flask import Flask
 
-from shizuverse.models import db, ClientBooking, BookingEvent
+from shizuverse.models import db, ClientBooking, BookingEvent, User
+from shizuverse.models.service_provider import ServiceProvider
+from shizuverse.models.service_models import Service, ServiceCategory, ServiceSubcategory
 from shizuverse.routes.admin import admin_bp as portal_bp
 from shizuverse.api.admin import admin_bp as api_admin_bp
 from shizuverse.utils.payment_rules import get_payment_tier, get_deposit_amount
@@ -58,6 +60,26 @@ def app(tmp_path):
 
     with application.app_context():
         db.create_all()
+        # Fixture debt repaired: since T-20/T-28 the assign endpoint validates
+        # that the provider EXISTS+is approved and that the booking is
+        # CLASSIFIED (service_id not NULL). Seed a real service chain and an
+        # approved provider matching the phone the tests send (0700000002).
+        cat = ServiceCategory(name="Ménage")
+        db.session.add(cat); db.session.flush()
+        sub = ServiceSubcategory(name="Ménage standard", category_id=cat.id)
+        db.session.add(sub); db.session.flush()
+        svc = Service(name="Menage", subcategory_id=sub.id, is_active=True)
+        db.session.add(svc); db.session.flush()
+        user = User(email=None, user_type="provider", preferred_language="fr")
+        user.password_hash = "test-hash"  # scrypt unavailable on this build
+        db.session.add(user); db.session.flush()
+        db.session.add(ServiceProvider(
+            user_id=user.id, service_id=svc.id,
+            company_name="Presta Test", phone_number="+2250700000002",
+            verification_status="approved",
+        ))
+        db.session.commit()
+        application.config["_TEST_SERVICE_ID"] = svc.id
     yield application
     with application.app_context():
         db.drop_all()
@@ -87,6 +109,9 @@ def make_booking(app, **overrides):
             client_phone="0700000001",
             client_location="Cocody, Abidjan",
             service_name="Menage",
+            # Classified by default — the T-28 free-request guard is exercised
+            # in test_free_request_flow.py, not here.
+            service_id=app.config["_TEST_SERVICE_ID"],
             appointment_date=datetime.utcnow() + timedelta(days=3),
             status="requested",
         )

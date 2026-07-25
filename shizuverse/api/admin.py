@@ -144,6 +144,15 @@ def get_booking_recommendations(booking_id):
 def assign_booking(booking_id):
     booking = ClientBooking.query.get_or_404(booking_id)
     data = request.get_json() or {}
+
+    # Free requests (service_id NULL) must be CLASSIFIED before assignment —
+    # this is the only point where "Demande libre" would leak to a provider
+    # (shizu_provider_new_mission {{2}} = service_name). With this guard,
+    # classification is a step of the flow, not an option one can forget.
+    if booking.service_id is None:
+        return jsonify({'error': "Classez la demande avant d'assigner un prestataire "
+                                 "(PATCH /admin/bookings/<id>/service)."}), 400
+
     provider_name = data.get('provider_name', '').strip()
     provider_phone = normalize_phone(data.get('provider_phone', '').strip())
     if not provider_name:
