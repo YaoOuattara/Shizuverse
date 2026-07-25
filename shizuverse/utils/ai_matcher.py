@@ -147,6 +147,10 @@ def get_provider_recommendations(booking_id: int) -> list:
                     'urgency':      item['urgency_bonus'],
                 },
             })
+    # Tolerated degradation (documented, out of the 503 lot's scope): if the AI
+    # enrichment fails, recommendations fall back to score-only entries without
+    # signalling. A DB outage never reaches here — the caller endpoint 500/503s
+    # before this runs.
     except Exception:
         for item in top3:
             sp = item['sp']

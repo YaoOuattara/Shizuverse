@@ -1471,7 +1471,10 @@ def retention_count():
         clients = get_clients_to_reengage()
         return jsonify({'count': len(clients)})
     except Exception as e:
-        return jsonify({'count': 0, 'error': str(e)})
+        # A failure here (DB down included) must NOT masquerade as "0 clients"
+        # with a 200 — that's exactly the silent-outage pattern we refuse.
+        current_app.logger.error(f"[retention_count] error: {e}", exc_info=True)
+        return jsonify({'error': 'service_unavailable'}), 503
 
 
 @admin_bp.route('/retention/preview', methods=['GET'])

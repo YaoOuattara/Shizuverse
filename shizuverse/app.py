@@ -154,6 +154,16 @@ def create_app():
         from flask import jsonify as _jsonify
         return _jsonify({"error": "Trop de tentatives. Réessayez dans quelques minutes."}), 429
 
+    @app.errorhandler(SQLAlchemyError)
+    def database_error(e):
+        # DB outage (Neon down, pool exhausted…) must surface as a clean 503 —
+        # distinguishable from a code bug (500) and NEVER as a silent empty
+        # list. Flask picks this handler over errorhandler(Exception) because
+        # it is more specific.
+        app.logger.error(f"Database error: {e}", exc_info=True)
+        from flask import jsonify as _jsonify
+        return _jsonify({"error": "service_unavailable"}), 503
+
     @app.errorhandler(500)
     def internal_error(e):
         app.logger.error(f"Internal server error: {e}", exc_info=True)
