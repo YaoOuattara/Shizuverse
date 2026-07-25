@@ -368,6 +368,18 @@ export default function QuotePage() {
           {/* Keep the generic help link, except when the pay block already
               carries its own WhatsApp (the no-number-available case). */}
           {!(accepted && payInfo && payBlockCarriesWhatsApp) && <ContactShizu />}
+
+          {/* Magic-link visitors (WhatsApp browser) have no back button — give
+              the accepted state a way out. Same discreet style as the booking
+              success screen's "Nouvelle réservation" link. */}
+          {accepted && (
+            <a
+              href={`/${locale}`}
+              className="mt-4 text-sm text-gray-400 hover:text-gray-600 transition-colors py-1"
+            >
+              {isFr ? "Retour à l'accueil" : "Back to home"}
+            </a>
+          )}
         </div>
       </Shell>
     );

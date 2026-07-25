@@ -490,7 +490,7 @@ export default function AdminBookings() {
   // Payment tier decides whether "assigned" may be confirmed without payment.
   // after_service (< 15 000) is paid AFTER the mission → a bare confirm is
   // legitimate. deposit_30 / full_prepay must be paid BEFORE → confirmation
-  // only via "Mark payment received". If the tier is unknown, fall back to the
+  // only via "Record Payment". If the tier is unknown, fall back to the
   // amount threshold; if that too is unknown, default to prepay (no bare confirm).
   const selTier = rawSelected?.payment_tier ?? null;
   const selIsAfterService = selTier
@@ -516,9 +516,6 @@ export default function AdminBookings() {
   const [paymentInstructionsOpen, setPaymentInstructionsOpen] = useState(false);
   const [adminConfig, setAdminConfig] = useState<{ wave_number?: string; orange_number?: string; mtn_number?: string; whatsapp?: string; twilio_enabled?: boolean } | null>(null);
   const [sendingInstructions, setSendingInstructions] = useState(false);
-
-  // Explicit "mark payment received" confirmation (financial action → confirm first)
-  const [markPaidConfirmOpen, setMarkPaidConfirmOpen] = useState(false);
 
   // Dispute unlock (déverrouillage litige) — reason required, confirmed
   const [unlockModalOpen, setUnlockModalOpen] = useState(false);
@@ -1047,27 +1044,6 @@ export default function AdminBookings() {
       toast({ title: isFr ? "Litige résolu" : "Dispute Resolved" });
     } catch {
       toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible de résoudre le litige." : "Couldn't resolve the dispute.", variant: "destructive" });
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  // Explicit financial action: records that the client's payment was actually
-  // received (marks paid + confirms the booking). Confirmed via a dialog first.
-  const handleMarkPaymentReceived = async () => {
-    if (!selectedBooking) return;
-    setIsUpdating(true);
-    const prevPaymentStatus = selectedBooking.paymentStatus;
-    const prevStatus = selectedBooking.status;
-    updateLocalBooking(selectedBooking.id, { paymentStatus: 'paid', status: 'confirmed' });
-    setMarkPaidConfirmOpen(false);
-    try {
-      await adminApi.portalConfirmPayment(Number(selectedBooking.id));
-      toast({ title: isFr ? "Paiement marqué comme reçu" : "Payment marked as received" });
-    } catch (err) {
-      updateLocalBooking(selectedBooking.id, { paymentStatus: prevPaymentStatus, status: prevStatus });
-      console.error("Failed to confirm payment:", err);
-      toast({ title: isFr ? "Erreur" : "Error", description: isFr ? "Impossible d'enregistrer le paiement." : "Couldn't record the payment.", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -1684,9 +1660,9 @@ export default function AdminBookings() {
                           {isFr ? "Voir les instructions de paiement" : "View payment instructions"}
                         </Button>
                         <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                          onClick={() => setMarkPaidConfirmOpen(true)}>
+                          onClick={openPaymentModal}>
                           <Banknote className="h-3.5 w-3.5 mr-2" />
-                          {isFr ? "Marquer le paiement comme reçu" : "Mark payment as received"}
+                          {isFr ? "Enregistrer le paiement" : "Record Payment"}
                         </Button>
                       </div>
                     )}
@@ -1973,7 +1949,7 @@ export default function AdminBookings() {
                     {/* "Confirmer" removed here: confirming a raw request would
                         skip the whole quote → client acceptance → amount lock →
                         assignment flow. Confirmation happens via the quote path
-                        (or "Mark payment received" once the amount is locked). */}
+                        (or "Record Payment" once the amount is locked). */}
                     <Button
                       variant="destructive"
                       className="w-full"
@@ -2148,14 +2124,14 @@ export default function AdminBookings() {
                       </Button>
                     ) : (
                       /* prepay tiers: money must arrive BEFORE. No bare confirm —
-                         the only path to confirmed is "Mark payment received"
+                         the only path to confirmed is "Record Payment"
                          (in the Amount & Payment section above). */
                       <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 rounded-md px-3 py-2 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5">
                         <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                         <span>
                           {isFr
-                            ? "Ce service exige un acompte/paiement avant intervention. Confirmez via « Marquer le paiement comme reçu »."
-                            : "This service requires a deposit/payment before service. Confirm via \"Mark payment as received\"."}
+                            ? "Ce service exige un acompte/paiement avant intervention. Confirmez via « Enregistrer le paiement »."
+                            : "This service requires a deposit/payment before service. Confirm via \"Record Payment\"."}
                         </span>
                       </div>
                     )}
@@ -2916,37 +2892,6 @@ export default function AdminBookings() {
             >
               {sendingInstructions ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
               {isFr ? "Envoyer les instructions au client" : "Send instructions to client"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Mark payment received — explicit financial confirmation */}
-      <Dialog open={markPaidConfirmOpen} onOpenChange={setMarkPaidConfirmOpen}>
-        <DialogContent className="sm:max-w-[420px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Banknote className="h-5 w-5 text-emerald-600" />
-              {isFr ? "Marquer le paiement comme reçu" : "Mark payment as received"}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedBooking && (() => {
-                const amt = selectedBooking.baseAmount || selectedBooking.price || 0;
-                const amtStr = amt > 0 ? `${new Intl.NumberFormat('fr-FR').format(amt)} FCFA` : (isFr ? "le montant" : "the amount");
-                return isFr
-                  ? `Confirmez-vous avoir réellement reçu ${amtStr} de ${selectedBooking.clientName} ? La réservation sera marquée comme payée et confirmée.`
-                  : `Do you confirm you actually received ${amtStr} from ${selectedBooking.clientName}? The booking will be marked paid and confirmed.`;
-              })()}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMarkPaidConfirmOpen(false)} disabled={isUpdating}>
-              {isFr ? "Annuler" : "Cancel"}
-            </Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              onClick={handleMarkPaymentReceived} disabled={isUpdating}>
-              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-              {isFr ? "Oui, paiement reçu" : "Yes, payment received"}
             </Button>
           </DialogFooter>
         </DialogContent>
