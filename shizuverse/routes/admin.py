@@ -317,19 +317,41 @@ def update_provider_services(provider_id):
         if svc_id not in new_svc_ids:
             db.session.delete(row)
 
-    # Add rows for newly added services
+    # Add rows for newly added services — FULL copy of the canonical row.
+    # A partial copy left new rows with column defaults (listed_status
+    # 'unlisted', provider_status 'paused', no momo/docs/rates): an approved &
+    # listed provider gaining a service ended up with a mismatched sibling
+    # (T-20: status and profile are per PERSON, not per service line).
     for svc_id in new_svc_ids:
         if svc_id not in existing_by_svc_id:
             db.session.add(ServiceProvider(
                 user_id=user_id,
                 service_id=svc_id,
+                # Profile
                 company_name=canonical.company_name,
                 phone_number=canonical.phone_number,
                 bio=canonical.bio,
                 address=canonical.address,
+                account_type=getattr(canonical, 'account_type', None),
+                rccm_number=canonical.rccm_number,
+                profile_picture=canonical.profile_picture,
+                profile_photo_url=canonical.profile_photo_url,
+                id_document_url=canonical.id_document_url,
+                experience_text=canonical.experience_text,
+                experience_photo_url=canonical.experience_photo_url,
+                mobile_money_number=canonical.mobile_money_number,
+                mobile_money_name=canonical.mobile_money_name,
+                mobile_money_operator=canonical.mobile_money_operator,
+                service_rates=canonical.service_rates,
+                # Status (person-level)
                 verified=canonical.verified,
                 verification_status=canonical.verification_status,
-                account_type=getattr(canonical, 'account_type', None),
+                listed_status=canonical.listed_status,
+                provider_status=canonical.provider_status,
+                submitted_at=canonical.submitted_at,
+                reviewed_at=canonical.reviewed_at,
+                reviewed_by=canonical.reviewed_by,
+                available_today=canonical.available_today,
             ))
 
     db.session.commit()
