@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import AdminLayout from "./AdminLayout";
 import { getAdminToken } from "@/lib/adminAuth";
+import ErrorBanner from "@/components/ErrorBanner";
 import { Loader2, MapPin, Phone, Users } from "lucide-react";
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
@@ -21,25 +22,31 @@ export default function AdminWaitlist() {
   const [data, setData]       = useState<WaitlistEntry[]>([]);
   const [total, setTotal]     = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(false);
+  const [tick, setTick]       = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
     const token = getAdminToken();
+    setLoading(true); setError(false);
     fetch(`${FLASK_API}/api/admin/waitlist`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((r) => r.json())
+      // A 503/500 body parses as JSON too — without this guard it would land
+      // in .then() as an empty list (the silent-outage pattern we refuse).
+      .then((r) => { if (!r.ok) throw new Error(`API ${r.status}`); return r.json(); })
       .then((json) => {
         setData(json.waitlist ?? []);
         setTotal(json.total ?? 0);
       })
-      .catch(() => {})
+      .catch((e) => { console.error(e); setError(true); })
       .finally(() => setLoading(false));
-  }, []);
+  }, [tick]);
 
   return (
     <AdminLayout title={isFr ? "Liste d'attente" : "Waitlist"}>
       <div className="space-y-6">
+        {error && <ErrorBanner isFr={isFr} onRetry={() => setTick((t) => t + 1)} />}
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

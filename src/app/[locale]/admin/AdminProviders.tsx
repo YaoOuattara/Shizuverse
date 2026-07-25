@@ -74,6 +74,7 @@ import { type AdminProvider, type VerificationStatus } from "@/data/adminStore";
 import { COMMUNES } from "@/components/CommuneAutocomplete";
 import { useAdminProviders, type ApiProvider } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
+import ErrorBanner from "@/components/ErrorBanner";
 import { formatMoney } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
 
@@ -147,7 +148,7 @@ export default function AdminProviders() {
     label: t(`rejectionReasons.${key}`),
   }));
   const suspensionReasons = getSuspensionReasons(isFr);
-  const { providers: apiProviders, loading: providersLoading } = useAdminProviders();
+  const { providers: apiProviders, loading: providersLoading, error: providersError, retry: retryProviders } = useAdminProviders();
   const [localProviders, setLocalProviders] = useState<AdminProvider[]>([]);
 
   useEffect(() => {
@@ -576,6 +577,7 @@ export default function AdminProviders() {
   return (
     <AdminLayout title={isFr ? "Prestataires" : "Providers"}>
       <div className="space-y-4">
+        {providersError && <ErrorBanner isFr={isFr} onRetry={retryProviders} />}
         {/* Verification Status Tabs */}
         <ScrollArea className="w-full">
           <div className="flex gap-1 pb-2" data-testid="verification-tabs">

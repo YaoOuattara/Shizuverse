@@ -54,6 +54,7 @@ import {
 } from "lucide-react";
 import { useAdminReviews, type ApiReview } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
+import ErrorBanner from "@/components/ErrorBanner";
 import { useToast } from "@/hooks/use-toast";
 
 // Local shape that the UI works with
@@ -106,7 +107,7 @@ export default function AdminReviews() {
   const { toast } = useToast();
   const params = useParams();
   const isFr = (params?.locale as string) === 'fr';
-  const { reviews: apiReviews, setReviews: setApiReviews, loading } = useAdminReviews();
+  const { reviews: apiReviews, setReviews: setApiReviews, loading, error: reviewsError, retry: retryReviews } = useAdminReviews();
 
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   useEffect(() => {
@@ -315,6 +316,7 @@ export default function AdminReviews() {
   return (
     <AdminLayout title={isFr ? "Avis" : "Reviews"}>
       <div className="space-y-4">
+        {reviewsError && <ErrorBanner isFr={isFr} onRetry={retryReviews} />}
         {/* Search */}
         <Card>
           <CardContent className="py-4">

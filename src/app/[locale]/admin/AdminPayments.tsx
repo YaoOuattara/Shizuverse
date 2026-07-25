@@ -57,6 +57,7 @@ import {
 } from "lucide-react";
 import { useAdminBookings, useAdminOverview, type ApiBooking } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
+import ErrorBanner from "@/components/ErrorBanner";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
 import { formatMoney } from "@/lib/currency";
@@ -178,7 +179,7 @@ export default function AdminPayments() {
   const params = useParams();
   const isFr = (params?.locale as string) === "fr";
   const { overview, loading: overviewLoading } = useAdminOverview();
-  const { bookings: apiBookings } = useAdminBookings();
+  const { bookings: apiBookings, error: bookingsError, retry: retryBookings } = useAdminBookings();
 
   const [bookings, setBookings] = useState<PaymentBooking[]>([]);
   useEffect(() => {
@@ -352,6 +353,7 @@ export default function AdminPayments() {
   return (
     <AdminLayout title={isFr ? "Paiements" : "Payments"}>
       <div className="space-y-4">
+        {bookingsError && <ErrorBanner isFr={isFr} onRetry={retryBookings} />}
         {/* Finance Summary — same source as Overview GMV */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Card className="border-l-4 border-l-emerald-500">

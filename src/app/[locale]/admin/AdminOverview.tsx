@@ -58,6 +58,7 @@ import { useAdminStore, type AdminProvider, type DateRangeOption, type Verificat
 import { useToast } from "@/hooks/use-toast";
 import { formatMoney } from "@/lib/currency";
 import { adminApi } from "@/lib/api";
+import ErrorBanner from "@/components/ErrorBanner";
 
 const statusColors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
@@ -109,7 +110,7 @@ export default function AdminOverview() {
   const { bookings: liveBookings } = useAdminBookings();
   const { providers: liveProviders } = useAdminProviders();
   const { reviews: liveReviews } = useAdminReviews();
-  const { overview, loading: overviewLoading } = useAdminOverview();
+  const { overview, loading: overviewLoading, error: overviewError, retry: retryOverview } = useAdminOverview();
 
   // Provider counts — derived from the live providers list (single source of truth)
   const liveActiveProviders = liveProviders.filter(p => p.provider_status === 'active').length;
@@ -266,6 +267,7 @@ export default function AdminOverview() {
 
   return (
     <AdminLayout title={isFr ? "Tableau de bord" : "Overview"}>
+      {overviewError && <div className="mb-4"><ErrorBanner isFr={isFr} onRetry={retryOverview} /></div>}
       {(liveBookings.length > 0 || liveProviders.length > 0) && (
         <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-sm text-green-800">
           <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>

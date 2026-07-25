@@ -57,6 +57,7 @@ import {
 import { useAdminStore, type AdminService, type PricingRules } from "@/data/adminStore";
 import { useAdminServices, type ApiService } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
+import ErrorBanner from "@/components/ErrorBanner";
 import { formatPrice } from "@/lib/formatPrice";
 import { useToast } from "@/hooks/use-toast";
 import { formatMoney } from "@/lib/currency";
@@ -101,7 +102,7 @@ export default function AdminServices() {
   const params = useParams();
   const isFr = ((params?.locale as string) ?? "fr") === "fr";
   const { toast } = useToast();
-  const { services: apiServices, loading: servicesLoading } = useAdminServices();
+  const { services: apiServices, loading: servicesLoading, error: servicesError, retry: retryServices } = useAdminServices();
   const { bookings = [] } = useAdminStore();
 
   const [services, setServices] = useState<AdminService[]>([]);
@@ -496,6 +497,7 @@ export default function AdminServices() {
   return (
     <AdminLayout title={isFr ? "Services" : "Services"}>
       <div className="space-y-4">
+        {servicesError && <ErrorBanner isFr={isFr} onRetry={retryServices} />}
 
         {/* Search bar + actions */}
         <Card>

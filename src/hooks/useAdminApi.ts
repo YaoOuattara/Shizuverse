@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { adminApi } from "@/lib/api";
 
 export interface ApiStats {
@@ -118,57 +118,73 @@ export interface ApiService {
 export function useAdminStats() {
   const [stats, setStats] = useState<ApiStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    setLoading(true); setError(false);
     adminApi.getStats()
       .then(setStats)
-      .catch(console.error)
+      .catch((e) => { console.error(e); setError(true); })
       .finally(() => setLoading(false));
-  }, []);
+  }, [tick]);
 
-  return { stats, loading };
+  const retry = useCallback(() => setTick((t) => t + 1), []);
+  return { stats, loading, error, retry };
 }
 
 export function useAdminBookings(status?: string) {
   const [bookings, setBookings] = useState<ApiBooking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    setLoading(true); setError(false);
     adminApi.portalGetBookings(status ? { status } : undefined)
       .then((data: ApiBooking[]) => setBookings(Array.isArray(data) ? data : []))
-      .catch(console.error)
+      .catch((e) => { console.error(e); setError(true); })
       .finally(() => setLoading(false));
-  }, [status]);
+  }, [status, tick]);
 
-  return { bookings, loading };
+  const retry = useCallback(() => setTick((t) => t + 1), []);
+  return { bookings, loading, error, retry };
 }
 
 export function useAdminProviders() {
   const [providers, setProviders] = useState<ApiProvider[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    setLoading(true); setError(false);
     adminApi.portalGetProviders()
       .then((data: ApiProvider[]) => setProviders(Array.isArray(data) ? data : []))
-      .catch(console.error)
+      .catch((e) => { console.error(e); setError(true); })
       .finally(() => setLoading(false));
-  }, []);
+  }, [tick]);
 
-  return { providers, loading };
+  const retry = useCallback(() => setTick((t) => t + 1), []);
+  return { providers, loading, error, retry };
 }
 
 export function useAdminServices() {
   const [services, setServices] = useState<ApiService[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    setLoading(true); setError(false);
     adminApi.getServices()
       .then((data: ApiService[]) => setServices(Array.isArray(data) ? data : []))
-      .catch(console.error)
+      .catch((e) => { console.error(e); setError(true); })
       .finally(() => setLoading(false));
-  }, []);
+  }, [tick]);
 
-  return { services, loading };
+  const retry = useCallback(() => setTick((t) => t + 1), []);
+  return { services, loading, error, retry };
 }
 
 export interface ApiOverview {
@@ -189,15 +205,19 @@ export interface ApiOverview {
 export function useAdminOverview() {
   const [overview, setOverview] = useState<ApiOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    setLoading(true); setError(false);
     adminApi.portalGetOverview()
       .then((data: ApiOverview) => setOverview(data))
-      .catch(console.error)
+      .catch((e) => { console.error(e); setError(true); })
       .finally(() => setLoading(false));
-  }, []);
+  }, [tick]);
 
-  return { overview, loading };
+  const retry = useCallback(() => setTick((t) => t + 1), []);
+  return { overview, loading, error, retry };
 }
 
 export interface FinanceSummary {
@@ -212,27 +232,35 @@ export interface FinanceSummary {
 export function useAdminReviews(status?: string) {
   const [reviews, setReviews] = useState<ApiReview[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    setLoading(true); setError(false);
     adminApi.portalGetReviews(status ? { status } : undefined)
       .then((data: ApiReview[]) => setReviews(Array.isArray(data) ? data : []))
-      .catch(console.error)
+      .catch((e) => { console.error(e); setError(true); })
       .finally(() => setLoading(false));
-  }, [status]);
+  }, [status, tick]);
 
-  return { reviews, setReviews, loading };
+  const retry = useCallback(() => setTick((t) => t + 1), []);
+  return { reviews, setReviews, loading, error, retry };
 }
 
 export function useAdminFinanceSummary() {
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    setIsLoading(true); setError(false);
     adminApi.portalGetFinanceSummary()
       .then((data: FinanceSummary) => setSummary(data))
-      .catch(() => setSummary(null))
+      .catch((e) => { console.error(e); setSummary(null); setError(true); })
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [tick]);
 
-  return { summary, isLoading };
+  const retry = useCallback(() => setTick((t) => t + 1), []);
+  return { summary, isLoading, error, retry };
 }

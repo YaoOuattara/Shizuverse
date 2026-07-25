@@ -26,6 +26,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import ErrorBanner from "@/components/ErrorBanner";
 import ProviderBookingCard from "@/components/ProviderBookingCard";
 import NewRequestCard from "@/components/NewRequestCard";
 import AchievementBadges from "@/components/AchievementBadges";
@@ -128,6 +129,8 @@ export default function ProviderDashboard() {
 
   const [isLoading, setIsLoading]             = useState(true);
   const [hasToken, setHasToken]               = useState(false);
+  const [listError, setListError]             = useState(false);
+  const [listTick, setListTick]               = useState(0);
   const [searchQuery, setSearchQuery]         = useState("");
   const [availableToday, setAvailableToday]   = useState(false);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
@@ -247,6 +250,8 @@ export default function ProviderDashboard() {
         const hasCached = (() => {
           try { return Array.isArray(JSON.parse(localStorage.getItem(STORAGE_KEYS.BOOKINGS) || "null")); } catch { return false; }
         })();
+        // No cache to fall back on → the screen would be silently empty.
+        if (!hasCached) setListError(true);
         if (hasCached) {
           toast({
             title: isFr ? "Données non actualisées" : "Stale data",
@@ -259,7 +264,7 @@ export default function ProviderDashboard() {
       })
       .finally(() => setIsLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [listTick]);
 
   // ── Availability ──────────────────────────────────────────────────────────
 
@@ -713,6 +718,12 @@ export default function ProviderDashboard() {
       </header>
 
       <main className="flex-1 overflow-auto p-4 sm:p-6">
+
+        {listError && (
+          <div className="mb-4">
+            <ErrorBanner isFr={isFr} onRetry={() => { setListError(false); setListTick(t => t + 1); }} />
+          </div>
+        )}
 
         {/* 1 — Provider ID card */}
         {providerInfo.verificationStatus === "approved" ? (

@@ -67,6 +67,7 @@ import { useAdminStore, type AdminBooking } from "@/data/adminStore";
 import { useAdminBookings, useAdminProviders, useAdminServices, type ApiBooking, type ApiProvider, type ApiService } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import ErrorBanner from "@/components/ErrorBanner";
 import { format, parseISO } from "date-fns";
 import { formatMoney } from "@/lib/currency";
 import {
@@ -379,7 +380,7 @@ export default function AdminBookings() {
   const paymentStatusLabels = getPaymentStatusLabels(isFr);
   const payoutStatusLabels = getPayoutStatusLabels(isFr);
   const { toast } = useToast();
-  const { bookings: apiBookings, loading: bookingsLoading } = useAdminBookings();
+  const { bookings: apiBookings, loading: bookingsLoading, error: bookingsError, retry: retryBookings } = useAdminBookings();
   const { providers: liveProviders } = useAdminProviders();
   const { reviews } = useAdminStore();
   // Real services from the API — replaces the mock store as the engine's source.
@@ -1228,6 +1229,9 @@ export default function AdminBookings() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Outage / bug: never a silent empty list (503 AND 500) */}
+        {bookingsError && <ErrorBanner isFr={isFr} onRetry={retryBookings} />}
 
         {/* Bookings List */}
         <Card>

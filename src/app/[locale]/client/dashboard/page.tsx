@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CalendarDays, Plus, MessageCircle, Star, Loader2, ChevronRight, KeyRound, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
+import ErrorBanner from "@/components/ErrorBanner";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -188,6 +189,8 @@ export default function ClientDashboard() {
   const [categories, setCategories]         = useState<ApiCategory[]>([]);
   const [bookings, setBookings]             = useState<ApiBooking[]>([]);
   const [loading, setLoading]               = useState(true);
+  const [listError, setListError]           = useState(false);
+  const [listTick, setListTick]             = useState(0);
   const [filter, setFilter]                 = useState<Filter>("all");
   const [reviewedIds, setReviewedIds]       = useState<Set<string>>(new Set());
   const [paymentDeclaredIds, setPaymentDeclaredIds] = useState<Set<number>>(new Set());
@@ -212,10 +215,12 @@ export default function ClientDashboard() {
       if (reviewed) setReviewedIds(new Set(JSON.parse(reviewed)));
     } catch { /* keep defaults */ }
 
+    setLoading(true); setListError(false);
     fetch(`${FLASK_API}/api/client/bookings`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => {
+        if (!r.ok && r.status !== 401) throw new Error(`API ${r.status}`);
         if (r.status === 401) {
           localStorage.removeItem("client_token");
           localStorage.removeItem("client_info");
@@ -238,9 +243,9 @@ export default function ClientDashboard() {
           }
         } catch { /* ignore */ }
       })
-      .catch(() => {})
+      .catch(() => setListError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }, [listTick]);
 
   const activeBooking = useMemo(
     () => bookings.find(b => ACTIVE_STATUSES.has(b.status) && b.status !== "pending_payment") ?? null,
@@ -498,6 +503,11 @@ export default function ClientDashboard() {
         </div>
 
         {/* ── Booking list ─────────────────────────────────────────────── */}
+        {listError && (
+          <div className="mb-3">
+            <ErrorBanner isFr={locale !== "en"} onRetry={() => setListTick(t => t + 1)} />
+          </div>
+        )}
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <CalendarDays className="mb-4 h-12 w-12 text-gray-300" />
