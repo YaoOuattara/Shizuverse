@@ -255,11 +255,13 @@ export default function ProviderRegisterPage() {
       account_type: accountType,
       company_name: accountType === "company" ? businessName.trim() : undefined,
       rccm_number: accountType === "company" && rccmNumber.trim() ? rccmNumber.trim() : undefined,
+      // Stable key: String(category_id) — a localized display name orphans the
+      // data on rename and splits FR/EN registrations (remap migration handles
+      // the legacy name-keyed rows).
       service_rates: Object.fromEntries(
-        Object.entries(serviceRates).map(([id, r]) => {
-          const cat = categories.find((c) => c.id === Number(id));
-          return [cat ? displayCatName(cat, locale) : id, { min: Number(r.min) || 0, max: Number(r.max) || 0 }];
-        })
+        Object.entries(serviceRates).map(([id, r]) =>
+          [String(id), { min: Number(r.min) || 0, max: Number(r.max) || 0 }]
+        )
       ),
       profile_photo_url: profilePhotoUrl || undefined,
       id_doc_type: idDocType || undefined,

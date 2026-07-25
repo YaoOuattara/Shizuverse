@@ -488,6 +488,8 @@ export default function AdminProviders() {
   const [serviceAddValue, setServiceAddValue] = useState("");
   const [isSavingServices, setIsSavingServices] = useState(false);
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  // category_id → display name, for the declared-rates block (new key format).
+  const [categoryNameById, setCategoryNameById] = useState<Record<string, string>>({});
 
   // ── Edit zones state ──────────────────────────────────────────────────────
   const [editZonesMode, setEditZonesMode] = useState(false);
@@ -498,9 +500,10 @@ export default function AdminProviders() {
     const base = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
     fetch(`${base}/api/services/categories`)
       .then((r) => r.json())
-      .then((data: Array<{ name_fr?: string; name: string }>) =>
-        setAvailableCategories(data.map((c) => c.name_fr || c.name).sort())
-      )
+      .then((data: Array<{ id: number; name_fr?: string; name: string }>) => {
+        setAvailableCategories(data.map((c) => c.name_fr || c.name).sort());
+        setCategoryNameById(Object.fromEntries(data.map((c) => [String(c.id), c.name_fr || c.name])));
+      })
       .catch(() => {});
   }, []);
 
@@ -1076,7 +1079,9 @@ export default function AdminProviders() {
                     <div className="space-y-1.5">
                       {entries.map(([category, r]) => (
                         <div key={category} className="flex items-center justify-between gap-3 text-sm">
-                          <span className="text-muted-foreground">{category}</span>
+                          {/* New format keys by category_id — resolve to a name,
+                              falling back to the raw key for legacy name-keyed rows. */}
+                          <span className="text-muted-foreground">{categoryNameById[category] ?? category}</span>
                           <span className="font-medium tabular-nums whitespace-nowrap">
                             {formatMoney(Number(r?.min) || 0).replace(/ CFA$/, "")} – {formatMoney(Number(r?.max) || 0)}
                           </span>
