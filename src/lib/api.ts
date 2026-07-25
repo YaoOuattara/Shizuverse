@@ -112,6 +112,10 @@ export const adminApi = {
   portalGetFinanceSummary: () => adminFetch("/admin/finance/summary"),
   portalUpdateFinance: (bookingId: string, body: { payment_status?: string; payout_status?: string; final_amount?: number; reason?: string }) =>
     adminFetch(`/admin/bookings/${bookingId}/finance`, { method: "POST", body: JSON.stringify(body) }),
+  // Classify a FREE request (service_id null) into a real service. Backend
+  // refuses on already-classified bookings; assignment is blocked until done.
+  portalClassifyBooking: (bookingId: number, service_id: number) =>
+    adminFetch(`/admin/bookings/${bookingId}/service`, { method: "PATCH", body: JSON.stringify({ service_id }) }),
   portalSetBookingQuote: (bookingId: string, amount_xof: number, note?: string) =>
     adminFetch(`/admin/bookings/${bookingId}/quote`, { method: 'POST', body: JSON.stringify({ amount_xof, note: note ?? '' }) }),
   portalCancelBooking: (bookingId: number, reason?: string) =>

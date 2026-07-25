@@ -13,6 +13,9 @@ interface ApiCategory {
   name: string;
   name_fr: string;
   name_en: string;
+  // Present in the API payload — used to route a chip straight to the booking
+  // flow of its category's first service (T-28).
+  subcategories?: { service_id: number | null }[];
 }
 
 const CONTENT = {
@@ -20,9 +23,9 @@ const CONTENT = {
     badge: "Abidjan · Côte d'Ivoire",
     headline: "On s'occupe de tout. Vous gagnez du temps.",
     subtext:
-      "Réservez un prestataire vérifié à Abidjan en quelques minutes.",
+      "Décrivez votre besoin. On vous envoie le bon professionnel, vérifié par nos soins.",
     searchPlaceholder: "Quel est votre besoin ?",
-    searchBtn: "Rechercher",
+    searchBtn: "Envoyer",
     urgentBtn: "Besoin urgent — 2h",
     planBtn: "Planifier un service",
     browseAll: "Parcourir toutes les catégories →",
@@ -36,9 +39,9 @@ const CONTENT = {
     badge: "Abidjan · Côte d'Ivoire",
     headline: "We handle it all. You save time.",
     subtext:
-      "Book a verified provider in Abidjan in minutes.",
+      "Tell us what you need. We send you the right professional, vetted by our team.",
     searchPlaceholder: "What do you need?",
-    searchBtn: "Search",
+    searchBtn: "Send",
     urgentBtn: "Urgent — within 2h",
     planBtn: "Plan a service",
     browseAll: "Browse all categories →",
@@ -67,10 +70,22 @@ export default function HomeHero() {
       .finally(() => setChipsLoading(false));
   }, []);
 
+  // Concierge entry (T-21/T-28): the typed text becomes the initial
+  // description of a FREE booking request — not a catalog search. This is what
+  // makes the "Envoyer" button true.
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const q = searchValue.trim();
-    router.push(`/${locale}/services${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+    router.push(`/${locale}/booking/demande${q ? `?desc=${encodeURIComponent(q)}` : ""}`);
+  };
+
+  // Chip → the booking flow of the category's first service; a category with
+  // no bookable service degrades to a free request seeded with its name.
+  const chipHref = (cat: ApiCategory): string => {
+    const sid = cat.subcategories?.find((s) => s.service_id != null)?.service_id;
+    if (sid != null) return `/${locale}/booking/${sid}`;
+    const label = locale === "fr" ? (cat.name_fr || cat.name) : (cat.name_en || cat.name);
+    return `/${locale}/booking/demande?desc=${encodeURIComponent(label)}`;
   };
 
   // Show up to 8 chips so the row doesn't overflow on mobile
@@ -139,7 +154,7 @@ export default function HomeHero() {
             : chips.map((cat) => (
                 <Link
                   key={cat.id}
-                  href={`/${locale}/services?category=${cat.id}`}
+                  href={chipHref(cat)}
                   className="inline-flex items-center px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors border border-white/20"
                 >
                   {locale === "fr" ? (cat.name_fr || cat.name) : (cat.name_en || cat.name)}
@@ -150,7 +165,7 @@ export default function HomeHero() {
         {/* ── Two urgency paths ──────────────────────────────────────── */}
         <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center max-w-lg mx-auto">
           <Link
-            href={`/${locale}/services?urgency=urgent`}
+            href={`/${locale}/booking/demande?urgency=urgent_2h`}
             className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-3 rounded-xl transition-colors text-sm"
           >
             <Zap className="h-4 w-4 shrink-0" />

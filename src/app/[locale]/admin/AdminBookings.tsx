@@ -276,6 +276,7 @@ const EVENT_LABELS: Record<string, { fr: string; en: string }> = {
   amount_unlocked:   { fr: "Montant déverrouillé (litige)",  en: "Amount unlocked (dispute)" },
   payment_confirmed: { fr: "Paiement confirmé",              en: "Payment confirmed" },
   payment_recorded:  { fr: "Versement enregistré",           en: "Payment recorded" },
+  service_classified:{ fr: "Demande classée",                en: "Request classified" },
   dispute_opened:    { fr: "Litige ouvert",                  en: "Dispute opened" },
   dispute_resolved:  { fr: "Litige résolu",                  en: "Dispute resolved" },
   status_changed:    { fr: "Statut modifié par l'admin",     en: "Status changed by admin" },
@@ -505,6 +506,11 @@ export default function AdminBookings() {
   const [disputeModalOpen, setDisputeModalOpen] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
   const [disputeFlagOverrides, setDisputeFlagOverrides] = useState<Record<string, boolean>>({});
+
+  // Free-request classification (T-28): selector shown ONLY while serviceId is
+  // null — classifying is a required step of the flow (assignment is blocked).
+  const [classifyServiceId, setClassifyServiceId] = useState("");
+  const [isClassifying, setIsClassifying] = useState(false);
 
   // Payment instructions modal (consultation only — never mutates the booking)
   const [paymentInstructionsOpen, setPaymentInstructionsOpen] = useState(false);
@@ -915,6 +921,35 @@ export default function AdminBookings() {
           setAiRecommendations(data?.recommendations ?? []))
         .catch(() => setAiRecommendations([]))
         .finally(() => setAiLoading(false));
+    }
+  };
+
+  // Classify a free request into a real service (T-28). On success the badge
+  // and selector disappear (serviceId set) and assignment becomes possible.
+  const handleClassifyBooking = async () => {
+    if (!selectedBooking || !classifyServiceId || isClassifying) return;
+    const svc = apiServices.find((s) => String(s.id) === classifyServiceId);
+    if (!svc) return;
+    setIsClassifying(true);
+    try {
+      await adminApi.portalClassifyBooking(Number(selectedBooking.id), svc.id);
+      updateLocalBooking(selectedBooking.id, { serviceId: svc.id, serviceName: svc.name });
+      setClassifyServiceId("");
+      await loadBookingEvents(selectedBooking.id);
+      toast({
+        title: isFr ? "Demande classée" : "Request classified",
+        description: isFr ? `Service : ${svc.name}.` : `Service: ${svc.name}.`,
+      });
+    } catch (err) {
+      console.error("Failed to classify booking:", err);
+      const backendMsg = extractApiError(err);
+      toast({
+        title: isFr ? "Erreur" : "Error",
+        description: backendMsg || (isFr ? "Impossible de classer la demande." : "Couldn't classify the request."),
+        variant: "destructive",
+      });
+    } finally {
+      setIsClassifying(false);
     }
   };
 
@@ -1419,7 +1454,47 @@ export default function AdminBookings() {
                   </div>
                   <span className="text-lg font-bold">{formatMoney(selectedBooking.price, selectedBooking.currency)}</span>
                 </div>
-                
+
+                {/* Free request (T-28): classification is a REQUIRED step —
+                    assignment is blocked server-side until a service is set.
+                    The selector only exists while serviceId is null. */}
+                {selectedBooking.serviceId == null && (
+                  <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-700 p-3 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                        {isFr ? "Demande libre" : "Free request"}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {isFr
+                          ? "Classez la demande pour pouvoir assigner un prestataire."
+                          : "Classify the request to enable provider assignment."}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Select value={classifyServiceId} onValueChange={setClassifyServiceId}>
+                        <SelectTrigger className="flex-1" data-testid="select-classify-service">
+                          <SelectValue placeholder={isFr ? "Choisir un service…" : "Choose a service…"} />
+                        </SelectTrigger>
+                        <SelectContent className="z-50">
+                          {apiServices.map((s) => (
+                            <SelectItem key={s.id} value={String(s.id)}>
+                              {s.category ? `${s.category} — ${s.name}` : s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        onClick={handleClassifyBooking}
+                        disabled={!classifyServiceId || isClassifying}
+                        data-testid="button-classify-service"
+                      >
+                        {isClassifying ? <Loader2 className="h-4 w-4 animate-spin" /> : (isFr ? "Classer" : "Classify")}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Fee Breakdown — commission/payout are computed on final_amount
                     when it exists. Show quote AND final separately when they
                     differ, so the lines always reconcile with the base used. */}

@@ -125,11 +125,16 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
   // ── Service info ──────────────────────────────────────────────────────────
   const [categoryName, setCategoryName] = useState<string>("");
+  // Free-request mode (T-28): the hero routes natural-language requests to
+  // /booking/demande — no service chosen; the admin classifies afterwards.
+  const isFreeRequest = serviceId === "demande";
+
   const [subName, setSubName] = useState<string>(serviceName ?? "");
   // Indicative pricing of the matched category (display only, from the API)
   const [pricing, setPricing] = useState<CategoryPricing | null>(null);
 
   useEffect(() => {
+    if (isFreeRequest) return; // nothing to resolve — no service yet
     fetch(`${FLASK_API}/api/services/categories`)
       .then((r) => r.json())
       .then((cats: ApiCategory[]) => {
@@ -194,7 +199,9 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   const [waitlistSuccess, setWaitlistSuccess]     = useState(false);
 
   // ── AI intake ─────────────────────────────────────────────────────────────
-  const [aiInput, setAiInput]         = useState("");
+  // Seeded from ?desc= — the text typed in the hero bar arrives here as the
+  // initial description of the request (concierge entry, T-21).
+  const [aiInput, setAiInput]         = useState(() => searchParams?.get("desc") ?? "");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [dateHint, setDateHint]       = useState<string | null>(null);
 
@@ -285,7 +292,9 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           appointment_date: appointmentIso,
           locale,   // capture the client's active UI language for all downstream messaging
           notes:            [providerNote, notes.trim()].filter(Boolean).join('\n') || undefined,
-          service_name:     serviceName ?? "",
+          // Canonical label for free requests (locale-independent: the admin
+          // classifies it into a real service before assignment, T-28).
+          service_name:     isFreeRequest ? "Demande libre" : (serviceName ?? ""),
           urgency,
           time_preference:  timePref,
           ...(isNumericId ? { service_id: serviceIdNum } : { service_slug: serviceId }),
@@ -443,8 +452,16 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   const step1 = (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">{isFr ? "Service confirmé" : "Service confirmed"}</h2>
-        <p className="text-gray-500 text-sm mt-1">{isFr ? "Voici le service que vous souhaitez réserver." : "Here is the service you want to book."}</p>
+        <h2 className="text-xl font-bold text-gray-900">
+          {isFreeRequest
+            ? (isFr ? "Votre demande" : "Your request")
+            : (isFr ? "Service confirmé" : "Service confirmed")}
+        </h2>
+        <p className="text-gray-500 text-sm mt-1">
+          {isFreeRequest
+            ? (isFr ? "Décrivez votre besoin — on vous envoie le bon professionnel." : "Tell us what you need — we send you the right professional.")
+            : (isFr ? "Voici le service que vous souhaitez réserver." : "Here is the service you want to book.")}
+        </p>
       </div>
 
       {isRebook && (
@@ -459,10 +476,18 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
       )}
 
       <div className="rounded-xl border border-[#0F3A7A]/10 bg-[#0F3A7A]/5 p-4">
-        {categoryName && (
+        {!isFreeRequest && categoryName && (
           <p className="text-xs font-semibold text-[#0F3A7A]/60 uppercase tracking-wide mb-1">{categoryName}</p>
         )}
-        <p className="text-lg font-bold text-[#0F3A7A]">{subName || serviceName || (isFr ? "Service à domicile" : "Home service")}</p>
+        {isFreeRequest ? (
+          aiInput.trim() ? (
+            <p className="text-base font-medium text-[#0F3A7A] italic">« {aiInput.trim()} »</p>
+          ) : (
+            <p className="text-lg font-bold text-[#0F3A7A]">{isFr ? "Demande libre" : "Custom request"}</p>
+          )
+        ) : (
+          <p className="text-lg font-bold text-[#0F3A7A]">{subName || serviceName || (isFr ? "Service à domicile" : "Home service")}</p>
+        )}
         <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
           <MapPin className="h-3.5 w-3.5 shrink-0" />
           {isFr ? "Intervention à domicile · Abidjan" : "Home service · Abidjan"}
@@ -822,7 +847,8 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
       </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white divide-y divide-gray-100 px-4">
-        <RecapRow label={isFr ? "Service"    : "Service"}    value={subName || serviceName || ""} />
+        <RecapRow label={isFr ? "Service"    : "Service"}
+                  value={isFreeRequest ? (isFr ? "Demande libre" : "Custom request") : (subName || serviceName || "")} />
         {categoryName && <RecapRow label={isFr ? "Catégorie" : "Category"} value={categoryName} />}
         <RecapRow label={isFr ? "Urgence"    : "Urgency"}    value={urgencyLabel} />
         <RecapRow label={isFr ? "Horaire"    : "Time slot"}  value={timeLabel} />
