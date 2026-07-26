@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 const FLASK_API = process.env.NEXT_PUBLIC_FLASK_API_URL ?? "https://shizu-verse.onrender.com";
-const BLUE = "#0F3A7A";
+const BLUE = "#0D2B6B";
 
 interface Quote {
   service_name: string;
@@ -73,7 +73,7 @@ const METHOD_LABELS: Record<string, string> = {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mt-6 w-full rounded-2xl border border-gray-200 bg-white p-5 text-left">
+    <div className="mt-6 w-full rounded-2xl border border-[#B5D4F4] bg-white p-5 text-left">
       <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: BLUE }}>{title}</p>
       {children}
     </div>
@@ -92,7 +92,7 @@ function CopyRow({ label, value, isFr }: { label: string; value: string; isFr: b
     }
   };
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-[#B5D4F4] bg-white px-4 py-3">
       <div className="min-w-0">
         <p className="text-xs text-gray-400">{label}</p>
         <p className="text-base font-semibold text-gray-900 tabular-nums truncate">{value}</p>
@@ -100,7 +100,7 @@ function CopyRow({ label, value, isFr }: { label: string; value: string; isFr: b
       <button
         onClick={copy}
         aria-label={isFr ? `Copier le numéro ${label}` : `Copy ${label} number`}
-        className="shrink-0 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors"
+        className="shrink-0 min-h-[44px] inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors"
         style={copied ? { backgroundColor: "#16a34a", color: "#fff" } : { backgroundColor: `${BLUE}0D`, color: BLUE }}>
         {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
         {copied ? (isFr ? "Copié" : "Copied") : (isFr ? "Copier" : "Copy")}
@@ -274,7 +274,7 @@ export default function QuotePage() {
 
   // ── Shells ────────────────────────────────────────────────────────────────
   const Shell = ({ children }: { children: React.ReactNode }) => (
-    <main className="min-h-[100dvh] bg-gray-50 px-4 py-8 flex flex-col">
+    <main className="min-h-[100dvh] bg-[#EDF4FC] px-4 py-8 flex flex-col">
       <div className="w-full max-w-md mx-auto flex-1 flex flex-col">{children}</div>
     </main>
   );
@@ -314,10 +314,10 @@ export default function QuotePage() {
     return (
       <Shell>
         <div className="flex-1 flex flex-col items-center justify-center text-center">
-          <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+          <div className="w-14 h-14 rounded-full bg-[#E8F0FB] flex items-center justify-center mb-4">
             <ShieldCheck className="h-7 w-7 text-gray-400" />
           </div>
-          <h1 className="text-xl font-bold text-gray-900">{title}</h1>
+          <h1 className="text-xl font-bold text-[#0D2B6B]">{title}</h1>
           <p className="text-gray-500 text-sm mt-2 leading-relaxed">{body}</p>
           {errKind === "already" && alreadyStatus === "accepted" && payInfo && (
             <PaymentInstructions info={payInfo} isFr={isFr} waUrl={waUrl} />
@@ -336,10 +336,10 @@ export default function QuotePage() {
     return (
       <Shell>
         <div className="flex-1 flex flex-col items-center justify-center text-center">
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-5 ${accepted ? "bg-green-50" : "bg-gray-100"}`}>
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-5 ${accepted ? "bg-green-50" : "bg-[#E8F0FB]"}`}>
             {accepted ? <CheckCircle className="h-8 w-8 text-green-500" /> : <XCircle className="h-8 w-8 text-gray-400" />}
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-[#0D2B6B]">
             {accepted ? (isFr ? "Devis accepté !" : "Quote accepted!") : (isFr ? "Devis refusé" : "Quote declined")}
           </h1>
           <p className="text-gray-500 text-sm mt-2 leading-relaxed">
@@ -353,13 +353,13 @@ export default function QuotePage() {
           )}
 
           {accepted && (
-            <div className="mt-6 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left flex items-start gap-2.5">
+            <div className="mt-6 w-full rounded-xl border border-[#B5D4F4] bg-white px-4 py-3 text-left flex items-start gap-2.5">
               <Sparkles className="h-4 w-4 shrink-0 mt-0.5" style={{ color: BLUE }} />
               <div>
                 <p className="text-sm font-medium text-gray-900">
                   {isFr ? "Créez un compte pour suivre vos réservations" : "Create an account to track your bookings"}
                 </p>
-                <a href={`/${locale}/auth/register`} className="text-sm font-semibold" style={{ color: BLUE }}>
+                <a href={`/${locale}/auth/register`} className="inline-flex items-center min-h-[44px] text-sm font-semibold text-[#185FA5]">
                   {isFr ? "Créer mon compte →" : "Create my account →"}
                 </a>
               </div>
@@ -391,17 +391,17 @@ export default function QuotePage() {
   if (declineMode) {
     return (
       <Shell>
-        <button onClick={() => setDeclineMode(false)} className="text-sm text-gray-400 mb-4 self-start">
+        <button onClick={() => setDeclineMode(false)} className="min-h-[44px] inline-flex items-center text-sm text-gray-400 mb-2 self-start">
           {isFr ? "← Retour" : "← Back"}
         </button>
-        <h1 className="text-xl font-bold text-gray-900">{isFr ? "Pourquoi refusez-vous ?" : "Why are you declining?"}</h1>
+        <h1 className="text-xl font-bold text-[#0D2B6B]">{isFr ? "Pourquoi refusez-vous ?" : "Why are you declining?"}</h1>
         <p className="text-gray-500 text-sm mt-1">{isFr ? "Votre retour nous aide à ajuster nos prix." : "Your feedback helps us adjust our pricing."}</p>
 
         <div className="mt-5 space-y-2">
           {REASONS.map((r) => (
             <button key={r.value} onClick={() => setReason(r.value)}
               className={`w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${
-                reason === r.value ? "border-transparent text-white" : "border-gray-200 bg-white text-gray-700"}`}
+                reason === r.value ? "border-transparent text-white" : "border-[#B5D4F4] bg-white text-gray-700"}`}
               style={reason === r.value ? { backgroundColor: BLUE } : undefined}>
               {isFr ? r.fr : r.en}
             </button>
@@ -413,7 +413,7 @@ export default function QuotePage() {
           onChange={(e) => setComment(e.target.value)}
           rows={3}
           placeholder={isFr ? "Commentaire (optionnel)" : "Comment (optional)"}
-          className="mt-4 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2"
+          className="mt-4 w-full rounded-xl border border-[#B5D4F4] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2"
         />
 
         <div className="mt-auto pt-6">
@@ -435,27 +435,27 @@ export default function QuotePage() {
   return (
     <Shell>
       <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{isFr ? "Votre devis Shizu" : "Your Shizu quote"}</p>
-      <h1 className="text-xl font-bold text-gray-900 mt-1">{quote.service_name}</h1>
+      <h1 className="text-xl font-bold text-[#0D2B6B] mt-1">{quote.service_name}</h1>
 
-      <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-5 text-center">
+      <div className="mt-5 rounded-2xl border border-[#B5D4F4] bg-white p-5 text-center">
         <p className="text-sm text-gray-500">{isFr ? "Montant" : "Amount"}</p>
         <p className="text-4xl font-extrabold mt-1" style={{ color: BLUE }}>{fmtMoney(quote.amount_xof)}</p>
       </div>
 
       {tl && (
-        <div className="mt-3 rounded-xl bg-[#0F3A7A]/5 border border-[#0F3A7A]/15 px-4 py-3">
+        <div className="mt-3 rounded-xl bg-[#E8F0FB] border border-[#B5D4F4] px-4 py-3">
           <p className="text-xs font-semibold" style={{ color: BLUE }}>{isFr ? "Modalité de paiement" : "Payment terms"}</p>
           <p className="text-sm text-gray-700 mt-0.5">{tl}</p>
         </div>
       )}
 
       {quote.quote_note && (
-        <div className="mt-3 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
+        <div className="mt-3 rounded-xl bg-[#E8F0FB] border border-[#B5D4F4] px-4 py-3">
           <p className="text-sm text-gray-600 leading-relaxed">{quote.quote_note}</p>
         </div>
       )}
 
-      <div className="mt-4 rounded-xl border border-gray-200 bg-white divide-y divide-gray-100 px-4">
+      <div className="mt-4 rounded-xl border border-[#B5D4F4] bg-white divide-y divide-[#B5D4F4]/60 px-4">
         <div className="flex items-center gap-2 py-2.5 text-sm text-gray-700">
           <Calendar className="h-4 w-4 text-gray-400 shrink-0" />
           {fmtDate(quote.appointment_date, isFr)}{quote.time_slot ? ` · ${timeSlotLabel(quote.time_slot, isFr)}` : ""}
@@ -480,7 +480,7 @@ export default function QuotePage() {
         <button
           disabled={submitting}
           onClick={() => setDeclineMode(true)}
-          className="w-full inline-flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 text-sm font-semibold py-3 rounded-xl disabled:opacity-50">
+          className="w-full inline-flex items-center justify-center gap-2 bg-white border border-[#B5D4F4] text-[#185FA5] text-sm font-semibold py-3 rounded-xl disabled:opacity-50">
           {isFr ? "Refuser" : "Decline"}
         </button>
         <p className="flex items-center justify-center gap-1.5 text-xs text-gray-400 pt-1">

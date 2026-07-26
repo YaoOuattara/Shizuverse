@@ -84,23 +84,23 @@ function ProgressBar({ step, isFr }: { step: number; isFr: boolean }) {
             <div className="relative flex items-center w-full justify-center">
               {i > 0 && (
                 <div className={`absolute right-1/2 top-1/2 -translate-y-1/2 h-0.5 w-full
-                  ${done || current ? "bg-green-400" : "bg-gray-200"}`}
+                  ${done || current ? "bg-green-400" : "bg-[#B5D4F4]"}`}
                 />
               )}
               {i < labels.length - 1 && (
                 <div className={`absolute left-1/2 top-1/2 -translate-y-1/2 h-0.5 w-full
-                  ${done ? "bg-green-400" : "bg-gray-200"}`}
+                  ${done ? "bg-green-400" : "bg-[#B5D4F4]"}`}
                 />
               )}
               <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors
                 ${done    ? "bg-green-500 text-white"
-                : current ? "bg-[#0F3A7A] text-white"
-                          : "bg-gray-200 text-gray-400"}`}
+                : current ? "bg-[#0D2B6B] text-white"
+                          : "bg-[#E8F0FB] text-[#185FA5]"}`}
               >
                 {done ? <CheckCircle className="h-4 w-4" /> : n}
               </div>
             </div>
-            <span className={`text-xs hidden sm:block ${current ? "text-[#0F3A7A] font-medium" : "text-gray-400"}`}>
+            <span className={`text-xs hidden sm:block ${current ? "text-[#0D2B6B] font-medium" : "text-gray-400"}`}>
               {label}
             </span>
           </div>
@@ -113,8 +113,8 @@ function ProgressBar({ step, isFr }: { step: number; isFr: boolean }) {
 // ── Input class ───────────────────────────────────────────────────────────────
 
 const inputCls =
-  "flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm " +
-  "focus:outline-none focus:ring-2 focus:ring-[#0F3A7A]/30 focus:border-[#0F3A7A]";
+  "flex h-11 w-full rounded-md border border-[#B5D4F4] bg-white px-3 py-2 text-sm " +
+  "focus:outline-none focus:ring-2 focus:ring-[#0D2B6B]/30 focus:border-[#0D2B6B]";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main component
@@ -341,29 +341,30 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
     const waUrl = `https://wa.me/${waNumber}?text=${waText}`;
 
     return (
-      <main className="max-w-md mx-auto px-4 py-12">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+      <main className="min-h-screen bg-[#EDF4FC] px-4 py-12">
+        <div className="max-w-md mx-auto">
+        <div className="bg-white rounded-2xl border border-[#B5D4F4] shadow-sm p-8 text-center">
           <div className="flex justify-center mb-5">
             <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
               <CheckCircle className="h-8 w-8 text-green-500" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">{isFr ? "Demande envoyée !" : "Request sent!"}</h1>
+          <h1 className="text-2xl font-bold text-[#0D2B6B]">{isFr ? "Demande envoyée !" : "Request sent!"}</h1>
           <p className="text-gray-500 mt-2 text-sm leading-relaxed">
             {isFr
               ? "Votre demande a bien été transmise. Un prestataire va vous contacter très prochainement."
               : "Your request has been submitted. A provider will contact you very soon."}
           </p>
-          <div className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gray-50 border border-gray-200 px-4 py-2.5">
-            <CalendarCheck className="h-4 w-4 text-[#0F3A7A] shrink-0" />
-            <span className="font-mono font-semibold text-[#0F3A7A] text-sm tracking-wide">{ref}</span>
+          <div className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#E8F0FB] border border-[#B5D4F4] px-4 py-2.5">
+            <CalendarCheck className="h-4 w-4 text-[#0D2B6B] shrink-0" />
+            <span className="font-mono font-semibold text-[#0D2B6B] text-sm tracking-wide">{ref}</span>
           </div>
 
           {/* Next-step note — sets expectation on the WhatsApp quote */}
-          <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-[#0F3A7A]/5 border border-[#0F3A7A]/15 px-4 py-3 text-left">
-            <MessageCircle className="h-4 w-4 text-[#0F3A7A] shrink-0 mt-0.5" />
+          <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-[#0D2B6B]/5 border border-[#0D2B6B]/15 px-4 py-3 text-left">
+            <MessageCircle className="h-4 w-4 text-[#0D2B6B] shrink-0 mt-0.5" />
             <p className="text-xs text-gray-600 leading-relaxed">
-              <span className="font-semibold text-[#0F3A7A]">{isFr ? "Prochaine étape : " : "Next step: "}</span>
+              <span className="font-semibold text-[#0D2B6B]">{isFr ? "Prochaine étape : " : "Next step: "}</span>
               {isFr
                 ? "notre équipe vous envoie un devis précis sur WhatsApp sous 2h (8h–20h). Vous confirmez, et nous assignons un prestataire vérifié."
                 : "our team sends you an accurate quote on WhatsApp within 2h (8am–8pm). You confirm, and we assign a verified provider."}
@@ -372,7 +373,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
           <div className="flex flex-col gap-3 mt-6">
             <a href={`/${locale}/bookings`}
-              className="w-full inline-flex items-center justify-center gap-2 bg-[#0F3A7A] text-white text-sm font-semibold py-3 rounded-xl hover:bg-[#0d3068] transition-colors">
+              className="w-full inline-flex items-center justify-center gap-2 bg-[#0D2B6B] text-white text-sm font-semibold py-3 rounded-xl hover:bg-[#0a2158] transition-colors">
               <CalendarCheck className="h-4 w-4" />
               {isFr ? "Suivre ma demande" : "Track my request"}
             </a>
@@ -403,10 +404,10 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
             </button>
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                <UserPlus className="h-4 w-4 text-[#0F3A7A]" />
+                <UserPlus className="h-4 w-4 text-[#0D2B6B]" />
               </div>
               <div>
-                <p className="font-semibold text-[#0F3A7A] text-sm">
+                <p className="font-semibold text-[#0D2B6B] text-sm">
                   {isFr ? "Suivez vos réservations en temps réel" : "Track your bookings in real time"}
                 </p>
                 <p className="text-blue-700/70 text-xs mt-1 leading-relaxed">
@@ -416,7 +417,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2 mt-3">
                   <a href={`/${locale}/auth/register`}
-                    className="bg-[#0F3A7A] text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-[#0d3068] transition-colors text-center">
+                    className="min-h-[44px] inline-flex items-center justify-center bg-[#0D2B6B] text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-[#0a2158] transition-colors text-center">
                     {isFr ? "Créer mon compte" : "Create my account"}
                   </a>
                   <button onClick={() => setShowNudge(false)}
@@ -428,6 +429,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
             </div>
           </div>
         )}
+        </div>
       </main>
     );
   }
@@ -444,14 +446,14 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   // ── Chip helper ───────────────────────────────────────────────────────────
   const chip = (val: string, active: boolean, onClick: () => void, label: string, urgent = false) => (
     <button key={val} type="button" onClick={onClick}
-      className={`px-4 py-2 rounded-full border-2 text-sm font-medium transition-all
+      className={`min-h-[44px] px-4 py-2 rounded-full border-2 text-sm font-medium transition-all
         ${active
           ? urgent
             ? "border-red-500 bg-red-500 text-white"
             : "border-green-600 bg-green-600 text-white"
           : urgent
             ? "border-orange-400 bg-white text-orange-600 hover:border-orange-500"
-            : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
+            : "border-[#B5D4F4] bg-white text-[#185FA5] hover:border-[#185FA5]/40"}`}>
       {label}
     </button>
   );
@@ -462,7 +464,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   const step1 = (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">
+        <h2 className="text-xl font-bold text-[#0D2B6B]">
           {isFreeRequest
             ? (isFr ? "Votre demande" : "Your request")
             : (isFr ? "Service confirmé" : "Service confirmed")}
@@ -488,18 +490,18 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
         </div>
       )}
 
-      <div className="rounded-xl border border-[#0F3A7A]/10 bg-[#0F3A7A]/5 p-4">
+      <div className="rounded-xl border border-[#0D2B6B]/10 bg-[#0D2B6B]/5 p-4">
         {!isFreeRequest && categoryName && (
-          <p className="text-xs font-semibold text-[#0F3A7A]/60 uppercase tracking-wide mb-1">{categoryName}</p>
+          <p className="text-xs font-semibold text-[#0D2B6B]/60 uppercase tracking-wide mb-1">{categoryName}</p>
         )}
         {isFreeRequest ? (
           aiInput.trim() ? (
-            <p className="text-base font-medium text-[#0F3A7A] italic">« {aiInput.trim()} »</p>
+            <p className="text-base font-medium text-[#0D2B6B] italic">« {aiInput.trim()} »</p>
           ) : (
-            <p className="text-lg font-bold text-[#0F3A7A]">{isFr ? "Demande libre" : "Custom request"}</p>
+            <p className="text-lg font-bold text-[#0D2B6B]">{isFr ? "Demande libre" : "Custom request"}</p>
           )
         ) : (
-          <p className="text-lg font-bold text-[#0F3A7A]">{subName || serviceName || (isFr ? "Service à domicile" : "Home service")}</p>
+          <p className="text-lg font-bold text-[#0D2B6B]">{subName || serviceName || (isFr ? "Service à domicile" : "Home service")}</p>
         )}
         <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
           <MapPin className="h-3.5 w-3.5 shrink-0" />
@@ -533,7 +535,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   const step2 = (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">{isFr ? "Décrire votre besoin" : "Describe your need"}</h2>
+        <h2 className="text-xl font-bold text-[#0D2B6B]">{isFr ? "Décrire votre besoin" : "Describe your need"}</h2>
         <p className="text-gray-500 text-sm mt-1">{isFr ? "Aidez-nous à trouver le bon prestataire." : "Help us find the right provider."}</p>
       </div>
 
@@ -545,7 +547,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
         </div>
       </div>
 
-      <div className="border-t border-gray-100" />
+      <div className="border-t border-[#B5D4F4]" />
 
       {/* Time slot */}
       <div>
@@ -563,7 +565,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
           placeholder={isFr ? "Décrivez votre besoin, accès, contraintes..." : "Describe your need, access, constraints..."}
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#0F3A7A]/30 focus:border-[#0F3A7A]"
+          className="w-full rounded-md border border-[#B5D4F4] bg-white px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#0D2B6B]/30 focus:border-[#0D2B6B]"
         />
       </div>
 
@@ -581,7 +583,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
             className="flex-1 border border-purple-200 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
           />
           <button type="button" onClick={handleAnalyze} disabled={!aiInput.trim() || isAnalyzing}
-            className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors">
+            className="min-h-[44px] px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors">
             {isAnalyzing && <Loader2 className="h-4 w-4 animate-spin" />}
             {isFr ? "Analyser" : "Analyze"}
           </button>
@@ -595,7 +597,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
       <div className="flex gap-3">
         <button type="button" onClick={() => setStep(1)}
-          className="flex-1 border border-gray-200 text-gray-600 font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors">
+          className="flex-1 border border-[#B5D4F4] text-[#185FA5] font-medium py-3 rounded-xl hover:bg-[#E8F0FB] transition-colors">
           {isFr ? "Retour" : "Back"}
         </button>
         <button type="button" onClick={() => setStep(3)} disabled={!step2CanContinue}
@@ -612,7 +614,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   const step3 = (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">{isFr ? "Choisissez une date" : "Choose a date"}</h2>
+        <h2 className="text-xl font-bold text-[#0D2B6B]">{isFr ? "Choisissez une date" : "Choose a date"}</h2>
         <p className="text-gray-500 text-sm mt-1">{isFr ? "Sélectionnez votre date préférée." : "Select your preferred date."}</p>
       </div>
 
@@ -633,18 +635,18 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
       ) : (
         <>
           {/* Calendar */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="rounded-2xl border border-[#B5D4F4] bg-white p-4">
             <div className="flex items-center justify-between mb-4">
               <button type="button" onClick={() => setCalDate(new Date(calYear, calMonth - 1, 1))}
                 disabled={!canGoPrev}
-                className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-[#E8F0FB] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
                 <ChevronLeft className="h-5 w-5 text-gray-600" />
               </button>
-              <span className="font-semibold text-gray-900 text-sm">
+              <span className="font-semibold text-[#0D2B6B] text-sm">
                 {(isFr ? MONTHS_FR : MONTHS_EN)[calMonth]} {calYear}
               </span>
               <button type="button" onClick={() => setCalDate(new Date(calYear, calMonth + 1, 1))}
-                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-[#E8F0FB] transition-colors">
                 <ChevronRight className="h-5 w-5 text-gray-600" />
               </button>
             </div>
@@ -665,11 +667,11 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
                 return (
                   <button key={ds} type="button" disabled={isPast}
                     onClick={() => setDate(ds)}
-                    className={`mx-auto w-9 h-9 rounded-full text-sm font-medium transition-all
+                    className={`mx-auto w-10 h-10 rounded-full text-sm font-medium transition-all
                       ${isPast  ? "text-gray-300 cursor-not-allowed"
-                      : isSel   ? "bg-[#0F3A7A] text-white"
-                      : isToday ? "border-2 border-[#0F3A7A] text-[#0F3A7A]"
-                                  : "hover:bg-gray-100 text-gray-700"}`}>
+                      : isSel   ? "bg-[#0D2B6B] text-white"
+                      : isToday ? "border-2 border-[#0D2B6B] text-[#0D2B6B]"
+                                  : "hover:bg-[#E8F0FB] text-gray-700"}`}>
                     {day}
                   </button>
                 );
@@ -695,7 +697,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
       <div className="flex gap-3">
         <button type="button" onClick={() => setStep(2)}
-          className="flex-1 border border-gray-200 text-gray-600 font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors">
+          className="flex-1 border border-[#B5D4F4] text-[#185FA5] font-medium py-3 rounded-xl hover:bg-[#E8F0FB] transition-colors">
           {isFr ? "Retour" : "Back"}
         </button>
         <button type="button" onClick={() => setStep(4)} disabled={!isUrgent && !date}
@@ -712,7 +714,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   const step4 = (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">{isFr ? "Vos informations" : "Your information"}</h2>
+        <h2 className="text-xl font-bold text-[#0D2B6B]">{isFr ? "Vos informations" : "Your information"}</h2>
         <p className="text-gray-500 text-sm mt-1">{isFr ? "Pour que le prestataire puisse vous contacter." : "So the provider can reach you."}</p>
       </div>
 
@@ -733,8 +735,8 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           locale={locale}
           placeholder="07 XX XX XX XX"
           required
-          selectClassName="rounded-l-md border-gray-300 bg-gray-50 text-gray-500 focus:ring-[#0F3A7A]/30"
-          inputClassName="rounded-none rounded-r-md border-gray-300 bg-white py-2 focus:ring-[#0F3A7A]/30 focus:border-[#0F3A7A]"
+          selectClassName="rounded-l-md border-[#B5D4F4] bg-[#E8F0FB] text-gray-500 focus:ring-[#0D2B6B]/30"
+          inputClassName="rounded-none rounded-r-md border-[#B5D4F4] bg-white py-2 focus:ring-[#0D2B6B]/30 focus:border-[#0D2B6B]"
         />
       </div>
 
@@ -745,10 +747,10 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           {LAUNCH_ZONES.map((zone) => (
             <button key={zone} type="button"
               onClick={() => setCommune(zone)}
-              className={`px-4 py-2 rounded-full border-2 text-sm font-medium transition-all
+              className={`min-h-[44px] px-4 py-2 rounded-full border-2 text-sm font-medium transition-all
                 ${commune === zone
                   ? "border-green-600 bg-green-600 text-white"
-                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
+                  : "border-[#B5D4F4] bg-white text-[#185FA5] hover:border-[#185FA5]/40"}`}>
               {zone}
             </button>
           ))}
@@ -765,7 +767,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
         {/* Inline waitlist form */}
         {waitlistOpen && !waitlistSuccess && (
-          <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+          <div className="mt-3 rounded-xl border border-[#B5D4F4] bg-[#E8F0FB] p-4 space-y-3">
             <p className="text-xs font-semibold text-gray-700">
               {isFr ? "Rejoindre la liste d'attente" : "Join the waitlist"}
             </p>
@@ -777,12 +779,12 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
               defaultValue={waitlistPhone}
               onChange={setWaitlistPhone}
               placeholder="07 XX XX XX XX"
-              selectClassName="rounded-l-md border-gray-300 bg-gray-50 text-gray-500 focus:ring-[#0F3A7A]/30"
-              inputClassName="rounded-none rounded-r-md border-gray-300 bg-white py-2 focus:ring-[#0F3A7A]/30 focus:border-[#0F3A7A]"
+              selectClassName="rounded-l-md border-[#B5D4F4] bg-[#E8F0FB] text-gray-500 focus:ring-[#0D2B6B]/30"
+              inputClassName="rounded-none rounded-r-md border-[#B5D4F4] bg-white py-2 focus:ring-[#0D2B6B]/30 focus:border-[#0D2B6B]"
             />
             <button type="button" onClick={handleWaitlistSubmit}
               disabled={!waitlistCommune.trim() || !waitlistPhone.trim() || waitlistSubmitting}
-              className="w-full bg-green-600 text-white text-sm font-semibold py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5">
+              className="min-h-[44px] w-full bg-green-600 text-white text-sm font-semibold py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5">
               {waitlistSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {isFr ? "Me prévenir" : "Notify me"}
             </button>
@@ -810,7 +812,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
       </div>
 
       {/* Security note */}
-      <div className="flex items-start gap-2 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
+      <div className="flex items-start gap-2 rounded-xl bg-[#E8F0FB] border border-[#B5D4F4] px-4 py-3">
         <ShieldCheck className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
         <p className="text-xs text-gray-500 leading-relaxed">
           {isFr
@@ -821,7 +823,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
       <div className="flex gap-3">
         <button type="button" onClick={() => setStep(3)}
-          className="flex-1 border border-gray-200 text-gray-600 font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors">
+          className="flex-1 border border-[#B5D4F4] text-[#185FA5] font-medium py-3 rounded-xl hover:bg-[#E8F0FB] transition-colors">
           {isFr ? "Retour" : "Back"}
         </button>
         <button type="button" onClick={() => setStep(5)} disabled={!step4CanContinue}
@@ -844,7 +846,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   const priceRange = formatPrice(pricing, isFr);
 
   const RecapRow = ({ label, value }: { label: string; value: string }) => (
-    <div className="flex justify-between items-start py-2.5 border-b border-gray-100 last:border-0">
+    <div className="flex justify-between items-start py-2.5 border-b border-[#B5D4F4] last:border-0">
       <span className="text-sm text-gray-500">{label}</span>
       <span className="text-sm font-medium text-gray-900 text-right max-w-[55%]">{value}</span>
     </div>
@@ -855,11 +857,11 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   const step5 = (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">{isFr ? "Récapitulatif" : "Summary"}</h2>
+        <h2 className="text-xl font-bold text-[#0D2B6B]">{isFr ? "Récapitulatif" : "Summary"}</h2>
         <p className="text-gray-500 text-sm mt-1">{isFr ? "Vérifiez les détails avant de confirmer." : "Review your details before confirming."}</p>
       </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white divide-y divide-gray-100 px-4">
+      <div className="rounded-2xl border border-[#B5D4F4] bg-white divide-y divide-[#B5D4F4]/60 px-4">
         <RecapRow label={isFr ? "Service"    : "Service"}
                   value={isFreeRequest ? (isFr ? "Demande libre" : "Custom request") : (subName || serviceName || "")} />
         {categoryName && <RecapRow label={isFr ? "Catégorie" : "Category"} value={categoryName} />}
@@ -873,14 +875,14 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
         {notes   && <RecapRow label={isFr ? "Précisions" : "Notes"} value={notes} />}
       </div>
 
-      <div className="rounded-xl bg-[#0F3A7A]/5 border border-[#0F3A7A]/15 px-4 py-3 flex items-center justify-between">
-        <span className="text-sm text-[#0F3A7A]/80 font-medium">{isFr ? "Fourchette indicative" : "Indicative range"}</span>
-        <span className="text-sm font-bold text-[#0F3A7A]">{priceRange}</span>
+      <div className="rounded-xl bg-[#0D2B6B]/5 border border-[#0D2B6B]/15 px-4 py-3 flex items-center justify-between">
+        <span className="text-sm text-[#0D2B6B]/80 font-medium">{isFr ? "Fourchette indicative" : "Indicative range"}</span>
+        <span className="text-sm font-bold text-[#0D2B6B]">{priceRange}</span>
       </div>
 
       {/* Price-expectation note — adapted to the category pricing mode */}
-      <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
-        <MessageCircle className="h-4 w-4 text-[#0F3A7A] shrink-0 mt-0.5" />
+      <div className="flex items-start gap-2.5 rounded-xl bg-[#E8F0FB] border border-[#B5D4F4] px-4 py-3">
+        <MessageCircle className="h-4 w-4 text-[#0D2B6B] shrink-0 mt-0.5" />
         <p className="text-xs text-gray-600 leading-relaxed">
           {pricing?.is_quote_based
             ? (isFr
@@ -901,7 +903,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
       <div className="flex gap-3">
         <button type="button" onClick={() => setStep(4)}
-          className="flex-1 border border-gray-200 text-gray-600 font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors">
+          className="flex-1 border border-[#B5D4F4] text-[#185FA5] font-medium py-3 rounded-xl hover:bg-[#E8F0FB] transition-colors">
           {isFr ? "Retour" : "Back"}
         </button>
         <button type="button" onClick={handleSubmit} disabled={isSubmitting}
@@ -917,13 +919,15 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <main className="max-w-lg mx-auto px-4 py-8">
-      <ProgressBar step={step} isFr={isFr} />
-      {step === 1 && step1}
-      {step === 2 && step2}
-      {step === 3 && step3}
-      {step === 4 && step4}
-      {step === 5 && step5}
+    <main className="min-h-screen bg-[#EDF4FC] px-4 py-8">
+      <div className="max-w-lg mx-auto bg-white rounded-2xl border border-[#B5D4F4] shadow-sm p-5 sm:p-6">
+        <ProgressBar step={step} isFr={isFr} />
+        {step === 1 && step1}
+        {step === 2 && step2}
+        {step === 3 && step3}
+        {step === 4 && step4}
+        {step === 5 && step5}
+      </div>
     </main>
   );
 }
