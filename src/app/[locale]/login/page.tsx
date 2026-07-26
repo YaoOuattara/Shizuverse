@@ -52,8 +52,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm">
+    <div className="min-h-screen bg-[#EDF4FC] flex items-center justify-center px-4 py-12">
+      <div className="bg-white rounded-2xl shadow-sm border border-[#B5D4F4] p-8 w-full max-w-sm">
 
         <img
           src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1779646648/shizu_logo_horizontal_dark_khesrn.png"
@@ -61,7 +61,7 @@ export default function LoginPage() {
           style={{ height: '48px', width: 'auto', objectFit: 'contain', margin: '0 auto 24px', display: 'block' }}
         />
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">
+        <h1 className="text-2xl font-bold text-[#0D2B6B] mb-1">
           {isFr ? "Bon retour !" : "Welcome back!"}
         </h1>
         <p className="text-sm text-gray-400 mb-8">
@@ -79,8 +79,8 @@ export default function LoginPage() {
               onChange={setPhone}
               autoFocus
               required
-              selectClassName="rounded-l-xl border-gray-200 bg-gray-50 text-gray-500"
-              inputClassName="rounded-r-xl border-gray-200 py-3 focus:ring-green-500"
+              selectClassName="rounded-l-xl border-[#B5D4F4] bg-[#E8F0FB] text-gray-500"
+              inputClassName="rounded-r-xl border-[#B5D4F4] py-3 focus:ring-green-500"
             />
           </div>
 
@@ -96,12 +96,12 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 placeholder:text-gray-300"
+                className="w-full rounded-xl border border-[#B5D4F4] px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 placeholder:text-gray-300"
               />
               <button
                 type="button"
                 onClick={() => setShowPw(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600"
               >
                 {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>

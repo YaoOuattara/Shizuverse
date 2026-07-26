@@ -279,12 +279,12 @@ export default function BookingsPage() {
 
   if (phase === "lookup") {
     return (
-      <div className="min-h-screen bg-background">
-        <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+      <div className="min-h-screen bg-[#EDF4FC]">
+        <header className="sticky top-0 z-50 border-b border-[#0D2B6B] bg-[#0D2B6B]">
           <div className="mx-auto max-w-2xl px-4 py-4">
             <button
               onClick={() => showGuestForm ? setShowGuestForm(false) : router.push(`/${locale}`)}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors -ml-1"
+              className="flex items-center gap-1.5 min-h-[44px] text-sm text-white/80 hover:text-white transition-colors -ml-1"
             >
               <ArrowLeft className="h-4 w-4" />
               {showGuestForm
@@ -297,10 +297,10 @@ export default function BookingsPage() {
         <main className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4 py-12">
           <div className="w-full max-w-sm">
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0F3A7A]/10 mb-4">
-                <CalendarDays className="h-7 w-7 text-[#0F3A7A]" />
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0D2B6B]/10 mb-4">
+                <CalendarDays className="h-7 w-7 text-[#0D2B6B]" />
               </div>
-              <h1 className="text-2xl font-bold text-foreground">
+              <h1 className="text-2xl font-bold text-[#0D2B6B]">
                 {isFr ? "Mes réservations" : "My Bookings"}
               </h1>
             </div>
@@ -324,7 +324,7 @@ export default function BookingsPage() {
                   {isFr ? "Première réservation ?" : "First booking?"}{" "}
                   <button
                     onClick={() => setShowGuestForm(true)}
-                    className="text-[#0F3A7A] font-medium hover:underline"
+                    className="text-[#0D2B6B] font-medium hover:underline"
                   >
                     {isFr ? "Suivre sans compte →" : "Track without account →"}
                   </button>
@@ -357,7 +357,7 @@ export default function BookingsPage() {
                     placeholder="#SHZ-2026-XXXX"
                     required
                     autoComplete="off"
-                    className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground placeholder:font-sans"
+                    className="w-full rounded-xl border border-[#B5D4F4] bg-white px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground placeholder:font-sans"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     {isFr
@@ -388,7 +388,7 @@ export default function BookingsPage() {
   if (phase === "loading") {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-[#0F3A7A]" />
+        <Loader2 className="h-8 w-8 animate-spin text-[#0D2B6B]" />
         <p className="text-sm text-muted-foreground">
           {isFr ? "Chargement de vos réservations…" : "Loading your bookings…"}
         </p>
@@ -401,30 +401,30 @@ export default function BookingsPage() {
   const displayPhone = activePhone ?? "";
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+    <div className="min-h-screen bg-[#EDF4FC]">
+      <header className="sticky top-0 z-50 border-b border-[#0D2B6B] bg-[#0D2B6B]">
         <div className="mx-auto max-w-2xl px-4 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <CalendarDays className="h-5 w-5 text-[#0F3A7A]" />
-            <h1 className="text-base font-semibold text-foreground">
+            <CalendarDays className="h-5 w-5 text-white" />
+            <h1 className="text-base font-semibold text-white">
               {isFr ? "Mes réservations" : "My Bookings"}
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground hidden sm:inline">{displayPhone}</span>
+            <span className="text-xs text-white/60 hidden sm:inline">{displayPhone}</span>
             <button
               onClick={() => {
                 const savedRef = localStorage.getItem(REF_KEY) ?? "";
                 doFetch(displayPhone, savedRef);
               }}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-white/80 hover:text-white transition-colors"
               aria-label={isFr ? "Rafraîchir" : "Refresh"}
             >
               <RefreshCw className="h-4 w-4" />
             </button>
             <button
               onClick={handleReset}
-              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+              className="min-h-[44px] text-xs text-white/80 hover:text-white underline underline-offset-2 transition-colors"
             >
               {isFr ? "Changer de numéro" : "Change number"}
             </button>
@@ -436,7 +436,7 @@ export default function BookingsPage() {
         {bookings.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <CalendarDays className="mb-4 h-12 w-12 text-muted-foreground/40" />
-            <h2 className="text-base font-semibold text-foreground">
+            <h2 className="text-base font-semibold text-[#0D2B6B]">
               {isFr ? "Aucune réservation trouvée" : "No bookings found"}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground max-w-xs">
@@ -447,13 +447,13 @@ export default function BookingsPage() {
             <div className="flex flex-col sm:flex-row gap-3 mt-6">
               <button
                 onClick={handleReset}
-                className="text-sm border border-input px-4 py-2 rounded-xl hover:bg-muted transition-colors"
+                className="min-h-[44px] text-sm border border-[#B5D4F4] px-4 py-2 rounded-xl hover:bg-[#E8F0FB] transition-colors"
               >
                 {isFr ? "Réessayer" : "Try again"}
               </button>
               <button
                 onClick={() => router.push(`/${locale}/services`)}
-                className="text-sm bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors"
+                className="min-h-[44px] text-sm bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors"
               >
                 {isFr ? "Réserver un service" : "Book a service"}
               </button>
@@ -483,7 +483,7 @@ export default function BookingsPage() {
               );
 
               return (
-                <div key={b.id} className="rounded-2xl border border-border bg-card p-5 space-y-3">
+                <div key={b.id} className="rounded-2xl border border-[#B5D4F4] bg-white p-5 space-y-3">
                   {/* Top row: ref + status */}
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -519,7 +519,7 @@ export default function BookingsPage() {
 
                   {/* Expanded details */}
                   {isExpanded && (
-                    <div className="rounded-xl bg-muted/40 px-3 py-3 space-y-2 text-sm">
+                    <div className="rounded-xl bg-[#E8F0FB] px-3 py-3 space-y-2 text-sm">
                       {b.provider_name && (
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-muted-foreground">{isFr ? "Prestataire" : "Provider"}</span>
@@ -555,7 +555,7 @@ export default function BookingsPage() {
                     {/* Voir détails toggle */}
                     <button
                       onClick={() => setExpandedId(isExpanded ? null : b.id)}
-                      className="flex items-center gap-1.5 border border-input text-muted-foreground hover:text-foreground hover:border-gray-300 text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
+                      className="flex items-center gap-1.5 min-h-[44px] border border-[#B5D4F4] text-muted-foreground hover:text-foreground hover:border-[#185FA5]/40 text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
                     >
                       {isExpanded ? (isFr ? "Réduire" : "Collapse") : (isFr ? "Voir détails" : "View details")}
                     </button>
@@ -566,7 +566,7 @@ export default function BookingsPage() {
                         href={shizuWaHref(b.id, status.label)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 bg-[#25D366] hover:bg-[#1ebe5c] text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
+                        className="flex items-center gap-1.5 min-h-[44px] bg-[#25D366] hover:bg-[#1ebe5c] text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
                       >
                         <MessageCircle className="h-3.5 w-3.5" />
                         💬 {isFr ? "Contacter Shizu" : "Contact Shizu"}
@@ -579,7 +579,7 @@ export default function BookingsPage() {
                         href={`https://wa.me/${SHIZU_WA}?text=${waModifyMsg}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 border border-gray-200 text-gray-600 hover:bg-gray-50 text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
+                        className="flex items-center gap-1.5 min-h-[44px] border border-[#B5D4F4] text-gray-600 hover:bg-[#E8F0FB] text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
                       >
                         {isFr ? "Modifier" : "Edit"}
                       </a>
@@ -589,7 +589,7 @@ export default function BookingsPage() {
                     {isCompleted && (
                       <button
                         onClick={() => router.push(rebookHref(b, categories, locale))}
-                        className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
+                        className="flex items-center gap-1.5 min-h-[44px] bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
                       >
                         <Plus className="h-3.5 w-3.5" />
                         {isFr ? "Réserver à nouveau" : "Book again"}
@@ -600,7 +600,7 @@ export default function BookingsPage() {
                     {isCompleted && !isReviewed && (
                       <button
                         onClick={() => router.push(`/${locale}/review/${b.id}?${reviewQs}`)}
-                        className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
+                        className="flex items-center gap-1.5 min-h-[44px] bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
                       >
                         <Star className="h-3.5 w-3.5" />
                         {isFr ? "Laisser un avis" : "Leave a review"}

@@ -75,8 +75,8 @@ export default function ReviewPage() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
-        <Card className="w-full max-w-md text-center">
+      <div className="min-h-screen flex items-center justify-center bg-[#EDF4FC] px-4">
+        <Card className="w-full max-w-md text-center border-[#B5D4F4]">
           <CardContent className="pt-10 pb-8 space-y-4">
             <CheckCircle className="mx-auto h-16 w-16 text-green-500" />
             <h2 className="text-2xl font-bold">{t("successTitle")}</h2>
@@ -96,7 +96,7 @@ export default function ReviewPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-muted/30 px-4 py-8">
+    <div className="min-h-screen bg-[#EDF4FC] px-4 py-8">
       <div className="mx-auto max-w-lg space-y-4">
         <Button
           variant="ghost"
@@ -108,13 +108,13 @@ export default function ReviewPage() {
           {t("backToBookings")}
         </Button>
 
-        <Card>
+        <Card className="border-[#B5D4F4]">
           <CardHeader>
-            <CardTitle>{t("title")}</CardTitle>
+            <CardTitle className="text-[#0D2B6B]">{t("title")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Booking summary */}
-            <div className="rounded-lg bg-muted p-4 space-y-1 text-sm">
+            <div className="rounded-lg bg-[#E8F0FB] p-4 space-y-1 text-sm">
               <p className="font-medium text-foreground mb-1">{t("bookingSummary")}</p>
               {serviceName && (
                 <p>
@@ -172,10 +172,10 @@ export default function ReviewPage() {
                     <button
                       type="button"
                       onClick={() => setter(value === true ? null : true)}
-                      className={`rounded-full p-2 transition-colors ${
+                      className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full transition-colors ${
                         value === true
                           ? "bg-green-100 text-green-600"
-                          : "bg-muted text-muted-foreground hover:bg-green-50 hover:text-green-500"
+                          : "bg-[#E8F0FB] text-muted-foreground hover:bg-green-50 hover:text-green-500"
                       }`}
                       aria-label={`${t(key)} positif`}
                     >
@@ -184,10 +184,10 @@ export default function ReviewPage() {
                     <button
                       type="button"
                       onClick={() => setter(value === false ? null : false)}
-                      className={`rounded-full p-2 transition-colors ${
+                      className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full transition-colors ${
                         value === false
                           ? "bg-red-100 text-red-600"
-                          : "bg-muted text-muted-foreground hover:bg-red-50 hover:text-red-500"
+                          : "bg-[#E8F0FB] text-muted-foreground hover:bg-red-50 hover:text-red-500"
                       }`}
                       aria-label={`${t(key)} négatif`}
                     >
@@ -214,7 +214,7 @@ export default function ReviewPage() {
             <Button
               onClick={handleSubmit}
               disabled={submitting || !rating}
-              className="w-full"
+              className="w-full min-h-[44px]"
             >
               {submitting ? (
                 <>

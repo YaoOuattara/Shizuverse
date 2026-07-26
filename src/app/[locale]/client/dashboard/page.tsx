@@ -325,7 +325,7 @@ export default function ClientDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-[#0F3A7A]" />
+        <Loader2 className="h-8 w-8 animate-spin text-[#0D2B6B]" />
       </div>
     );
   }
@@ -333,10 +333,10 @@ export default function ClientDashboard() {
   const displayName = client?.name ?? (isFr ? "vous" : "you");
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-[#EDF4FC] flex flex-col">
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <header className="bg-[#0F3A7A] px-4 pt-6 pb-5 sm:px-6">
+      <header className="bg-[#0D2B6B] px-4 pt-6 pb-5 sm:px-6">
         <div className="max-w-2xl mx-auto space-y-4">
 
           {/* Name row */}
@@ -356,14 +356,14 @@ export default function ClientDashboard() {
             <div className="flex flex-col items-end gap-1.5 shrink-0">
               <button
                 onClick={() => router.push(`/${locale}/services`)}
-                className="flex items-center gap-1.5 border border-white/40 text-white text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-white/10 transition-colors"
+                className="flex items-center gap-1.5 min-h-[44px] border border-white/40 text-white text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-white/10 transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
                 {isFr ? "Réserver" : "Book"}
               </button>
               <button
                 onClick={handleLogout}
-                className="text-white/40 hover:text-white/70 text-[11px] transition-colors"
+                className="min-h-[44px] text-white/60 hover:text-white text-[11px] transition-colors"
               >
                 {isFr ? "Déconnexion" : "Log out"}
               </button>
@@ -406,7 +406,7 @@ export default function ClientDashboard() {
             {activeBooking.provider_name ? (
               <>
                 <div className="flex items-center gap-3 bg-white rounded-xl px-3 py-2.5 border border-green-100">
-                  <div className="w-9 h-9 rounded-full bg-[#0F3A7A] flex items-center justify-center text-white text-xs font-bold shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-[#0D2B6B] flex items-center justify-center text-white text-xs font-bold shrink-0">
                     {activeBooking.provider_name[0]?.toUpperCase() ?? "?"}
                   </div>
                   <div>
@@ -426,7 +426,7 @@ export default function ClientDashboard() {
                   {activeBooking.provider_id && (
                     <button
                       onClick={() => router.push(`/${locale}/provider/${activeBooking.provider_id}`)}
-                      className="flex-1 flex items-center justify-center gap-1.5 border border-gray-200 bg-white text-gray-600 text-xs font-semibold px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
+                      className="flex-1 flex items-center justify-center gap-1.5 border border-[#B5D4F4] bg-white text-gray-600 text-xs font-semibold px-3 py-2.5 rounded-xl hover:bg-[#E8F0FB] transition-colors">
                       <ChevronRight className="h-3.5 w-3.5" />
                       {isFr ? "Voir fiche" : "View profile"}
                     </button>
@@ -505,10 +505,10 @@ export default function ClientDashboard() {
             { key: "cancelled", label: isFr ? "Annulées" : "Cancelled" },
           ] as { key: Filter; label: string }[]).map(f => (
             <button key={f.key} onClick={() => setFilter(f.key)}
-              className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              className={`shrink-0 min-h-[44px] px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 filter === f.key
-                  ? "bg-[#0F3A7A] text-white"
-                  : "bg-white border border-gray-200 text-gray-600 hover:border-[#0F3A7A]/40"
+                  ? "bg-[#0D2B6B] text-white"
+                  : "bg-white border border-[#B5D4F4] text-[#0D2B6B] hover:border-[#185FA5]/40"
               }`}>
               {f.label}
             </button>
@@ -550,7 +550,7 @@ export default function ClientDashboard() {
 
               return (
                 <div key={b.id}
-                  className={`bg-white rounded-2xl border border-gray-100 p-4 space-y-3 ${isCancelled ? "opacity-70" : ""}`}>
+                  className={`bg-white rounded-2xl border border-[#B5D4F4] p-4 space-y-3 ${isCancelled ? "opacity-70" : ""}`}>
 
                   {/* Top: service + status */}
                   <div className="flex items-start justify-between gap-3">
@@ -590,7 +590,7 @@ export default function ClientDashboard() {
 
                   {/* Expanded details */}
                   {isExpanded && (
-                    <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-3 space-y-2 text-xs">
+                    <div className="rounded-xl bg-[#E8F0FB] border border-[#B5D4F4] px-3 py-3 space-y-2 text-xs">
                       {b.client_location && (
                         <div className="flex items-start justify-between gap-2">
                           <span className="text-gray-400 shrink-0">{isFr ? "Adresse" : "Address"}</span>
@@ -617,14 +617,14 @@ export default function ClientDashboard() {
                     {/* Voir détails */}
                     <button
                       onClick={() => setExpandedId(isExpanded ? null : b.id)}
-                      className="flex items-center gap-1.5 border border-gray-200 text-gray-500 hover:text-gray-700 text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
+                      className="flex items-center gap-1.5 min-h-[44px] border border-[#B5D4F4] text-gray-500 hover:text-gray-700 text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
                       {isExpanded ? (isFr ? "Réduire" : "Collapse") : (isFr ? "Voir détails" : "View details")}
                     </button>
 
                     {/* Contacter Shizu */}
                     {SHIZU_WA && (
                       <a href={waShizuHref(b, isFr)} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 bg-[#25D366] hover:bg-[#1ebe5c] text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
+                        className="flex items-center gap-1.5 min-h-[44px] bg-[#25D366] hover:bg-[#1ebe5c] text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
                         <MessageCircle className="h-3.5 w-3.5" />
                         💬 {isFr ? "Contacter Shizu" : "Contact Shizu"}
                       </a>
@@ -635,7 +635,7 @@ export default function ClientDashboard() {
                       <a
                         href={`https://wa.me/${SHIZU_WA}?text=${waModifyMsg}`}
                         target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 border border-gray-200 text-gray-600 hover:bg-gray-50 text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
+                        className="flex items-center gap-1.5 min-h-[44px] border border-[#B5D4F4] text-gray-600 hover:bg-[#E8F0FB] text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
                         {isFr ? "Modifier" : "Edit"}
                       </a>
                     )}
@@ -644,7 +644,7 @@ export default function ClientDashboard() {
                     {isCompleted && (
                       <button
                         onClick={() => router.push(rebookHref(b, categories, locale, client))}
-                        className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
+                        className="flex items-center gap-1.5 min-h-[44px] bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
                         <Plus className="h-3.5 w-3.5" />
                         {isFr ? "Réserver à nouveau" : "Book again"}
                       </button>
@@ -652,7 +652,7 @@ export default function ClientDashboard() {
                     {isCompleted && !isReviewed && (
                       <button
                         onClick={() => router.push(`/${locale}/review/${b.id}?${reviewQs}`)}
-                        className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
+                        className="flex items-center gap-1.5 min-h-[44px] bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
                         <Star className="h-3.5 w-3.5" />
                         {isFr ? "Laisser un avis" : "Leave a review"}
                       </button>
@@ -668,7 +668,7 @@ export default function ClientDashboard() {
                     {isCancelled && (
                       <button
                         onClick={() => router.push(rebookHref(b, categories, locale, client))}
-                        className="flex items-center gap-1.5 border border-gray-200 text-gray-600 text-xs font-semibold px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors">
+                        className="flex items-center gap-1.5 min-h-[44px] border border-[#B5D4F4] text-gray-600 text-xs font-semibold px-3 py-2 rounded-xl hover:bg-[#E8F0FB] transition-colors">
                         <Plus className="h-3.5 w-3.5" />
                         {isFr ? "Réserver à nouveau" : "Book again"}
                       </button>
@@ -700,7 +700,7 @@ export default function ClientDashboard() {
             {isFr ? "Changer mon mot de passe" : "Change my password"}
           </button>
         ) : (
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+          <div className="rounded-2xl border border-[#B5D4F4] bg-white p-4 space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
                 <KeyRound className="h-4 w-4" />
@@ -722,7 +722,7 @@ export default function ClientDashboard() {
                   <input type={pwShowCurrent ? "text" : "password"} value={pwCurrent}
                     onChange={e => setPwCurrent(e.target.value)}
                     placeholder={isFr ? "Mot de passe actuel" : "Current password"}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                    className="w-full border border-[#B5D4F4] rounded-xl px-3 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                   <button type="button" onClick={() => setPwShowCurrent(v => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
                     {pwShowCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -733,7 +733,7 @@ export default function ClientDashboard() {
                   <input type={pwShowNew ? "text" : "password"} value={pwNew}
                     onChange={e => setPwNew(e.target.value)}
                     placeholder={isFr ? "Nouveau mot de passe (6 car. min.)" : "New password (min. 6 chars)"}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                    className="w-full border border-[#B5D4F4] rounded-xl px-3 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                   <button type="button" onClick={() => setPwShowNew(v => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
                     {pwShowNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -743,7 +743,7 @@ export default function ClientDashboard() {
                 <input type="password" value={pwConfirm}
                   onChange={e => setPwConfirm(e.target.value)}
                   placeholder={isFr ? "Confirmer le mot de passe" : "Confirm password"}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  className="w-full border border-[#B5D4F4] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
 
                 {pwError && <p className="text-xs text-red-600">{pwError}</p>}
 

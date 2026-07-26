@@ -78,12 +78,12 @@ export default function ClientRegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-md w-full">
+    <div className="min-h-screen bg-[#EDF4FC] flex items-center justify-center px-4 py-12">
+      <div className="bg-white rounded-2xl shadow-sm border border-[#B5D4F4] p-8 max-w-md w-full">
         {/* Back */}
         <button
           onClick={() => router.push(`/${locale}`)}
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-6 transition-colors"
+          className="flex items-center gap-1.5 min-h-[44px] text-sm text-[#185FA5] hover:text-[#0D2B6B] mb-4 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           {isFr ? "Retour à l'accueil" : "Back to home"}
@@ -91,7 +91,7 @@ export default function ClientRegisterPage() {
 
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-[#0D2B6B]">
             {isFr ? "Créer un compte client" : "Create a client account"}
           </h1>
           <p className="text-gray-500 mt-1 text-sm">
@@ -113,8 +113,8 @@ export default function ClientRegisterPage() {
                   onClick={() => setAccountType(type)}
                   className={`flex flex-col items-center gap-1 p-4 rounded-xl border-2 transition-all text-sm font-medium
                     ${accountType === type
-                      ? "border-[#0F3A7A] bg-[#0F3A7A]/5 text-[#0F3A7A]"
-                      : "border-gray-100 bg-white text-gray-600 hover:border-gray-200"
+                      ? "border-[#0D2B6B] bg-[#0D2B6B]/5 text-[#0D2B6B]"
+                      : "border-[#B5D4F4] bg-white text-[#185FA5] hover:border-[#185FA5]/40"
                     }`}
                 >
                   <span className="text-xl">{type === "individual" ? "👤" : "🏢"}</span>
@@ -191,7 +191,7 @@ export default function ClientRegisterPage() {
           <Button
             type="submit"
             disabled={!isValid || isSubmitting}
-            className="w-full bg-[#0F3A7A] hover:bg-[#0d3068]"
+            className="w-full min-h-[44px] bg-[#0D2B6B] hover:bg-[#0a2158]"
           >
             {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -204,7 +204,7 @@ export default function ClientRegisterPage() {
           {isFr ? "Déjà un compte ?" : "Already have an account?"}{" "}
           <button
             onClick={() => router.push(`/${locale}/bookings`)}
-            className="text-[#0F3A7A] underline"
+            className="text-[#0D2B6B] underline min-h-[44px] inline-flex items-center"
           >
             {isFr ? "Réserver directement" : "Book directly"}
           </button>
