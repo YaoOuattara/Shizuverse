@@ -48,6 +48,61 @@ def _load():
     return app, db, ServiceProvider
 
 
+def compute_changes(ServiceProvider):
+    """Détecte tous les champs à aligner. Retourne [(row, field, before, target)]."""
+    import datetime as _dt
+    rows = ServiceProvider.query.order_by(
+        ServiceProvider.user_id, ServiceProvider.id).all()
+    by_user = {}
+    for r in rows:
+        by_user.setdefault(r.user_id, []).append(r)
+
+    changes = []
+    for user_id, user_rows in sorted(by_user.items()):
+        approved = [r for r in user_rows if r.verification_status == "approved"]
+        if not approved or len(user_rows) == 1:
+            continue
+        targets = {
+            "verification_status": "approved",
+            "verified": True,
+            "listed_status": ("listed"
+                              if any(r.listed_status == "listed" for r in user_rows)
+                              else None),
+            "provider_status": ("active"
+                                if any(r.provider_status == "active" for r in user_rows)
+                                else None),
+            "reviewed_at": min((r.reviewed_at for r in user_rows if r.reviewed_at),
+                               default=None),
+            "submitted_at": min((r.submitted_at for r in user_rows if r.submitted_at),
+                                default=None),
+            "reviewed_by": next((r.reviewed_by for r in user_rows
+                                 if r.reviewed_by is not None), None),
+        }
+        by_recency = sorted(user_rows,
+                            key=lambda r: (r.updated_at or r.created_at or _dt.datetime.min),
+                            reverse=True)
+        for field in PROFILE_FIELDS:
+            targets[field] = next(
+                (getattr(r, field) for r in by_recency
+                 if getattr(r, field) not in (None, "")), None)
+
+        for r in user_rows:
+            for field, target in targets.items():
+                if target is None:
+                    continue              # None n'écrase JAMAIS une valeur
+                before = getattr(r, field)
+                if before != target:
+                    changes.append((r, field, before, target))
+
+        fully_empty = [f for f in PROFILE_FIELDS
+                       if targets[f] is None
+                       and any(getattr(r, f) in (None, "") for r in user_rows)]
+        if fully_empty and any(c[0].user_id == user_id for c in changes):
+            print(f"  user_id={user_id} : champs vides sur TOUTES les lignes "
+                  f"(perte réelle, à re-saisir) : {', '.join(fully_empty)}")
+    return changes
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="Alignement par champ des lignes sœurs (dry-run par défaut).")
@@ -58,95 +113,44 @@ def main():
     app, db, ServiceProvider = _load()
 
     with app.app_context():
-        rows = ServiceProvider.query.order_by(
-            ServiceProvider.user_id, ServiceProvider.id).all()
-        by_user = {}
-        for r in rows:
-            by_user.setdefault(r.user_id, []).append(r)
-
         mode = "EXÉCUTION" if args.execute else "DRY-RUN"
-        total_changes = 0
-        touched_users = 0
 
-        for user_id, user_rows in sorted(by_user.items()):
-            approved = [r for r in user_rows if r.verification_status == "approved"]
-            if not approved or len(user_rows) == 1:
-                continue
+        changes = compute_changes(ServiceProvider)
+        for r, field, before, target in changes:
+            print(f"  user_id={r.user_id} sp_id={r.id} "
+                  f"(service_id={r.service_id}) {field}: {before!r} → {target!r}")
 
-            # ── Cible PAR CHAMP, « vers le haut » ────────────────────────────
-            targets = {
-                "verification_status": "approved",
-                "verified": True,
-                "listed_status": ("listed"
-                                  if any(r.listed_status == "listed" for r in user_rows)
-                                  else None),
-                "provider_status": ("active"
-                                    if any(r.provider_status == "active" for r in user_rows)
-                                    else None),
-                # Historique : plus ancienne valeur non nulle, jamais effacée.
-                "reviewed_at": min((r.reviewed_at for r in user_rows if r.reviewed_at),
-                                   default=None),
-                "submitted_at": min((r.submitted_at for r in user_rows if r.submitted_at),
-                                    default=None),
-                "reviewed_by": next((r.reviewed_by for r in user_rows
-                                     if r.reviewed_by is not None), None),
-            }
-            # Profil : coalesce non-nul, ligne la plus récemment modifiée d'abord.
-            by_recency = sorted(user_rows,
-                                key=lambda r: (r.updated_at or r.created_at
-                                               or __import__("datetime").datetime.min),
-                                reverse=True)
-            for field in PROFILE_FIELDS:
-                targets[field] = next(
-                    (getattr(r, field) for r in by_recency
-                     if getattr(r, field) not in (None, "")), None)
-
-            user_changes = 0
-            for r in user_rows:
-                for field, target in targets.items():
-                    if target is None:
-                        continue          # None n'écrase JAMAIS une valeur
-                    before = getattr(r, field)
-                    if before == target:
-                        continue
-                    if before not in (None, "") and field in PROFILE_FIELDS:
-                        # Deux valeurs non nulles divergentes sur un champ
-                        # profil : la plus récente gagne (déjà choisie), mais
-                        # on le voit dans le log.
-                        pass
-                    print(f"  user_id={user_id} sp_id={r.id} "
-                          f"(service_id={r.service_id}) {field}: "
-                          f"{before!r} → {target!r}")
-                    if args.execute:
-                        setattr(r, field, target)
-                    user_changes += 1
-
-            # Champs profil nuls sur TOUTES les sœurs = donnée réellement perdue.
-            fully_empty = [f for f in PROFILE_FIELDS
-                           if targets[f] is None
-                           and any(getattr(r, f) in (None, "") for r in user_rows)]
-            if fully_empty and user_changes:
-                print(f"  user_id={user_id} : champs vides sur TOUTES les lignes "
-                      f"(perte réelle, à re-saisir) : {', '.join(fully_empty)}")
-
-            if user_changes:
-                touched_users += 1
-                total_changes += user_changes
-                print(f"  ↳ user_id={user_id} : {user_changes} champ(s) alignés "
-                      f"({user_rows[0].company_name!r})")
-
+        touched_users = len({r.user_id for r, *_ in changes})
         print(f"\n{mode} — {touched_users} prestataire(s) concerné(s), "
-              f"{total_changes} champ(s) à aligner.")
+              f"{len(changes)} champ(s) à aligner.")
 
         if not args.execute:
             print("Aucune écriture (dry-run). Relancer avec --execute pour réparer.")
-            return
+            return 0
 
+        for r, field, before, target in changes:
+            setattr(r, field, target)
         db.session.commit()
-        print("Écrit. Vérifiez au Render Shell :")
+
+        # ── PREUVE, pas promesse : re-détection sur une session expirée. ─────
+        # Tout est rechargé depuis la base ; s'il reste des changements après
+        # commit, quelque chose n'a PAS persisté → on le dit et on sort en 1.
+        db.session.expire_all()
+        residual = compute_changes(ServiceProvider)
+        if residual:
+            print(f"\n❌ ÉCHEC DE PERSISTANCE : {len(residual)} champ(s) encore "
+                  f"désalignés APRÈS commit — rien n'a été écrit durablement.")
+            for r, field, before, target in residual[:10]:
+                print(f"   user_id={r.user_id} sp_id={r.id} {field}: {before!r} ≠ {target!r}")
+            return 1
+
+        print(f"\n✓ Écrit et VÉRIFIÉ : re-détection post-commit → 0 champ restant "
+              f"({len(changes)} champ(s) alignés).")
+        print("Contrôle manuel possible au Render Shell :")
         print("  SELECT user_id, id, service_id, verification_status, verified, "
               "listed_status, provider_status, reviewed_at FROM service_providers "
               "ORDER BY user_id, id;")
+        return 0
 
 
 if __name__ == "__main__":
