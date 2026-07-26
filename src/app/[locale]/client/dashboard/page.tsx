@@ -152,7 +152,7 @@ function findServiceId(serviceName: string, categories: ApiCategory[]): number |
   return null;
 }
 
-function rebookHref(b: ApiBooking, categories: ApiCategory[], locale: string): string {
+function rebookHref(b: ApiBooking, categories: ApiCategory[], locale: string, client: ClientInfo | null): string {
   const sid = findServiceId(b.service_name, categories);
   if (!sid) return `/${locale}/services`;
   const loc = b.client_location ?? "";
@@ -162,6 +162,10 @@ function rebookHref(b: ApiBooking, categories: ApiCategory[], locale: string): s
   const qs = new URLSearchParams({ rebook: "true" });
   if (commune) qs.set("commune", commune);
   if (address)  qs.set("address", address);
+  // Client connecté : le formulaire pré-remplit aussi l'étape 4 (name/phone),
+  // comme commune/adresse — le rebook devient réellement « quelques secondes ».
+  if (client?.name)  qs.set("name", client.name);
+  if (client?.phone) qs.set("phone", client.phone);
   return `/${locale}/booking/${sid}?${qs.toString()}`;
 }
 
@@ -629,7 +633,7 @@ export default function ClientDashboard() {
                     {/* Completed: rebook + review */}
                     {isCompleted && (
                       <button
-                        onClick={() => router.push(rebookHref(b, categories, locale))}
+                        onClick={() => router.push(rebookHref(b, categories, locale, client))}
                         className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
                         <Plus className="h-3.5 w-3.5" />
                         Réserver à nouveau
@@ -653,7 +657,7 @@ export default function ClientDashboard() {
                     {/* Cancelled: rebook */}
                     {isCancelled && (
                       <button
-                        onClick={() => router.push(rebookHref(b, categories, locale))}
+                        onClick={() => router.push(rebookHref(b, categories, locale, client))}
                         className="flex items-center gap-1.5 border border-gray-200 text-gray-600 text-xs font-semibold px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors">
                         <Plus className="h-3.5 w-3.5" />
                         Réserver à nouveau

@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import PhoneInput from "@/components/PhoneInput";
 
-const WHATSAPP_NUMBER =
-  process.env.NEXT_PUBLIC_SHIZU_WHATSAPP || "2250700000000";
+import { SHIZU_WHATSAPP } from "@/lib/support";
+
+const WHATSAPP_NUMBER = SHIZU_WHATSAPP;
 
 export default function ForgotPasswordPage() {
   const t = useTranslations("forgotPassword");

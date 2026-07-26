@@ -90,6 +90,22 @@ function normalizeRef(input: string): string {
   return input.trim().replace(/^#/, "").toUpperCase();
 }
 
+/**
+ * Miroir front de normalize_phone (backend, shizuverse/utils/phone.py) — les
+ * réservations sont stockées en E.164 (+225 + 10 chiffres, 0 compris).
+ * Normaliser AVANT envoi rend le lookup indépendant de la version du backend
+ * déployé : 0707050154, "07 07 05 01 54", 225…, 00225…, +33… matchent tous.
+ */
+function normalizePhoneInput(input: string): string {
+  let p = input.trim().replace(/[\s\-.()]/g, "");
+  p = p.replace(/^\+?(?:00)?225(?:\+?225)+/, "+225"); // double indicatif accidentel
+  if (p.startsWith("00")) p = "+" + p.slice(2);       // 00225… -> +225…
+  if (p.startsWith("225") && !p.startsWith("+")) p = "+" + p;
+  if (p.startsWith("+")) return p;                    // international (CI ou étranger)
+  if (p.startsWith("0") && p.length === 10) return "+225" + p; // local CI
+  return p;
+}
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("fr-FR", {
     day: "numeric",
@@ -203,8 +219,10 @@ export default function BookingsPage() {
       const reviewed   = localStorage.getItem(REVIEWED_KEY);
       if (reviewed) setReviewedIds(new Set(JSON.parse(reviewed)));
       if (savedPhone && savedRef) {
-        setActivePhone(savedPhone);
-        doFetch(savedPhone, savedRef);
+        // Les valeurs sauvegardées avant l'ajout du helper peuvent être brutes.
+        const phone = normalizePhoneInput(savedPhone);
+        setActivePhone(phone);
+        doFetch(phone, savedRef);
       }
     } catch { /* keep defaults */ }
   }, []);
@@ -238,7 +256,7 @@ export default function BookingsPage() {
   function handleLookup(e: React.FormEvent) {
     e.preventDefault();
     if (!phoneInput.trim() || !refInput.trim()) return;
-    const phone = phoneInput.replace(/\s+/g, "");
+    const phone = normalizePhoneInput(phoneInput);
     const ref   = normalizeRef(refInput);
     setActivePhone(phone);
     doFetch(phone, ref);

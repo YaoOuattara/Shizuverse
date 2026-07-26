@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { SHIZU_WHATSAPP } from "@/lib/support";
 import {
   Loader2, Sparkles, CheckCircle, MessageCircle, CalendarCheck,
   ShieldCheck, UserPlus, X, ChevronLeft, ChevronRight, MapPin, Check,
@@ -184,9 +185,10 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
     }
   }, [urgencyChip, todayStr, date]);
 
-  // Step 4
-  const [name, setName]       = useState("");
-  const [phone, setPhone]     = useState("");
+  // Step 4 — rebook connecté : nom/téléphone pré-remplis depuis le lien du
+  // dashboard (?name=&phone=), comme commune/adresse.
+  const [name, setName]       = useState(() => searchParams?.get("name") ?? "");
+  const [phone, setPhone]     = useState(() => searchParams?.get("phone") ?? "");
   const [phoneValid, setPhoneValid] = useState(false);
   const [commune, setCommune] = useState(() => searchParams?.get("commune") ?? "");
   const [address, setAddress] = useState(() => searchParams?.get("address") ?? "");
@@ -262,7 +264,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
     setError(null);
     setIsSubmitting(true);
 
-    fetch("https://shizu-verse.onrender.com/health").catch(() => {});
+    fetch(`${FLASK_API}/health`).catch(() => {});   // réveil du dyno (best-effort)
 
     const effectiveDate = date ?? todayStr;
     const timeStr  = timeSlot === "morning" ? "09:00" : timeSlot === "afternoon" ? "13:00" : "17:00";
@@ -312,7 +314,15 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
       setBookingId(data.id ?? null);
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      // Message HUMAIN : une panne (5xx / réseau) dit « réessayez », une
+      // erreur de validation garde le message explicite du backend.
+      const raw = err instanceof Error ? err.message : String(err);
+      const isOutage = /service_unavailable|Erreur 5\d\d|Internal server error|Failed to fetch|NetworkError|Load failed/i.test(raw);
+      setError(isOutage
+        ? (isFr
+            ? "Service momentanément indisponible — vérifiez votre connexion et réessayez dans un instant."
+            : "Service temporarily unavailable — check your connection and try again in a moment.")
+        : raw);
     } finally {
       setIsSubmitting(false);
     }
@@ -322,7 +332,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
   if (success) {
     const year = new Date().getFullYear();
     const ref  = bookingId ? `#SHZ-${year}-${bookingId}` : `#SHZ-${year}-???`;
-    const waNumber = process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "2250700000000";
+    const waNumber = SHIZU_WHATSAPP;
     const waText   = encodeURIComponent(
       isFr
         ? `Bonjour Shizu, j'ai une question concernant ma réservation ${ref}`
@@ -467,10 +477,13 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
       {isRebook && (
         <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 flex items-start gap-2.5">
           <CheckCircle className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
+          {/* Copy honnête : le pré-remplissage dépend des params reçus (le lien
+              invité ne porte pas name/phone) — on ne promet donc rien de plus
+              que la rapidité. */}
           <p className="text-sm text-green-800">
             {isFr
-              ? "Vous réservez à nouveau ce service. Vos informations ont été pré-remplies."
-              : "You are re-booking this service. Your details have been pre-filled."}
+              ? "Reprenez votre réservation en quelques secondes."
+              : "Rebook in just a few seconds."}
           </p>
         </div>
       )}

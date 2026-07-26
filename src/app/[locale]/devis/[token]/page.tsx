@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { timeSlotLabel } from "@/lib/timeSlots";
+import { SHIZU_WHATSAPP } from "@/lib/support";
 import {
   Loader2, CheckCircle, XCircle, ShieldCheck, MessageCircle,
   Calendar, MapPin, Sparkles, Copy, Check,
@@ -198,8 +199,7 @@ export default function QuotePage() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<"accepted" | "declined" | null>(null);
 
-  const waNumber = (process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "2250700000000").replace("+", "");
-  const waUrl = `https://wa.me/${waNumber}`;
+  const waUrl = SHIZU_WHATSAPP ? `https://wa.me/${SHIZU_WHATSAPP}` : "";
 
   // PaymentInstructions renders its OWN WhatsApp button ONLY in the "no number
   // available" case (money is due but SHIZU_WAVE/ORANGE/MTN are empty). Only

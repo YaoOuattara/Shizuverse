@@ -14,6 +14,7 @@ import {
   Smartphone, Upload, CheckCircle2, Lock,
 } from "lucide-react";
 import { COMMUNES } from "@/components/CommuneAutocomplete";
+import { SHIZU_WHATSAPP } from "@/lib/support";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -288,7 +289,7 @@ export default function ProviderRegisterPage() {
 
   // ── Success screen ────────────────────────────────────────────────────────
   if (submitted) {
-    const shizuWa = (process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "2250700000000").replace(/\D/g, "");
+    const shizuWa = SHIZU_WHATSAPP;
     const waText = encodeURIComponent(
       isFr
         ? "Bonjour Shizu, je viens de soumettre mon profil prestataire et j'ai une question."
