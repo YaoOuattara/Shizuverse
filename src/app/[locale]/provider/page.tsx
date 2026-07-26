@@ -23,6 +23,7 @@ import {
   Bell,
   Zap,
   Share2,
+  LogOut,
   Trophy,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -94,7 +95,9 @@ const STORAGE_KEYS = {
   FILTERS:            "provider_dashboard_filters",
   STATS_VISIBLE:      "provider_dashboard_stats_visible",
   BOOKINGS:           "provider_cached_bookings",
-  AVAILABILITY:       "provider_available_today",
+  // AVAILABILITY retiré — available_today est un champ sans horodatage que
+  // RIEN ne lit (ni matcher ni assignation). Réintroduction conditionnée à
+  // une vraie disponibilité avec fraîcheur (date + lecteur côté matching).
   COACHING_DISMISSED: "provider_coaching_dismissed",
   WELCOME_DISMISSED:  "provider_welcome_dismissed",
   CONSEILS_OPEN:      "provider_conseils_open",
@@ -132,8 +135,6 @@ export default function ProviderDashboard() {
   const [listError, setListError]             = useState(false);
   const [listTick, setListTick]               = useState(0);
   const [searchQuery, setSearchQuery]         = useState("");
-  const [availableToday, setAvailableToday]   = useState(false);
-  const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [providerName, setProviderName]       = useState("");
   const [showFloatingWa, setShowFloatingWa]   = useState(false);
   const [showStats, setShowStats]             = useState(true);
@@ -166,8 +167,6 @@ export default function ProviderDashboard() {
       setShowStats(savedStats !== null ? JSON.parse(savedStats) : !isMobileViewport());
       const savedFilters = localStorage.getItem(STORAGE_KEYS.FILTERS);
       if (savedFilters) setFilters(JSON.parse(savedFilters));
-      const savedAvailability = localStorage.getItem(STORAGE_KEYS.AVAILABILITY);
-      if (savedAvailability !== null) setAvailableToday(JSON.parse(savedAvailability));
       const savedConseils = localStorage.getItem(STORAGE_KEYS.CONSEILS_OPEN);
       if (savedConseils !== null) setConseilsOpen(JSON.parse(savedConseils));
       const savedRewards = localStorage.getItem(STORAGE_KEYS.REWARDS_EXPANDED);
@@ -266,26 +265,15 @@ export default function ProviderDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listTick]);
 
-  // ── Availability ──────────────────────────────────────────────────────────
-
-  const toggleAvailability = async () => {
-    const next = !availableToday;
-    setAvailableToday(next);
-    localStorage.setItem(STORAGE_KEYS.AVAILABILITY, JSON.stringify(next));
-    setAvailabilityLoading(true);
-    try {
-      const token = getProviderToken();
-      await fetch(`${FLASK_API}/api/provider/availability`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ available_today: next }),
-      });
-    } catch { /* ignore */ } finally {
-      setAvailabilityLoading(false);
-    }
-  };
-
   // ── Filter handlers ───────────────────────────────────────────────────────
+
+  // Purge volontaire du token (il n'existait AUCUN bouton de déconnexion).
+  const handleLogout = () => {
+    ["provider_token", "provider_info"].forEach(k => {
+      localStorage.removeItem(k); sessionStorage.removeItem(k);
+    });
+    router.push(`/${locale}/provider/login`);
+  };
 
   const handleStatusFilter  = (value: string) => setFilters(p => ({ ...p, status: value }));
   const handleServiceFilter = (value: string) => setFilters(p => ({ ...p, service: value }));
@@ -384,37 +372,6 @@ export default function ProviderDashboard() {
     }
     setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: "completed" as ProviderBookingStatus } : b));
     toast({ title: "Mission terminée !", description: "Bravo ! La réservation est marquée comme terminée.", variant: "success" });
-  };
-
-  const handleRescheduleBooking = async (bookingId: string, newDate: string, newTime: string): Promise<void> => {
-    const booking = bookings.find(b => b.id === bookingId);
-    let hasConflict = false;
-    if (booking) {
-      const conflict = checkScheduleConflicts(
-        { date: newDate, time: newTime, duration: booking.duration },
-        bookings.filter(b => b.status === "confirmed"),
-        bookingId
-      );
-      if (conflict.hasConflict) {
-        hasConflict = true;
-        toast({ title: t("conflictWarningTitle"), description: t("conflictRescheduleDesc", { warning: formatConflictWarning(conflict.conflictingBookings) }), variant: "destructive" });
-      }
-    }
-    await new Promise(resolve => setTimeout(resolve, 500));
-    if (Math.random() < 0.05) {
-      toast({ title: t("failedRescheduleTitle"), description: t("failedRescheduleDesc"), variant: "destructive" });
-      throw new Error("Reschedule failed");
-    }
-    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, date: newDate, time: newTime } : b));
-    if (!hasConflict) {
-      toast({
-        title: t("rescheduledTitle"),
-        description: booking
-          ? t("rescheduledDesc", { customerName: booking.customerName, date: newDate, time: newTime })
-          : t("rescheduledFallback", { date: newDate, time: newTime }),
-        variant: "success",
-      });
-    }
   };
 
   // ── Derived state ─────────────────────────────────────────────────────────
@@ -549,22 +506,7 @@ export default function ProviderDashboard() {
       </div>
     );
 
-    if (vs === "approved" && !availableToday) return (
-      <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-green-200 bg-[#f0fdf4] px-4 py-3">
-        <p className="text-sm font-medium text-green-800">
-          {isFr ? "Activez votre disponibilité pour recevoir des demandes" : "Enable your availability to receive requests"}
-        </p>
-        <button
-          onClick={toggleAvailability}
-          disabled={availabilityLoading}
-          className="shrink-0 flex items-center gap-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
-          <Zap className="h-3 w-3" />
-          {isFr ? "Activer" : "Enable"}
-        </button>
-      </div>
-    );
-
-    if (vs === "approved" && availableToday && statusCounts.all === 0) return (
+    if (vs === "approved" && statusCounts.all === 0) return (
       <div className="mb-4 flex items-center gap-3 rounded-2xl border border-green-200 bg-[#f0fdf4] px-4 py-3">
         <span className="text-base leading-none">🟢</span>
         <p className="text-sm font-medium text-green-800">
@@ -677,10 +619,15 @@ export default function ProviderDashboard() {
       <header className="sticky top-0 z-40 bg-background border-b px-4 sm:px-6 py-3">
         <div className="flex items-center justify-between gap-3 mb-2.5">
           <h1 className="text-lg font-semibold text-foreground" data-testid="text-header">{t("title")}</h1>
-          <Button variant="outline" size="sm" onClick={() => router.push(`/${locale}/provider/profile`)} data-testid="button-view-my-profile">
-            <User className="mr-1.5 h-3.5 w-3.5" />
-            {t("myProfile")}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => router.push(`/${locale}/provider/profile`)} data-testid="button-view-my-profile">
+              <User className="mr-1.5 h-3.5 w-3.5" />
+              {t("myProfile")}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleLogout} aria-label={isFr ? "Se déconnecter" : "Log out"} data-testid="button-logout">
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Compact filter toolbar — hidden when 0 bookings */}
@@ -788,39 +735,11 @@ export default function ProviderDashboard() {
         {/* 2 — Smart onboarding banner */}
         {onboardingBanner}
 
-        {/* 3 — Availability toggle */}
-        <div
-          id="availability-toggle"
-          className={`mb-6 flex items-center justify-between gap-4 rounded-2xl border px-5 py-4 transition-colors ${
-            availableToday ? "border-green-200 bg-green-50" : "border-gray-200 bg-gray-50"
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${availableToday ? "bg-green-100" : "bg-gray-200"}`}>
-              <Zap className={`h-5 w-5 transition-colors ${availableToday ? "text-green-600" : "text-gray-400"}`} />
-            </div>
-            <div>
-              <p className={`font-semibold text-sm ${availableToday ? "text-green-800" : "text-gray-700"}`}>
-                {isFr ? "Disponible aujourd'hui" : "Available today"}
-              </p>
-              <p className={`text-xs mt-0.5 ${availableToday ? "text-green-600" : "text-gray-400"}`}>
-                {availableToday
-                  ? (isFr ? "Vous apparaissez comme disponible aux clients" : "You appear as available to clients")
-                  : (isFr ? "Vous n'acceptez pas de nouvelles demandes" : "You are not accepting new requests")}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={toggleAvailability}
-            disabled={availabilityLoading}
-            aria-label={isFr ? "Basculer la disponibilité" : "Toggle availability"}
-            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${availableToday ? "bg-green-500" : "bg-gray-300"}`}
-          >
-            <span className={`pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform ${availableToday ? "translate-x-5" : "translate-x-0.5"}`} />
-          </button>
-        </div>
+        {/* 3 — (retiré) toggle « Disponible aujourd'hui » : available_today
+            n'était lu par personne. Voir STORAGE_KEYS pour la condition de
+            réintroduction. */}
 
-        {/* 4 — Nouvelles demandes (pool ouvert + missions assignées par l'admin) */}
+        {/* 4 — Nouvelles demandes (missions assignées par l'admin — le pool ouvert est fermé, T-26/T-28) */}
         {(() => {
           const pending = bookings.filter(b => b.status === "pending" || b.status === "requested" || b.status === "assigned");
           return (
@@ -840,24 +759,9 @@ export default function ProviderDashboard() {
                   </p>
                   <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
                     {isFr
-                      ? "Activez votre disponibilité pour commencer à recevoir des clients"
-                      : "Enable your availability to start receiving clients"}
+                      ? "Les missions que Shizu vous assigne apparaîtront ici."
+                      : "Missions Shizu assigns to you will appear here."}
                   </p>
-                  {!availableToday && (
-                    <button
-                      onClick={toggleAvailability}
-                      disabled={availabilityLoading}
-                      className="mt-4 inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50"
-                    >
-                      <Zap className="h-4 w-4" />
-                      {isFr ? "Activer maintenant" : "Enable now"}
-                    </button>
-                  )}
-                  {availableToday && (
-                    <p className="mt-3 text-xs text-green-600 font-medium">
-                      ✓ {isFr ? "Vous êtes disponible — en attente de demandes" : "You're available — waiting for requests"}
-                    </p>
-                  )}
                 </div>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -881,6 +785,41 @@ export default function ProviderDashboard() {
           <UpcomingSchedule bookings={bookings} />
         </div>
 
+        {/* 11 — Booking list */}
+        {statusCounts.all > 0 && (
+          <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 mb-4 border-b border-border/50 md:relative md:mx-0 md:px-0 md:py-0 md:mb-4 md:border-b-0 md:bg-transparent md:backdrop-blur-none">
+            <StatusTabs value={filters.status} onChange={handleStatusFilter} counts={statusCounts} />
+          </div>
+        )}
+
+        {filteredBookings.length > 0 ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="bookings-grid">
+            {filteredBookings.map(booking => (
+              <ProviderBookingCard
+                key={booking.id}
+                booking={booking}
+                conflictWarning={getBookingConflict(booking.id)}
+                onAccept={handleAcceptBooking}
+                onReject={handleRejectBooking}
+                onStart={handleStartBooking}
+                onComplete={handleCompleteBooking}
+              />
+            ))}
+          </div>
+        ) : statusCounts.all > 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center" data-testid="empty-state">
+            <CalendarDays className="mb-4 h-12 w-12 text-muted-foreground" />
+            <h2 className="text-lg font-medium text-foreground">{t("noBookingsTitle")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {hasActiveFilters ? t("noBookingsWithFilters") : t("noBookingsEmpty")}
+            </p>
+            {hasActiveFilters && (
+              <Button variant="outline" className="mt-4" onClick={clearAllFilters} data-testid="button-clear-filters-empty">
+                {t("clearAllFilters")}
+              </Button>
+            )}
+          </div>
+        ) : null}
         {/* 6 — Earnings */}
         {(() => {
           const { gagne, enAttente, verse, prochainVersement } = computeEarnings(bookings);
@@ -935,15 +874,37 @@ export default function ProviderDashboard() {
           </div>
         )}
 
+        {/* 9 — Performances */}
+        {(() => {
+          const totalWithOutcome = statusCounts.confirmed + statusCounts.completed + statusCounts.cancelled;
+          const accepted   = statusCounts.confirmed + statusCounts.completed;
+          const acceptRate = totalWithOutcome > 0 ? Math.round((accepted / totalWithOutcome) * 100) : null;
+          const perfItems  = [
+            { label: isFr ? "Note moyenne"       : "Avg rating",      value: avgRating !== null ? avgRating.toFixed(1) : "—",    sub: ratingCount > 0 ? `${ratingCount} ${isFr ? "avis" : "reviews"}` : (isFr ? "Pas encore d'avis" : "No reviews yet") },
+            { label: isFr ? "Missions terminées" : "Completed",        value: String(statusCounts.completed),                    sub: isFr ? "au total" : "total" },
+            { label: isFr ? "Taux d'acceptation" : "Acceptance rate",  value: acceptRate !== null ? `${acceptRate}%` : "—",     sub: totalWithOutcome > 0 ? `${accepted}/${totalWithOutcome}` : (isFr ? "Pas encore de données" : "No data yet") },
+          ];
+          return (
+            <div className="mb-6">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                {isFr ? "Performances" : "Performance"}
+              </h2>
+              <div className="grid grid-cols-2 gap-3">
+                {perfItems.map(({ label, value, sub }) => (
+                  <div key={label} className="rounded-2xl border border-gray-100 bg-white px-4 py-4 shadow-sm">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
+                    <p className="text-base font-semibold text-foreground tabular-nums">{value}</p>
+                    {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* 8 — Conseils Shizu */}
         {(() => {
           const allTips = [
-            !availableToday && {
-              icon: "⚡",
-              text: isFr ? "Activez votre disponibilité pour recevoir des demandes" : "Enable your availability to receive requests",
-              onAction: toggleAvailability,
-              actionLabel: isFr ? "Activer →" : "Enable →",
-            },
             (providerProfile?.bio?.length ?? 0) <= 50 && {
               icon: "✍️",
               text: isFr ? "Rédigez une présentation (50 mots min.) pour rassurer les clients" : "Write a bio (50+ words) to reassure clients",
@@ -1001,35 +962,6 @@ export default function ProviderDashboard() {
           );
         })()}
 
-        {/* 9 — Performances */}
-        {(() => {
-          const totalWithOutcome = statusCounts.confirmed + statusCounts.completed + statusCounts.cancelled;
-          const accepted   = statusCounts.confirmed + statusCounts.completed;
-          const acceptRate = totalWithOutcome > 0 ? Math.round((accepted / totalWithOutcome) * 100) : null;
-          const perfItems  = [
-            { label: isFr ? "Note moyenne"       : "Avg rating",      value: avgRating !== null ? avgRating.toFixed(1) : "—",    sub: ratingCount > 0 ? `${ratingCount} ${isFr ? "avis" : "reviews"}` : (isFr ? "Pas encore d'avis" : "No reviews yet") },
-            { label: isFr ? "Missions terminées" : "Completed",        value: String(statusCounts.completed),                    sub: isFr ? "au total" : "total" },
-            { label: isFr ? "Taux d'acceptation" : "Acceptance rate",  value: acceptRate !== null ? `${acceptRate}%` : "—",     sub: totalWithOutcome > 0 ? `${accepted}/${totalWithOutcome}` : (isFr ? "Pas encore de données" : "No data yet") },
-            { label: isFr ? "Délai de réponse"   : "Response time",    value: "< 2h",                                            sub: isFr ? "estimation" : "estimate" },
-          ];
-          return (
-            <div className="mb-6">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                {isFr ? "Performances" : "Performance"}
-              </h2>
-              <div className="grid grid-cols-2 gap-3">
-                {perfItems.map(({ label, value, sub }) => (
-                  <div key={label} className="rounded-2xl border border-gray-100 bg-white px-4 py-4 shadow-sm">
-                    <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
-                    <p className="text-base font-semibold text-foreground tabular-nums">{value}</p>
-                    {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
         {/* 10 — Récompenses (compact collapsible) */}
         <div className="mb-6 rounded-2xl border border-gray-100 bg-white overflow-hidden shadow-sm">
           <button
@@ -1058,42 +990,6 @@ export default function ProviderDashboard() {
           )}
         </div>
 
-        {/* 11 — Booking list */}
-        {statusCounts.all > 0 && (
-          <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 mb-4 border-b border-border/50 md:relative md:mx-0 md:px-0 md:py-0 md:mb-4 md:border-b-0 md:bg-transparent md:backdrop-blur-none">
-            <StatusTabs value={filters.status} onChange={handleStatusFilter} counts={statusCounts} />
-          </div>
-        )}
-
-        {filteredBookings.length > 0 ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="bookings-grid">
-            {filteredBookings.map(booking => (
-              <ProviderBookingCard
-                key={booking.id}
-                booking={booking}
-                conflictWarning={getBookingConflict(booking.id)}
-                onAccept={handleAcceptBooking}
-                onReject={handleRejectBooking}
-                onReschedule={handleRescheduleBooking}
-                onStart={handleStartBooking}
-                onComplete={handleCompleteBooking}
-              />
-            ))}
-          </div>
-        ) : statusCounts.all > 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center" data-testid="empty-state">
-            <CalendarDays className="mb-4 h-12 w-12 text-muted-foreground" />
-            <h2 className="text-lg font-medium text-foreground">{t("noBookingsTitle")}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {hasActiveFilters ? t("noBookingsWithFilters") : t("noBookingsEmpty")}
-            </p>
-            {hasActiveFilters && (
-              <Button variant="outline" className="mt-4" onClick={clearAllFilters} data-testid="button-clear-filters-empty">
-                {t("clearAllFilters")}
-              </Button>
-            )}
-          </div>
-        ) : null}
       </main>
 
       {/* Floating WhatsApp — mobile only */}

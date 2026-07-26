@@ -588,6 +588,19 @@ export default function ProviderProfilePage() {
           </button>
           <h1 className="text-2xl font-bold">{isFr ? 'Mon profil' : 'My Profile'}</h1>
         </div>
+        <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            ["provider_token", "provider_info"].forEach(k => {
+              localStorage.removeItem(k); sessionStorage.removeItem(k);
+            });
+            router.push(`/${locale}/provider/login`);
+          }}
+          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800"
+        >
+          {isFr ? 'Déconnexion' : 'Log out'}
+        </button>
         <button
           type="button"
           onClick={() => setPreviewOpen(true)}
@@ -596,6 +609,7 @@ export default function ProviderProfilePage() {
           <Eye className="h-4 w-4" />
           {isFr ? 'Aperçu client' : 'Client preview'}
         </button>
+        </div>
       </div>
 
       {providerName && (

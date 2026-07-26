@@ -30,7 +30,7 @@ import {
   Calendar,
   Check,
   X,
-  CalendarClock,
+  MessageCircle,
   Phone,
   FileText,
   Loader2,
@@ -47,12 +47,15 @@ import type { ProviderBooking, ProviderBookingStatus } from "@/data/mockProvider
 import { formatMoney } from "@/lib/currency";
 import { useTranslations } from "next-intl";
 
+// Numéro support Shizu (wa.me) — le bouton « Contacter Shizu » remplace
+// l'ancien Reprogrammer (qui ne persistait rien).
+const SHIZU_WA = (process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "").replace(/\D/g, "");
+
 interface ProviderBookingCardProps {
   booking: ProviderBooking;
   conflictWarning?: string | null;
   onAccept?: (bookingId: string) => Promise<void> | void;
   onReject?: (bookingId: string) => Promise<void> | void;
-  onReschedule?: (bookingId: string, newDate: string, newTime: string) => Promise<void> | void;
   onStart?: (bookingId: string) => Promise<void> | void;
   onComplete?: (bookingId: string) => Promise<void> | void;
 }
@@ -62,19 +65,17 @@ export default function ProviderBookingCard({
   conflictWarning,
   onAccept,
   onReject,
-  onReschedule,
   onStart,
   onComplete,
 }: ProviderBookingCardProps) {
   const t = useTranslations("providerBookingCard");
+  // Référence canonique SHZ-{année}-{id} (année depuis requestedAt).
+  const shzRef = `SHZ-${!isNaN(Date.parse(booking.requestedAt)) ? new Date(booking.requestedAt).getFullYear() : new Date().getFullYear()}-${booking.id}`;
   const [isAccepting, setIsAccepting] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
-  const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = useState(false);
-  const [rescheduleDate, setRescheduleDate] = useState(booking.date);
-  const [rescheduleTime, setRescheduleTime] = useState(booking.time);
 
   const handleAccept = async () => {
     if (!onAccept) return;
@@ -97,19 +98,6 @@ export default function ProviderBookingCard({
       console.error("Reject booking failed:", error);
     } finally {
       setIsRejecting(false);
-    }
-  };
-
-  const handleReschedule = async () => {
-    if (!onReschedule) return;
-    setIsRescheduling(true);
-    try {
-      await onReschedule(booking.id, rescheduleDate, rescheduleTime);
-      setIsRescheduleDialogOpen(false);
-    } catch (error) {
-      console.error("Reschedule booking failed:", error);
-    } finally {
-      setIsRescheduling(false);
     }
   };
 
@@ -429,20 +417,23 @@ export default function ProviderBookingCard({
                       </AlertDialog>
                     )}
 
-                    {onReschedule && (
+                    {/* Reprogrammer retiré : le bouton ne persistait RIEN (simulation
+                        locale). Tout changement d'horaire passe par Shizu, qui
+                        reprogramme côté admin et notifie le client. */}
+                    {SHIZU_WA && (
                       <Button
                         variant="outline"
-                        onClick={() => setIsRescheduleDialogOpen(true)}
-                        disabled={isAnyLoading}
+                        asChild
                         className="flex-1 sm:flex-none"
-                        data-testid={`button-reschedule-${booking.id}`}
+                        data-testid={`button-contact-shizu-${booking.id}`}
                       >
-                        {isRescheduling ? (
-                          <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                        ) : (
-                          <CalendarClock className="mr-1.5 h-4 w-4" />
-                        )}
-                        {isRescheduling ? t("rescheduling") : t("reschedule")}
+                        <a
+                          href={`https://wa.me/${SHIZU_WA}?text=${encodeURIComponent(t("contactShizuMessage", { ref: shzRef }))}`}
+                          target="_blank" rel="noopener noreferrer"
+                        >
+                          <MessageCircle className="mr-1.5 h-4 w-4" />
+                          {t("contactShizu")}
+                        </a>
                       </Button>
                     )}
                   </div>
@@ -453,68 +444,6 @@ export default function ProviderBookingCard({
         </CardContent>
       </Card>
 
-      <Dialog open={isRescheduleDialogOpen} onOpenChange={setIsRescheduleDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]" data-testid="dialog-reschedule">
-          <DialogHeader>
-            <DialogTitle>{t("rescheduleTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("rescheduleDescription", {
-                customerName: booking.customerName,
-                serviceName: booking.serviceName,
-              })}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="reschedule-date">{t("newDate")}</Label>
-              <Input
-                id="reschedule-date"
-                type="text"
-                value={rescheduleDate}
-                onChange={(e) => setRescheduleDate(e.target.value)}
-                placeholder={t("newDatePlaceholder")}
-                data-testid="input-reschedule-date"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="reschedule-time">{t("newTime")}</Label>
-              <Input
-                id="reschedule-time"
-                type="text"
-                value={rescheduleTime}
-                onChange={(e) => setRescheduleTime(e.target.value)}
-                placeholder={t("newTimePlaceholder")}
-                data-testid="input-reschedule-time"
-              />
-            </div>
-          </div>
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsRescheduleDialogOpen(false)}
-              className="w-full sm:w-auto"
-              data-testid="button-reschedule-cancel"
-            >
-              {t("cancel")}
-            </Button>
-            <Button
-              onClick={handleReschedule}
-              disabled={isRescheduling || !rescheduleDate || !rescheduleTime}
-              className="w-full sm:w-auto"
-              data-testid="button-reschedule-confirm"
-            >
-              {isRescheduling ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t("rescheduling")}
-                </>
-              ) : (
-                t("confirmReschedule")
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

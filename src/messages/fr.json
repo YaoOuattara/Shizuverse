@@ -203,7 +203,9 @@
     "newDate": "Nouvelle date",
     "newDatePlaceholder": "ex. : 15 déc. 2025",
     "newTime": "Nouvelle heure",
-    "newTimePlaceholder": "ex. : 15h00"
+    "newTimePlaceholder": "ex. : 15h00",
+    "contactShizu": "Contacter Shizu",
+    "contactShizuMessage": "Bonjour Shizu, je vous contacte au sujet de la mission {ref} (changement d'horaire ou question)."
   },
   "statusTabs": {
     "ariaLabel": "Filtrer les réservations par statut",
