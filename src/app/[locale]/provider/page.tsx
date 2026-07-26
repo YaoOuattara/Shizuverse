@@ -553,7 +553,7 @@ export default function ProviderDashboard() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-[#EDF4FC]">
 
       {/* Filter bottom sheet */}
       {filterSheetOpen && (
@@ -616,15 +616,19 @@ export default function ProviderDashboard() {
       )}
 
       {/* Sticky header */}
-      <header className="sticky top-0 z-40 bg-background border-b px-4 sm:px-6 py-3">
+      <header className="sticky top-0 z-40 bg-[#0D2B6B] border-b border-[#0D2B6B] px-4 sm:px-6 py-3">
         <div className="flex items-center justify-between gap-3 mb-2.5">
-          <h1 className="text-lg font-semibold text-foreground" data-testid="text-header">{t("title")}</h1>
+          <h1 className="text-lg font-semibold text-white" data-testid="text-header">{t("title")}</h1>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => router.push(`/${locale}/provider/profile`)} data-testid="button-view-my-profile">
+            <Button variant="outline" size="sm" onClick={() => router.push(`/${locale}/provider/profile`)}
+              className="min-h-[44px] bg-white/10 border-white/30 text-white hover:bg-white hover:text-[#0D2B6B]"
+              data-testid="button-view-my-profile">
               <User className="mr-1.5 h-3.5 w-3.5" />
               {t("myProfile")}
             </Button>
-            <Button variant="ghost" size="sm" onClick={handleLogout} aria-label={isFr ? "Se déconnecter" : "Log out"} data-testid="button-logout">
+            <Button variant="ghost" size="sm" onClick={handleLogout} aria-label={isFr ? "Se déconnecter" : "Log out"}
+              className="min-h-[44px] text-white/80 hover:text-white hover:bg-white/10"
+              data-testid="button-logout">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
@@ -675,7 +679,7 @@ export default function ProviderDashboard() {
         {/* 1 — Provider ID card */}
         {providerInfo.verificationStatus === "approved" ? (
           <div
-            className="mb-4 bg-white rounded-2xl border border-gray-100 shadow-md overflow-hidden cursor-pointer"
+            className="mb-4 bg-white rounded-2xl border border-[#B5D4F4] shadow-md overflow-hidden cursor-pointer"
             onClick={() => providerInfo.id && window.open(`/${locale}/provider/${providerInfo.id}`, "_blank")}
           >
             <div className="flex items-center gap-4 p-4">
@@ -709,7 +713,7 @@ export default function ProviderDashboard() {
                 </div>
               </div>
             </div>
-            <div className="bg-[#0F3A7A] px-4 py-2.5 flex items-center justify-end">
+            <div className="bg-[#0D2B6B] px-4 py-2.5 flex items-center justify-end">
               <button
                 type="button"
                 onClick={e => { e.stopPropagation(); providerInfo.id && window.open(`/${locale}/provider/${providerInfo.id}`, "_blank"); }}
@@ -721,7 +725,7 @@ export default function ProviderDashboard() {
             </div>
           </div>
         ) : providerInfo.id ? (
-          <div className="mb-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+          <div className="mb-4 bg-white rounded-2xl border border-[#B5D4F4] shadow-sm p-4 flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-lg shrink-0">
               {(providerName || "P").slice(0, 1).toUpperCase()}
             </div>
@@ -746,13 +750,13 @@ export default function ProviderDashboard() {
             <div className="mb-6" data-testid="section-new-requests">
               <div className="flex items-center gap-2 mb-3">
                 <Bell className="h-5 w-5 text-amber-500" />
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-[#0D2B6B]">
                   {isFr ? "Nouvelles demandes" : "New Requests"}
                 </h2>
                 {pending.length > 0 && <Badge variant="destructive" className="text-xs">{pending.length}</Badge>}
               </div>
               {pending.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-muted-foreground/25 bg-muted/20 px-6 py-8 text-center">
+                <div className="rounded-xl border border-dashed border-[#B5D4F4] bg-[#E8F0FB]/60 px-6 py-8 text-center">
                   <Bell className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
                   <p className="text-sm font-medium text-foreground">
                     {isFr ? "Pas encore de demandes" : "No requests yet"}
@@ -827,11 +831,11 @@ export default function ProviderDashboard() {
             { label: isFr ? "Gagné"              : "Earned",       value: gagne,             sub: isFr ? "réservations terminées"      : "completed bookings",          textColor: "text-green-700", bg: "bg-green-50",  border: "border-green-100" },
             { label: isFr ? "En attente"         : "Pending",      value: enAttente,         sub: isFr ? "confirmé, paiement en cours" : "confirmed, awaiting payout",  textColor: "text-amber-700", bg: "bg-amber-50",  border: "border-amber-100" },
             { label: isFr ? "Versé"              : "Paid out",     value: verse,             sub: isFr ? "déjà reversé"                : "already disbursed",           textColor: "text-blue-700",  bg: "bg-blue-50",   border: "border-blue-100"  },
-            { label: isFr ? "Prochain versement" : "Next payout",  value: prochainVersement, sub: isFr ? "estimation prochaine"        : "upcoming estimate",           textColor: "text-gray-700",  bg: "bg-white",     border: "border-gray-100"  },
+            { label: isFr ? "Prochain versement" : "Next payout",  value: prochainVersement, sub: isFr ? "estimation prochaine"        : "upcoming estimate",           textColor: "text-[#0D2B6B]", bg: "bg-white",     border: "border-[#B5D4F4]"  },
           ];
           return (
             <div className="mb-6">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-[#0D2B6B] mb-3">
                 {isFr ? "Mes gains" : "My earnings"}
               </h2>
               <div className="grid grid-cols-2 gap-3">
@@ -886,12 +890,12 @@ export default function ProviderDashboard() {
           ];
           return (
             <div className="mb-6">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-[#0D2B6B] mb-3">
                 {isFr ? "Performances" : "Performance"}
               </h2>
               <div className="grid grid-cols-2 gap-3">
                 {perfItems.map(({ label, value, sub }) => (
-                  <div key={label} className="rounded-2xl border border-gray-100 bg-white px-4 py-4 shadow-sm">
+                  <div key={label} className="rounded-2xl border border-[#B5D4F4] bg-white px-4 py-4 shadow-sm">
                     <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
                     <p className="text-base font-semibold text-foreground tabular-nums">{value}</p>
                     {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
@@ -963,7 +967,7 @@ export default function ProviderDashboard() {
         })()}
 
         {/* 10 — Récompenses (compact collapsible) */}
-        <div className="mb-6 rounded-2xl border border-gray-100 bg-white overflow-hidden shadow-sm">
+        <div className="mb-6 rounded-2xl border border-[#B5D4F4] bg-white overflow-hidden shadow-sm">
           <button
             type="button"
             onClick={() => {
@@ -984,7 +988,7 @@ export default function ProviderDashboard() {
             <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${rewardsExpanded ? "rotate-180" : ""}`} />
           </button>
           {rewardsExpanded && (
-            <div className="border-t border-gray-100 px-4 pb-4 pt-3">
+            <div className="border-t border-[#B5D4F4]/60 px-4 pb-4 pt-3">
               <AchievementBadges bookings={bookings} />
             </div>
           )}
