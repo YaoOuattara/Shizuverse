@@ -76,7 +76,7 @@ def app(tmp_path):
         db.session.add(ServiceProvider(
             user_id=user.id, service_id=svc.id,
             company_name="Presta Test", phone_number="+2250700000002",
-            verification_status="approved",
+            verification_status="approved", provider_status="active",
         ))
         db.session.commit()
         application.config["_TEST_SERVICE_ID"] = svc.id

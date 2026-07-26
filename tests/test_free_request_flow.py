@@ -75,7 +75,7 @@ def app(tmp_path):
         sp = ServiceProvider(
             user_id=user.id, service_id=svc.id,
             company_name="Presta Test", phone_number=PROVIDER_PHONE,
-            verification_status="approved",
+            verification_status="approved", provider_status="active",
         )
         db.session.add(sp)
         db.session.commit()

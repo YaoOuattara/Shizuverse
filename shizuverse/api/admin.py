@@ -178,6 +178,14 @@ def assign_booking(booking_id):
     if not is_person_approved:
         return jsonify({'error': "Ce prestataire n'est pas approuvé. "
                                  "Seuls les prestataires validés peuvent être assignés."}), 400
+    # A paused provider must not receive missions — the AI matcher already
+    # excludes them; the manual assign path enforces the same rule.
+    is_person_active = ServiceProvider.query.filter_by(
+        user_id=sp.user_id, provider_status='active',
+    ).first() is not None
+    if not is_person_active:
+        return jsonify({'error': "Prestataire en pause. Réactivez-le avant de "
+                                 "lui assigner une mission."}), 400
 
     if not booking.amount_locked:
         return jsonify({'error': "Veuillez confirmer le montant avant d'assigner un prestataire"}), 400
@@ -805,39 +813,10 @@ def get_provider_bookings():
     sp = ServiceProvider.query.get(provider_sp_id) if provider_sp_id else None
     provider_company_name = sp.company_name if sp else None
 
-    # Provider's zones + service categories, from ALL their ServiceProvider rows.
-    prov_rows = ServiceProvider.query.filter_by(user_id=sp.user_id).all() if sp else []
-    prov_category_ids = set()
-    prov_zones = set()
-    for row in prov_rows:
-        if row.service and row.service.subcategory:
-            prov_category_ids.add(row.service.subcategory.category_id)
-        if row.address:
-            for z in row.address.split(','):
-                z = z.strip().lower()
-                if z:
-                    prov_zones.add(z)
-
-    def _relevant(b) -> bool:
-        """Only surface an open request if it matches the provider's category
-        AND zone. Unresolvable category/zone is treated as a match (don't hide
-        a legit request on missing metadata)."""
-        if prov_category_ids and b.service and b.service.subcategory:
-            if b.service.subcategory.category_id not in prov_category_ids:
-                return False
-        if prov_zones:
-            commune = (b.client_location or '').split(',')[0].strip().lower()
-            if commune and not any(z in commune or commune in z for z in prov_zones):
-                return False
-        return True
-
-    # New requests: unassigned requested/pending, filtered by zone + category.
-    open_requests = [
-        b for b in ClientBooking.query.filter(
-            ClientBooking.status.in_(['requested', 'pending']),
-        ).order_by(ClientBooking.appointment_date.asc()).all()
-        if _relevant(b)
-    ]
+    # T-26/T-28 — the open pool is CLOSED: providers only see missions the
+    # admin assigned to them (the accept endpoint refuses raw requests too).
+    # The old masked open-requests feed and its zone/category relevance
+    # machinery are gone with it.
 
     # Provider's OWN bookings (assigned to them) — full details, unmasked.
     own_bookings = []
@@ -847,80 +826,43 @@ def get_provider_bookings():
             ClientBooking.status.notin_(['requested', 'pending']),
         ).order_by(ClientBooking.appointment_date.desc()).all()
 
-    own_ids = {b.id for b in own_bookings}
-
     def _payout(b):
         if b.provider_payout is not None:
             return b.provider_payout
         base = b.final_amount if b.final_amount is not None else b.amount_xof
         return round(base * 0.85) if base else None
 
-    seen_ids = set()
     result = []
-    for b in own_bookings + open_requests:
-        if b.id in seen_ids:
-            continue
-        seen_ids.add(b.id)
-
+    for b in own_bookings:
         date = b.appointment_date.strftime('%Y-%m-%d') if b.appointment_date else ''
         time = b.appointment_date.strftime('%H:%M') if b.appointment_date else ''
         commune = (b.client_location or '').split(',')[0].strip()
 
-        if b.id in own_ids:
-            # OWN mission — the provider needs everything to do the job.
-            result.append({
-                'id': b.id,
-                'masked': False,
-                'customerName': b.client_name,
-                'customerPhone': b.client_phone,
-                'location': b.client_location,
-                'commune': commune,
-                'serviceName': b.service_name,
-                'date': date,
-                'time': time,
-                'time_preference': b.time_preference,
-                'urgency': b.urgency,
-                'duration': 60,
-                'status': b.status,
-                'payment_status': b.payment_status,
-                'amount_xof': b.amount_xof,
-                'amount_collected': b.amount_collected,
-                'amount_due': b.amount_due,
-                'collection_status': b.collection_status,
-                'overpaid': b.overpaid,
-                'estimatedPayout': _payout(b),
-                'notes': b.notes,
-                'requestedAt': b.created_at.isoformat() if b.created_at else None,
-            })
-        else:
-            # OPEN request — PII masked until the mission is assigned.
-            # No client name/phone, no exact address, no free-text notes
-            # (which may contain the address). Only what's needed to decide.
-            result.append({
-                'id': b.id,
-                'masked': True,
-                'customerName': None,
-                'customerPhone': None,
-                'location': None,
-                'commune': commune,
-                'serviceName': b.service_name,
-                'date': date,
-                'time': time,
-                'time_preference': b.time_preference,
-                'urgency': b.urgency,
-                'duration': 60,
-                'status': b.status,
-                'payment_status': b.payment_status,
-                'amount_xof': None,
-                # Amounts masked pre-assignment (PII); shape kept for the client.
-                'amount_collected': None,
-                'amount_due': None,
-                'collection_status': None,
-                'overpaid': None,
-                'estimatedPayout': _payout(b),
-                'notes': None,
-                'requestedAt': b.created_at.isoformat() if b.created_at else None,
-            })
+        # OWN mission — the provider needs everything to do the job.
+        result.append({
+            'id': b.id,
+            'masked': False,
+            'customerName': b.client_name,
+            'customerPhone': b.client_phone,
+            'location': b.client_location,
+            'commune': commune,
+            'serviceName': b.service_name,
+            'date': date,
+            'time': time,
+            'time_preference': b.time_preference,
+            'urgency': b.urgency,
+            'duration': 60,
+            'status': b.status,
+            'payment_status': b.payment_status,
+            'amount_xof': b.amount_xof,
+            'amount_collected': b.amount_collected,
+            'amount_due': b.amount_due,
+            'collection_status': b.collection_status,
+            'overpaid': b.overpaid,
+            'estimatedPayout': _payout(b),
+            'notes': b.notes,
+            'requestedAt': b.created_at.isoformat() if b.created_at else None,
+        })
     return jsonify(result)
 
 
@@ -937,6 +879,11 @@ def start_provider_booking(booking_id):
     booking = ClientBooking.query.get_or_404(booking_id)
     if booking.status not in ('confirmed', 'accepted'):
         return jsonify({'error': 'Booking must be confirmed before starting'}), 400
+
+    # Paused providers can't work missions (person-level, T-20).
+    if sp is not None and not ServiceProvider.query.filter_by(
+            user_id=sp.user_id, provider_status='active').first():
+        return jsonify({'error': "Votre compte est en pause. Contactez Shizu pour le réactiver."}), 403
 
     booking.status = 'in_progress'
     from shizuverse.models.booking_event import BookingEvent
@@ -1021,23 +968,27 @@ def accept_provider_booking(booking_id):
     booking = ClientBooking.query.get_or_404(booking_id)
     prev_status = booking.status
 
-    # Two accept paths:
-    #  - assigned (admin already dispatched, amount locked) → 'accepted'
-    #    (the provider agrees; start_provider_booking accepts 'accepted').
-    #    Payment confirmation stays separate ('confirmed' means paid).
-    #  - requested/pending (legacy open pool) → 'confirmed' (unchanged).
-    if booking.status == 'assigned':
-        new_status = 'accepted'
-    elif booking.status in ('requested', 'pending'):
-        new_status = 'confirmed'
-    else:
+    # T-26/T-28 — the legacy open pool is CLOSED. A provider may only accept a
+    # mission the admin assigned to THEM (quote → lock → assign flow); claiming
+    # a raw request skipped that whole flow (auto-acceptation).
+    if booking.status in ('requested', 'pending'):
+        return jsonify({'error': "Cette demande n'est pas encore assignée. "
+                                 "Shizu vous contactera si elle vous est confiée."}), 403
+    if booking.status != 'assigned':
         return jsonify({'error': 'Booking is not available to accept'}), 400
+    # …and assigned to THIS provider, not someone else.
+    if (sp is None or not booking.provider_phone
+            or normalize_phone(booking.provider_phone) != normalize_phone(sp.phone_number or '')):
+        return jsonify({'error': "Cette mission est assignée à un autre prestataire."}), 403
+
+    # Paused providers can't take missions (person-level, T-20).
+    if not ServiceProvider.query.filter_by(user_id=sp.user_id, provider_status='active').first():
+        return jsonify({'error': "Votre compte est en pause. Contactez Shizu pour le réactiver."}), 403
+
+    new_status = 'accepted'
 
     booking.status = new_status
-    # On the assigned path the admin already set provider_name/phone; keep them.
-    if prev_status in ('requested', 'pending'):
-        booking.provider_name = sp.company_name if sp else None
-        booking.provider_phone = sp.phone_number if sp else None
+    # The admin already set provider_name/phone at assignment; keep them.
     booking.reviewed_by = 'provider'
 
     from shizuverse.models.booking_event import BookingEvent
