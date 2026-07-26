@@ -46,37 +46,37 @@ const SHIZU_WA  = (process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "").replace(/\D/g, 
 
 // ── Service name translation ──────────────────────────────────────────────────
 
-const SERVICE_MAP: [string, string][] = [
-  ["cleaning",   "Ménage et nettoyage"],
-  ["nettoyage",  "Ménage et nettoyage"],
-  ["ménage",     "Ménage et nettoyage"],
-  ["plumbing",   "Plomberie"],
-  ["plomberie",  "Plomberie"],
-  ["handyman",   "Bricolage & Réparations"],
-  ["bricolage",  "Bricolage & Réparations"],
-  ["electrical", "Électricité"],
-  ["electr",     "Électricité"],
-  ["childcare",  "Garde d'enfants"],
-  ["baby",       "Garde d'enfants"],
-  ["nounou",     "Garde d'enfants"],
-  ["beauty",     "Beauté à domicile"],
-  ["beauté",     "Beauté à domicile"],
-  ["coiffure",   "Beauté à domicile"],
-  ["garden",     "Jardinage et piscine"],
-  ["jardinage",  "Jardinage et piscine"],
-  ["piscine",    "Jardinage et piscine"],
-  ["ac ",        "Climatisation et électroménager"],
-  ["clim",       "Climatisation et électroménager"],
-  ["electromen", "Climatisation et électroménager"],
-  ["senior",     "Aide aux seniors"],
-  ["painting",   "Peinture & Rénovation"],
-  ["peinture",   "Peinture & Rénovation"],
+const SERVICE_MAP: [string, string, string][] = [
+  ["cleaning",   "Ménage et nettoyage",              "Cleaning"],
+  ["nettoyage",  "Ménage et nettoyage",              "Cleaning"],
+  ["ménage",     "Ménage et nettoyage",              "Cleaning"],
+  ["plumbing",   "Plomberie",                        "Plumbing"],
+  ["plomberie",  "Plomberie",                        "Plumbing"],
+  ["handyman",   "Bricolage & Réparations",          "Handyman & Repairs"],
+  ["bricolage",  "Bricolage & Réparations",          "Handyman & Repairs"],
+  ["electrical", "Électricité",                      "Electrical"],
+  ["electr",     "Électricité",                      "Electrical"],
+  ["childcare",  "Garde d'enfants",                  "Childcare"],
+  ["baby",       "Garde d'enfants",                  "Childcare"],
+  ["nounou",     "Garde d'enfants",                  "Childcare"],
+  ["beauty",     "Beauté à domicile",                "Home beauty"],
+  ["beauté",     "Beauté à domicile",                "Home beauty"],
+  ["coiffure",   "Beauté à domicile",                "Home beauty"],
+  ["garden",     "Jardinage et piscine",             "Gardening & pool"],
+  ["jardinage",  "Jardinage et piscine",             "Gardening & pool"],
+  ["piscine",    "Jardinage et piscine",             "Gardening & pool"],
+  ["ac ",        "Climatisation et électroménager",  "AC & appliances"],
+  ["clim",       "Climatisation et électroménager",  "AC & appliances"],
+  ["electromen", "Climatisation et électroménager",  "AC & appliances"],
+  ["senior",     "Aide aux seniors",                 "Senior care"],
+  ["painting",   "Peinture & Rénovation",            "Painting & Renovation"],
+  ["peinture",   "Peinture & Rénovation",            "Painting & Renovation"],
 ];
 
-function translateService(name: string): string {
+function translateService(name: string, isFr: boolean): string {
   const lower = name.toLowerCase();
-  for (const [key, val] of SERVICE_MAP) {
-    if (lower.includes(key)) return val;
+  for (const [key, fr, en] of SERVICE_MAP) {
+    if (lower.includes(key)) return isFr ? fr : en;
   }
   return name;
 }
@@ -87,15 +87,17 @@ function initials(name: string): string {
   return name.split(" ").map(w => w[0] ?? "").join("").slice(0, 2).toUpperCase();
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("fr-FR", {
+function formatDate(iso: string, isFr: boolean): string {
+  return new Date(iso).toLocaleDateString(isFr ? "fr-FR" : "en-US", {
     day: "numeric", month: "long", year: "numeric",
   });
 }
 
-function formatTime(iso: string): string {
+function formatTime(iso: string, isFr: boolean): string {
   const d = new Date(iso);
-  return `${d.getHours().toString().padStart(2, "0")}h${d.getMinutes().toString().padStart(2, "0")}`;
+  const hh = d.getHours().toString().padStart(2, "0");
+  const mm = d.getMinutes().toString().padStart(2, "0");
+  return isFr ? `${hh}h${mm}` : `${hh}:${mm}`;
 }
 
 function bookingRef(b: ApiBooking): string {
@@ -105,31 +107,35 @@ function bookingRef(b: ApiBooking): string {
 
 interface StatusBadge { label: string; bg: string; text: string; dot: string }
 
-function statusBadge(status: string, provider: string | null): StatusBadge {
+function statusBadge(status: string, provider: string | null, isFr: boolean): StatusBadge {
   if (status === "completed")
-    return { label: "Terminée",          bg: "bg-green-50",  text: "text-green-700",  dot: "bg-green-500"  };
+    return { label: isFr ? "Terminée" : "Completed",                     bg: "bg-green-50",  text: "text-green-700",  dot: "bg-green-500"  };
   if (status === "cancelled" || status === "declined" || status === "disputed")
-    return { label: "Annulée",           bg: "bg-red-50",    text: "text-red-700",    dot: "bg-red-500"    };
+    return { label: isFr ? "Annulée" : "Cancelled",                      bg: "bg-red-50",    text: "text-red-700",    dot: "bg-red-500"    };
   if (status === "pending_payment")
-    return { label: "Paiement en attente", bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500"  };
+    return { label: isFr ? "Paiement en attente" : "Payment pending",    bg: "bg-amber-50",  text: "text-amber-700",  dot: "bg-amber-500"  };
   if (status === "accepted" || status === "in_progress")
-    return { label: "En cours",          bg: "bg-amber-50",  text: "text-amber-700",  dot: "bg-amber-500"  };
+    return { label: isFr ? "En cours" : "In progress",                   bg: "bg-amber-50",  text: "text-amber-700",  dot: "bg-amber-500"  };
   if (provider)
-    return { label: "Assignée",          bg: "bg-blue-50",   text: "text-blue-700",   dot: "bg-blue-500"   };
-  return   { label: "Demande reçue",     bg: "bg-gray-100",  text: "text-gray-600",   dot: "bg-gray-400"   };
+    return { label: isFr ? "Assignée" : "Assigned",                      bg: "bg-blue-50",   text: "text-blue-700",   dot: "bg-blue-500"   };
+  return   { label: isFr ? "Demande reçue" : "Request received",         bg: "bg-gray-100",  text: "text-gray-600",   dot: "bg-gray-400"   };
 }
 
 const ACTIVE_STATUSES = new Set(["requested", "pending", "accepted", "in_progress", "pending_payment"]);
 const CANCELLED_STATUSES = new Set(["cancelled", "declined", "disputed"]);
 
-function waShizuHref(b: ApiBooking): string {
-  const msg = `Bonjour Shizu, je vous contacte au sujet de ma réservation ${bookingRef(b)}.`;
+function waShizuHref(b: ApiBooking, isFr: boolean): string {
+  const msg = isFr
+    ? `Bonjour Shizu, je vous contacte au sujet de ma réservation ${bookingRef(b)}.`
+    : `Hello Shizu, I'm contacting you about my booking ${bookingRef(b)}.`;
   return SHIZU_WA ? `https://wa.me/${SHIZU_WA}?text=${encodeURIComponent(msg)}` : "#";
 }
 
-function waProviderHref(phone: string, b: ApiBooking): string {
+function waProviderHref(phone: string, b: ApiBooking, isFr: boolean): string {
   const p = phone.replace(/\D/g, "");
-  const msg = `Bonjour, je vous contacte pour ma réservation ${bookingRef(b)} via Shizu.`;
+  const msg = isFr
+    ? `Bonjour, je vous contacte pour ma réservation ${bookingRef(b)} via Shizu.`
+    : `Hello, I'm contacting you about my booking ${bookingRef(b)} via Shizu.`;
   return `https://wa.me/${p}?text=${encodeURIComponent(msg)}`;
 }
 
@@ -176,6 +182,7 @@ type Filter = "all" | "active" | "done" | "cancelled";
 export default function ClientDashboard() {
   const params = useParams();
   const locale = (params?.locale as string) ?? "fr";
+  const isFr   = locale !== "en";
   const router = useRouter();
 
   const [client, setClient]           = useState<ClientInfo | null>(null);
@@ -274,8 +281,8 @@ export default function ClientDashboard() {
   async function handlePasswordChange() {
     if (pwSaving) return;
     setPwError(null);
-    if (pwNew !== pwConfirm) { setPwError("Les mots de passe ne correspondent pas."); return; }
-    if (pwNew.length < 6) { setPwError("Minimum 6 caractères."); return; }
+    if (pwNew !== pwConfirm) { setPwError(isFr ? "Les mots de passe ne correspondent pas." : "Passwords do not match."); return; }
+    if (pwNew.length < 6) { setPwError(isFr ? "Minimum 6 caractères." : "Minimum 6 characters."); return; }
     setPwSaving(true);
     try {
       const token = localStorage.getItem("client_token");
@@ -285,11 +292,11 @@ export default function ClientDashboard() {
         body: JSON.stringify({ current_password: pwCurrent, new_password: pwNew }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setPwError(data.error ?? "Erreur."); return; }
+      if (!res.ok) { setPwError(data.error ?? (isFr ? "Erreur." : "Error.")); return; }
       setPwDone(true);
       setPwCurrent(""); setPwNew(""); setPwConfirm("");
     } catch {
-      setPwError("Erreur réseau.");
+      setPwError(isFr ? "Erreur réseau." : "Network error.");
     } finally {
       setPwSaving(false);
     }
@@ -323,7 +330,7 @@ export default function ClientDashboard() {
     );
   }
 
-  const displayName = client?.name ?? "vous";
+  const displayName = client?.name ?? (isFr ? "vous" : "you");
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -340,7 +347,7 @@ export default function ClientDashboard() {
                 {initials(client?.name ?? "?")}
               </div>
               <div className="min-w-0">
-                <p className="text-white/60 text-xs leading-none mb-0.5">Bonjour 👋</p>
+                <p className="text-white/60 text-xs leading-none mb-0.5">{isFr ? "Bonjour" : "Hello"} 👋</p>
                 <p className="text-white font-bold text-base leading-tight truncate">{displayName}</p>
               </div>
             </div>
@@ -352,13 +359,13 @@ export default function ClientDashboard() {
                 className="flex items-center gap-1.5 border border-white/40 text-white text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-white/10 transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
-                Réserver
+                {isFr ? "Réserver" : "Book"}
               </button>
               <button
                 onClick={handleLogout}
                 className="text-white/40 hover:text-white/70 text-[11px] transition-colors"
               >
-                Déconnexion
+                {isFr ? "Déconnexion" : "Log out"}
               </button>
             </div>
           </div>
@@ -366,9 +373,9 @@ export default function ClientDashboard() {
           {/* Stat grid */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { value: String(totalCount),     label: "Réservations" },
-              { value: String(completedCount), label: "Terminées" },
-              { value: "—", label: completedCount > 0 ? "Note moy." : "Pas encore noté" },
+              { value: String(totalCount),     label: isFr ? "Réservations" : "Bookings" },
+              { value: String(completedCount), label: isFr ? "Terminées" : "Completed" },
+              { value: "—", label: completedCount > 0 ? (isFr ? "Note moy." : "Avg. rating") : (isFr ? "Pas encore noté" : "Not rated yet") },
             ].map(({ value, label }) => (
               <div key={label} className="rounded-xl bg-white/10 px-3 py-2.5 text-center">
                 <p className="text-white font-bold text-lg leading-none">{value}</p>
@@ -386,12 +393,12 @@ export default function ClientDashboard() {
           <div className="rounded-2xl bg-[#f0fdf4] border-2 border-green-200 p-4 space-y-3">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
-              <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">Réservation active</p>
+              <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">{isFr ? "Réservation active" : "Active booking"}</p>
             </div>
             <div>
-              <p className="font-bold text-gray-900">{translateService(activeBooking.service_name)}</p>
+              <p className="font-bold text-gray-900">{translateService(activeBooking.service_name, isFr)}</p>
               <p className="text-sm text-gray-500 mt-0.5">
-                {formatDate(activeBooking.appointment_date)} · {formatTime(activeBooking.appointment_date)}
+                {formatDate(activeBooking.appointment_date, isFr)} · {formatTime(activeBooking.appointment_date, isFr)}
                 {activeBooking.client_location ? ` · ${activeBooking.client_location.split(",")[0]}` : ""}
               </p>
             </div>
@@ -404,16 +411,16 @@ export default function ClientDashboard() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-gray-900">{activeBooking.provider_name}</p>
-                    <p className="text-xs text-green-600 font-medium">Prestataire vérifié ✓</p>
+                    <p className="text-xs text-green-600 font-medium">{isFr ? "Prestataire vérifié" : "Verified provider"} ✓</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
                   {activeBooking.provider_phone && (
-                    <a href={waProviderHref(activeBooking.provider_phone, activeBooking)}
+                    <a href={waProviderHref(activeBooking.provider_phone, activeBooking, isFr)}
                       target="_blank" rel="noopener noreferrer"
                       className="flex-1 flex items-center justify-center gap-1.5 bg-[#25D366] hover:bg-[#1ebe5c] text-white text-xs font-semibold px-3 py-2.5 rounded-xl transition-colors">
                       <MessageCircle className="h-3.5 w-3.5" />
-                      Contacter {activeBooking.provider_name.split(" ")[0]}
+                      {isFr ? "Contacter" : "Contact"} {activeBooking.provider_name.split(" ")[0]}
                     </a>
                   )}
                   {activeBooking.provider_id && (
@@ -421,17 +428,17 @@ export default function ClientDashboard() {
                       onClick={() => router.push(`/${locale}/provider/${activeBooking.provider_id}`)}
                       className="flex-1 flex items-center justify-center gap-1.5 border border-gray-200 bg-white text-gray-600 text-xs font-semibold px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
                       <ChevronRight className="h-3.5 w-3.5" />
-                      Voir fiche
+                      {isFr ? "Voir fiche" : "View profile"}
                     </button>
                   )}
                 </div>
               </>
             ) : (
               SHIZU_WA ? (
-                <a href={waShizuHref(activeBooking)} target="_blank" rel="noopener noreferrer"
+                <a href={waShizuHref(activeBooking, isFr)} target="_blank" rel="noopener noreferrer"
                   className="flex items-center justify-center gap-1.5 border border-[#25D366] text-[#25D366] hover:bg-green-50 text-xs font-semibold px-3 py-2 rounded-xl transition-colors w-full">
                   <MessageCircle className="h-3.5 w-3.5" />
-                  Contacter Shizu
+                  {isFr ? "Contacter Shizu" : "Contact Shizu"}
                 </a>
               ) : null
             )}
@@ -443,14 +450,16 @@ export default function ClientDashboard() {
           const alreadyDeclared = paymentDeclaredIds.has(b.id);
           const amt = b.final_amount ?? b.amount_xof;
           const fmtAmt = amt != null ? new Intl.NumberFormat("fr-FR").format(amt) + " FCFA" : null;
-          const waMsg = `Bonjour Shizu, je dois effectuer le paiement pour ma réservation ${bookingRef(b)}${fmtAmt ? ` (${fmtAmt})` : ""}. Pouvez-vous m'envoyer les coordonnées de paiement ?`;
+          const waMsg = isFr
+            ? `Bonjour Shizu, je dois effectuer le paiement pour ma réservation ${bookingRef(b)}${fmtAmt ? ` (${fmtAmt})` : ""}. Pouvez-vous m'envoyer les coordonnées de paiement ?`
+            : `Hello Shizu, I need to pay for my booking ${bookingRef(b)}${fmtAmt ? ` (${fmtAmt})` : ""}. Could you send me the payment details?`;
           return (
             <div key={b.id} className="rounded-2xl bg-amber-50 border-2 border-amber-200 p-4 space-y-3">
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Paiement en attente</p>
-                  <p className="font-bold text-gray-900 mt-0.5">{translateService(b.service_name)}</p>
+                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">{isFr ? "Paiement en attente" : "Payment pending"}</p>
+                  <p className="font-bold text-gray-900 mt-0.5">{translateService(b.service_name, isFr)}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{bookingRef(b)}</p>
                 </div>
                 {fmtAmt && (
@@ -460,7 +469,7 @@ export default function ClientDashboard() {
               {alreadyDeclared ? (
                 <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-xl px-3 py-2.5">
                   <CheckCircle className="h-4 w-4 shrink-0" />
-                  <span className="text-xs font-medium">Paiement déclaré — en attente de confirmation Shizu</span>
+                  <span className="text-xs font-medium">{isFr ? "Paiement déclaré — en attente de confirmation Shizu" : "Payment declared — awaiting Shizu confirmation"}</span>
                 </div>
               ) : (
                 <div className="flex gap-2 flex-wrap">
@@ -469,7 +478,7 @@ export default function ClientDashboard() {
                       target="_blank" rel="noopener noreferrer"
                       className="flex-1 flex items-center justify-center gap-1.5 border border-amber-300 bg-white text-amber-700 hover:bg-amber-50 text-xs font-semibold px-3 py-2.5 rounded-xl transition-colors">
                       <MessageCircle className="h-3.5 w-3.5" />
-                      Obtenir instructions
+                      {isFr ? "Obtenir instructions" : "Get instructions"}
                     </a>
                   )}
                   <button
@@ -479,7 +488,7 @@ export default function ClientDashboard() {
                     {declaringPayment === b.id
                       ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       : <CheckCircle className="h-3.5 w-3.5" />}
-                    J&apos;ai effectué le paiement
+                    {isFr ? "J'ai effectué le paiement" : "I have made the payment"}
                   </button>
                 </div>
               )}
@@ -490,10 +499,10 @@ export default function ClientDashboard() {
         {/* ── Filter chips ─────────────────────────────────────────────── */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 no-scrollbar">
           {([
-            { key: "all",       label: "Toutes" },
-            { key: "active",    label: "En cours" },
-            { key: "done",      label: "Terminées" },
-            { key: "cancelled", label: "Annulées" },
+            { key: "all",       label: isFr ? "Toutes" : "All" },
+            { key: "active",    label: isFr ? "En cours" : "In progress" },
+            { key: "done",      label: isFr ? "Terminées" : "Completed" },
+            { key: "cancelled", label: isFr ? "Annulées" : "Cancelled" },
           ] as { key: Filter; label: string }[]).map(f => (
             <button key={f.key} onClick={() => setFilter(f.key)}
               className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
@@ -509,19 +518,19 @@ export default function ClientDashboard() {
         {/* ── Booking list ─────────────────────────────────────────────── */}
         {listError && (
           <div className="mb-3">
-            <ErrorBanner isFr={locale !== "en"} onRetry={() => setListTick(t => t + 1)} />
+            <ErrorBanner isFr={isFr} onRetry={() => setListTick(t => t + 1)} />
           </div>
         )}
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <CalendarDays className="mb-4 h-12 w-12 text-gray-300" />
-            <p className="text-sm font-medium text-gray-600">Aucune réservation</p>
-            <p className="text-xs text-gray-400 mt-1">Vos réservations apparaîtront ici.</p>
+            <p className="text-sm font-medium text-gray-600">{isFr ? "Aucune réservation" : "No bookings"}</p>
+            <p className="text-xs text-gray-400 mt-1">{isFr ? "Vos réservations apparaîtront ici." : "Your bookings will appear here."}</p>
           </div>
         ) : (
           <div className="space-y-3">
             {filtered.map(b => {
-              const badge       = statusBadge(b.status, b.provider_name);
+              const badge       = statusBadge(b.status, b.provider_name, isFr);
               const isCompleted = b.status === "completed";
               const isCancelled = CANCELLED_STATUSES.has(b.status);
               const isActive    = ACTIVE_STATUSES.has(b.status);
@@ -532,10 +541,11 @@ export default function ClientDashboard() {
               const reviewQs    = new URLSearchParams({
                 service:  b.service_name,
                 provider: b.provider_name ?? "",
-                date:     formatDate(b.appointment_date),
+                date:     formatDate(b.appointment_date, isFr),
               }).toString();
-              const waModifyMsg = encodeURIComponent(
-                `Bonjour Shizu, je souhaite modifier ma réservation ${bookingRef(b)} (${translateService(b.service_name)}).`
+              const waModifyMsg = encodeURIComponent(isFr
+                ? `Bonjour Shizu, je souhaite modifier ma réservation ${bookingRef(b)} (${translateService(b.service_name, true)}).`
+                : `Hello Shizu, I would like to change my booking ${bookingRef(b)} (${translateService(b.service_name, false)}).`
               );
 
               return (
@@ -546,7 +556,7 @@ export default function ClientDashboard() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[10px] text-gray-400 font-mono">{bookingRef(b)}</p>
-                      <p className="font-bold text-gray-900 mt-0.5 leading-tight">{translateService(b.service_name)}</p>
+                      <p className="font-bold text-gray-900 mt-0.5 leading-tight">{translateService(b.service_name, isFr)}</p>
                     </div>
                     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium shrink-0 ${badge.bg} ${badge.text}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
@@ -557,7 +567,7 @@ export default function ClientDashboard() {
                   {/* Date · time · commune */}
                   <div className="flex items-center gap-1.5 text-xs text-gray-500">
                     <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-                    <span>{formatDate(b.appointment_date)} · {formatTime(b.appointment_date)}</span>
+                    <span>{formatDate(b.appointment_date, isFr)} · {formatTime(b.appointment_date, isFr)}</span>
                     {commune && <><span className="text-gray-300">·</span><span>{commune}</span></>}
                   </div>
 
@@ -571,9 +581,9 @@ export default function ClientDashboard() {
                         const fmt = new Intl.NumberFormat("fr-FR").format(effectiveAmt) + " FCFA";
                         const sep = b.provider_name ? " — " : "";
                         if ((b.collection_status ?? b.payment_status) === "paid") {
-                          return <span className="text-green-600 font-semibold">{sep}Réglé : {fmt}</span>;
+                          return <span className="text-green-600 font-semibold">{sep}{isFr ? "Réglé" : "Paid"} : {fmt}</span>;
                         }
-                        return <span className="text-gray-500">{sep}Devis : {fmt}</span>;
+                        return <span className="text-gray-500">{sep}{isFr ? "Devis" : "Quote"} : {fmt}</span>;
                       })()}
                     </p>
                   )}
@@ -583,7 +593,7 @@ export default function ClientDashboard() {
                     <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-3 space-y-2 text-xs">
                       {b.client_location && (
                         <div className="flex items-start justify-between gap-2">
-                          <span className="text-gray-400 shrink-0">Adresse</span>
+                          <span className="text-gray-400 shrink-0">{isFr ? "Adresse" : "Address"}</span>
                           <span className="text-gray-700 text-right">{b.client_location}</span>
                         </div>
                       )}
@@ -595,7 +605,7 @@ export default function ClientDashboard() {
                       )}
                       {b.provider_name && (
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-gray-400 shrink-0">Prestataire</span>
+                          <span className="text-gray-400 shrink-0">{isFr ? "Prestataire" : "Provider"}</span>
                           <span className="text-gray-700 font-medium">{b.provider_name}</span>
                         </div>
                       )}
@@ -608,15 +618,15 @@ export default function ClientDashboard() {
                     <button
                       onClick={() => setExpandedId(isExpanded ? null : b.id)}
                       className="flex items-center gap-1.5 border border-gray-200 text-gray-500 hover:text-gray-700 text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
-                      {isExpanded ? "Réduire" : "Voir détails"}
+                      {isExpanded ? (isFr ? "Réduire" : "Collapse") : (isFr ? "Voir détails" : "View details")}
                     </button>
 
                     {/* Contacter Shizu */}
                     {SHIZU_WA && (
-                      <a href={waShizuHref(b)} target="_blank" rel="noopener noreferrer"
+                      <a href={waShizuHref(b, isFr)} target="_blank" rel="noopener noreferrer"
                         className="flex items-center gap-1.5 bg-[#25D366] hover:bg-[#1ebe5c] text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
                         <MessageCircle className="h-3.5 w-3.5" />
-                        💬 Contacter Shizu
+                        💬 {isFr ? "Contacter Shizu" : "Contact Shizu"}
                       </a>
                     )}
 
@@ -626,7 +636,7 @@ export default function ClientDashboard() {
                         href={`https://wa.me/${SHIZU_WA}?text=${waModifyMsg}`}
                         target="_blank" rel="noopener noreferrer"
                         className="flex items-center gap-1.5 border border-gray-200 text-gray-600 hover:bg-gray-50 text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
-                        Modifier
+                        {isFr ? "Modifier" : "Edit"}
                       </a>
                     )}
 
@@ -636,7 +646,7 @@ export default function ClientDashboard() {
                         onClick={() => router.push(rebookHref(b, categories, locale, client))}
                         className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
                         <Plus className="h-3.5 w-3.5" />
-                        Réserver à nouveau
+                        {isFr ? "Réserver à nouveau" : "Book again"}
                       </button>
                     )}
                     {isCompleted && !isReviewed && (
@@ -644,13 +654,13 @@ export default function ClientDashboard() {
                         onClick={() => router.push(`/${locale}/review/${b.id}?${reviewQs}`)}
                         className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
                         <Star className="h-3.5 w-3.5" />
-                        Laisser un avis
+                        {isFr ? "Laisser un avis" : "Leave a review"}
                       </button>
                     )}
                     {isCompleted && isReviewed && (
                       <span className="flex items-center gap-1 text-xs text-gray-400 py-2">
                         <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                        Avis laissé
+                        {isFr ? "Avis laissé" : "Reviewed"}
                       </span>
                     )}
 
@@ -660,7 +670,7 @@ export default function ClientDashboard() {
                         onClick={() => router.push(rebookHref(b, categories, locale, client))}
                         className="flex items-center gap-1.5 border border-gray-200 text-gray-600 text-xs font-semibold px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors">
                         <Plus className="h-3.5 w-3.5" />
-                        Réserver à nouveau
+                        {isFr ? "Réserver à nouveau" : "Book again"}
                       </button>
                     )}
 
@@ -678,7 +688,7 @@ export default function ClientDashboard() {
           onClick={() => router.push(`/${locale}/services`)}
           className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-3.5 rounded-2xl transition-colors text-sm mt-2">
           <Plus className="h-4 w-4" />
-          Nouvelle réservation
+          {isFr ? "Nouvelle réservation" : "New booking"}
         </button>
 
         {/* Password change */}
@@ -687,14 +697,14 @@ export default function ClientDashboard() {
             onClick={() => { setPwOpen(true); setPwDone(false); setPwError(null); }}
             className="flex items-center justify-center gap-1.5 w-full text-xs text-gray-400 hover:text-gray-600 transition-colors py-1">
             <KeyRound className="h-3.5 w-3.5" />
-            Changer mon mot de passe
+            {isFr ? "Changer mon mot de passe" : "Change my password"}
           </button>
         ) : (
           <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
                 <KeyRound className="h-4 w-4" />
-                Changer mon mot de passe
+                {isFr ? "Changer mon mot de passe" : "Change my password"}
               </p>
               <button onClick={() => { setPwOpen(false); setPwDone(false); setPwError(null); }}
                 className="text-xs text-gray-400 hover:text-gray-600">✕</button>
@@ -703,7 +713,7 @@ export default function ClientDashboard() {
             {pwDone ? (
               <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-xl px-3 py-2.5">
                 <CheckCircle className="h-4 w-4 shrink-0" />
-                <span className="text-sm font-medium">Mot de passe mis à jour.</span>
+                <span className="text-sm font-medium">{isFr ? "Mot de passe mis à jour." : "Password updated."}</span>
               </div>
             ) : (
               <>
@@ -711,7 +721,7 @@ export default function ClientDashboard() {
                 <div className="relative">
                   <input type={pwShowCurrent ? "text" : "password"} value={pwCurrent}
                     onChange={e => setPwCurrent(e.target.value)}
-                    placeholder="Mot de passe actuel"
+                    placeholder={isFr ? "Mot de passe actuel" : "Current password"}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                   <button type="button" onClick={() => setPwShowCurrent(v => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -722,7 +732,7 @@ export default function ClientDashboard() {
                 <div className="relative">
                   <input type={pwShowNew ? "text" : "password"} value={pwNew}
                     onChange={e => setPwNew(e.target.value)}
-                    placeholder="Nouveau mot de passe (6 car. min.)"
+                    placeholder={isFr ? "Nouveau mot de passe (6 car. min.)" : "New password (min. 6 chars)"}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                   <button type="button" onClick={() => setPwShowNew(v => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -732,7 +742,7 @@ export default function ClientDashboard() {
                 {/* Confirm */}
                 <input type="password" value={pwConfirm}
                   onChange={e => setPwConfirm(e.target.value)}
-                  placeholder="Confirmer le mot de passe"
+                  placeholder={isFr ? "Confirmer le mot de passe" : "Confirm password"}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
 
                 {pwError && <p className="text-xs text-red-600">{pwError}</p>}
@@ -741,7 +751,7 @@ export default function ClientDashboard() {
                   disabled={!pwCurrent || !pwNew || !pwConfirm || pwSaving}
                   className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5">
                   {pwSaving && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Mettre à jour
+                  {isFr ? "Mettre à jour" : "Update"}
                 </button>
               </>
             )}
@@ -751,12 +761,12 @@ export default function ClientDashboard() {
         {/* WA help link */}
         {SHIZU_WA && (
           <p className="text-center text-xs text-gray-400 pb-6">
-            Besoin d&apos;aide ?{" "}
+            {isFr ? "Besoin d'aide ?" : "Need help?"}{" "}
             <a
-              href={`https://wa.me/${SHIZU_WA}?text=${encodeURIComponent("Bonjour Shizu, j'ai besoin d'aide.")}`}
+              href={`https://wa.me/${SHIZU_WA}?text=${encodeURIComponent(isFr ? "Bonjour Shizu, j'ai besoin d'aide." : "Hello Shizu, I need help.")}`}
               target="_blank" rel="noopener noreferrer"
               className="text-green-600 hover:underline">
-              Contactez Shizu sur WhatsApp
+              {isFr ? "Contactez Shizu sur WhatsApp" : "Contact Shizu on WhatsApp"}
             </a>
           </p>
         )}
