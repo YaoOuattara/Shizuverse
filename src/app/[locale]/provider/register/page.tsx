@@ -10,12 +10,10 @@ import { useToast } from "@/hooks/use-toast";
 import PhoneInput from "@/components/PhoneInput";
 import { normalizeCiMomo, isValidCiMomo } from "@/lib/momo";
 import {
-  Loader2, CheckCircle, Sparkles, Droplets, Wrench, Zap, Hammer,
-  Baby, Heart, Leaf, Wind, ArrowLeft, Camera, CreditCard,
+  Loader2, CheckCircle, Sparkles, ArrowLeft, Camera, CreditCard,
   Smartphone, Upload, CheckCircle2, Lock,
 } from "lucide-react";
 import { COMMUNES } from "@/components/CommuneAutocomplete";
-import type { LucideIcon } from "lucide-react";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -28,19 +26,6 @@ interface ApiCategory {
   name_en: string;
 }
 
-function getCategoryIcon(cat: ApiCategory): LucideIcon {
-  const name = (cat.name_en || cat.name || "").toLowerCase();
-  if (name.includes("clean") || name.includes("nettoy"))           return Sparkles;
-  if (name.includes("plumb") || name.includes("plomb") || name.includes("water") || name.includes("eau")) return Droplets;
-  if (name.includes("electr"))                                     return Zap;
-  if (name.includes("carpen") || name.includes("menuiser") || name.includes("construct") || name.includes("handyman")) return Hammer;
-  if (name.includes("baby") || name.includes("child") || name.includes("enfant") || name.includes("nanny")) return Baby;
-  if (name.includes("massage") || name.includes("wellness") || name.includes("beauty") || name.includes("beaut")) return Heart;
-  if (name.includes("garden") || name.includes("jardin") || name.includes("green") || name.includes("plant")) return Leaf;
-  if (name.includes("ac") || name.includes("air") || name.includes("clim") || name.includes("hvac") || name.includes("wind") || name.includes("cool")) return Wind;
-  if (name.includes("plumb") || name.includes("pipe") || name.includes("wrench") || name.includes("repair") || name.includes("réparat")) return Wrench;
-  return Sparkles;
-}
 
 function displayCatName(cat: ApiCategory, locale: string): string {
   return locale === "fr" ? (cat.name_fr || cat.name) : (cat.name_en || cat.name);
@@ -116,6 +101,18 @@ export default function ProviderRegisterPage() {
   const [selectedServices, setSelectedServices] = useState<number[]>([]);
   const [selectedCommunes, setSelectedCommunes] = useState<string[]>([]);
   const [serviceRates, setServiceRates] = useState<Record<number, { min: string; max: string }>>({});
+
+  // ── Étape 3 : disclosures optionnelles (formulaire perçu plus court) ──────
+  const [showExp, setShowExp]     = useState(false);
+  const [showIdDoc, setShowIdDoc] = useState(false);
+  const [showMomo, setShowMomo]   = useState(false);
+  // Gate 5 : l'approbation Beauté exige une pièce d'identité — l'artisan doit
+  // l'apprendre ICI, pas au 422 de l'approbation.
+  const beautySelected = selectedServices.some((id) => {
+    const c = categories.find((cat) => cat.id === id);
+    return ((c?.name_fr || c?.name || "") + (c?.name_en || "")).toLowerCase().includes("beaut");
+  });
+  useEffect(() => { if (beautySelected) setShowIdDoc(true); }, [beautySelected]);
   const [bio, setBio] = useState("");
 
   useEffect(() => {
@@ -298,7 +295,7 @@ export default function ProviderRegisterPage() {
         : "Hello Shizu, I just submitted my provider profile and have a question."
     );
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-[#EDF4FC] px-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 max-w-md w-full text-center">
           <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="h-9 w-9 text-green-500" />
@@ -351,8 +348,8 @@ export default function ProviderRegisterPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-lg w-full">
+    <div className="min-h-screen bg-[#EDF4FC] flex items-center justify-center px-4 py-12">
+      <div className="bg-white rounded-2xl shadow-sm border border-[#B5D4F4] p-8 max-w-lg w-full">
 
         <img
           src="https://res.cloudinary.com/ddilgv5ir/image/upload/v1779646648/shizu_logo_horizontal_dark_khesrn.png"
@@ -371,7 +368,7 @@ export default function ProviderRegisterPage() {
 
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-[#0D2B6B]">
             {isFr ? "Rejoindre Shizu en tant que prestataire" : "Join Shizu as a Provider"}
           </h1>
           <p className="text-gray-500 mt-1 text-sm">
@@ -384,7 +381,7 @@ export default function ProviderRegisterPage() {
         <ProgressBar step={step} isFr={isFr} />
 
         {/* Active step card */}
-        <div className="rounded-2xl border border-gray-100 bg-white border-t-2 border-t-green-500 pt-6 pb-2 px-1">
+        <div className="rounded-2xl border border-[#B5D4F4] bg-white border-t-2 border-t-green-500 pt-6 pb-2 px-1">
 
         {/* ══════════════════════════════════════════════════════════════════
             Step 1 — Qui êtes-vous ?
@@ -397,7 +394,7 @@ export default function ProviderRegisterPage() {
 
             {/* Account type cards */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#0D2B6B]">
                 {isFr ? "Type de compte" : "Account type"}
               </p>
               <div className="grid grid-cols-2 gap-3">
@@ -452,7 +449,7 @@ export default function ProviderRegisterPage() {
 
             {/* Full name */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#0D2B6B]">
                 {isFr ? "Identité" : "Identity"}
               </p>
               <Label htmlFor="full_name" className="text-sm text-gray-700">
@@ -483,7 +480,7 @@ export default function ProviderRegisterPage() {
 
             {/* Password */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#0D2B6B]">
                 {isFr ? "Sécurité" : "Security"}
               </p>
               <Label htmlFor="password" className="text-sm text-gray-700">
@@ -530,7 +527,7 @@ export default function ProviderRegisterPage() {
 
             {/* Commune */}
             <div className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#0D2B6B]">
                 {isFr ? "Localisation" : "Location"}
               </p>
               <Label htmlFor="commune" className="text-sm text-gray-700">
@@ -554,13 +551,15 @@ export default function ProviderRegisterPage() {
               </p>
             </div>
 
-            <Button
-              onClick={handleStep1Continue}
-              disabled={!step1Valid}
-              className="w-full bg-green-600 hover:bg-green-700 mt-2"
-            >
-              {isFr ? "Continuer" : "Continue"}
-            </Button>
+            <div className="sticky bottom-0 z-10 bg-white -mx-1 px-1 pb-3 pt-2 shadow-[0_-6px_16px_-8px_rgba(13,43,107,0.25)] sm:static sm:mx-0 sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none mt-2">
+              <Button
+                onClick={handleStep1Continue}
+                disabled={!step1Valid}
+                className="w-full bg-green-600 hover:bg-green-700 min-h-[44px]"
+              >
+                {isFr ? "Continuer" : "Continue"}
+              </Button>
+            </div>
           </div>
         )}
 
@@ -575,7 +574,7 @@ export default function ProviderRegisterPage() {
 
             {/* Category chips */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#0D2B6B]">
                 {isFr ? "Services proposés" : "Services offered"} <span className="text-red-400">*</span>
               </p>
               {categoriesLoading ? (
@@ -584,10 +583,11 @@ export default function ProviderRegisterPage() {
                   <span className="text-sm">{isFr ? "Chargement…" : "Loading…"}</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {/* Chips (pattern des zones ci-dessous) — les grandes cartes à
+                      icônes génériques (et parfois fausses) sont supprimées. */}
                   {categories.map((cat) => {
                     const selected = selectedServices.includes(cat.id);
-                    const Icon = getCategoryIcon(cat);
                     return (
                       <button
                         key={cat.id}
@@ -600,20 +600,12 @@ export default function ProviderRegisterPage() {
                             setSelectedServices((prev) => [...prev, cat.id]);
                           }
                         }}
-                        className={`relative flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all
+                        className={`px-3.5 rounded-full text-sm font-medium border min-h-[44px] transition-all
                           ${selected
                             ? "border-[#0D2B6B] bg-[#0D2B6B] text-white"
-                            : "border-gray-100 hover:border-gray-200 bg-white"}`}
+                            : "border-[#B5D4F4] bg-white text-gray-700 hover:border-[#0D2B6B]"}`}
                       >
-                        <Icon className={`h-5 w-5 shrink-0 ${selected ? "text-white" : "text-gray-400"}`} />
-                        <span className={`text-sm font-medium leading-tight ${selected ? "text-white" : "text-gray-700"}`}>
-                          {displayCatName(cat, locale)}
-                        </span>
-                        {selected && (
-                          <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-white/20 flex items-center justify-center">
-                            <CheckCircle className="h-2.5 w-2.5 text-white" />
-                          </div>
-                        )}
+                        {displayCatName(cat, locale)}
                       </button>
                     );
                   })}
@@ -623,7 +615,7 @@ export default function ProviderRegisterPage() {
 
             {/* Commune chips */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#0D2B6B]">
                 {isFr ? "Zones d'intervention" : "Operating districts"} <span className="text-red-400">*</span>
               </p>
               <div className={`flex flex-wrap gap-2 ${COMMUNES.length > 10 ? "max-h-44 overflow-y-auto pr-1" : ""}`}>
@@ -641,7 +633,7 @@ export default function ProviderRegisterPage() {
                       className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all
                         ${selected
                           ? "border-[#0D2B6B] bg-[#0D2B6B] text-white"
-                          : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"}`}
+                          : "border-[#B5D4F4] bg-white text-gray-700 hover:border-[#0D2B6B]"}`}
                     >
                       {commune}
                     </button>
@@ -650,18 +642,14 @@ export default function ProviderRegisterPage() {
               </div>
             </div>
 
-            {/* Per-service price ranges */}
+            {/* Per-service price ranges — section entière masquée tant que rien
+                n'est sélectionné (plus de cadre vide placeholder). */}
+            {selectedServices.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#0D2B6B]">
                 {isFr ? "Tarif indicatif" : "Pricing per service"}
               </p>
-              {selectedServices.length === 0 ? (
-                <p className="text-sm text-gray-400 italic py-1">
-                  {isFr
-                    ? "Sélectionnez vos services pour définir vos tarifs"
-                    : "Select your services to set your rates"}
-                </p>
-              ) : (
+              {(
                 <div className="space-y-2">
                   {selectedServices.map((id) => {
                     const cat = categories.find((c) => c.id === id);
@@ -700,15 +688,16 @@ export default function ProviderRegisterPage() {
                 </div>
               )}
             </div>
+            )}
 
-            <div className="flex gap-3 pt-1">
-              <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
+            <div className="flex gap-3 pt-1 sticky bottom-0 z-10 bg-white -mx-1 px-1 pb-3 pt-2 shadow-[0_-6px_16px_-8px_rgba(13,43,107,0.25)] sm:static sm:mx-0 sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none">
+              <Button variant="outline" onClick={() => setStep(1)} className="flex-1 min-h-[44px]">
                 {isFr ? "Retour" : "Back"}
               </Button>
               <Button
                 onClick={() => setStep(3)}
                 disabled={!step2Valid}
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="flex-1 bg-green-600 hover:bg-green-700 min-h-[44px]"
               >
                 {isFr ? "Continuer" : "Continue"}
               </Button>
@@ -727,7 +716,7 @@ export default function ProviderRegisterPage() {
 
             {/* Bio */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#0D2B6B]">
                 {isFr ? "Présentation" : "Bio"} <span className="text-red-400">*</span>
               </p>
               <Textarea
@@ -756,12 +745,13 @@ export default function ProviderRegisterPage() {
               </Button>
             </div>
 
-            {/* Experience */}
+            {/* Experience — disclosure repliée */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                {isFr ? "Expérience professionnelle" : "Professional experience"}
-                <span className="ml-1 normal-case font-normal text-gray-300">({isFr ? "optionnelle" : "optional"})</span>
-              </p>
+              <button type="button" onClick={() => setShowExp((v) => !v)}
+                className="w-full text-left text-sm font-semibold text-[#0D2B6B] min-h-[44px] flex items-center">
+                {showExp ? "−" : "+"}&nbsp;{isFr ? "Expérience professionnelle (optionnel)" : "Professional experience (optional)"}
+              </button>
+              {showExp && (<>
               <Textarea
                 rows={3}
                 placeholder={isFr
@@ -771,9 +761,10 @@ export default function ProviderRegisterPage() {
                 onChange={(e) => setExperienceText(e.target.value)}
                 className="resize-none"
               />
+              </>)}
             </div>
 
-            {/* Green motivational nudge */}
+            {/* Green motivational nudge (UNE seule occurrence) */}
             <div className="rounded-xl border border-green-300 px-5 py-4" style={{ backgroundColor: "#f0fdf4" }}>
               <div className="flex items-center gap-2 mb-1">
                 <CheckCircle className="h-5 w-5 text-green-600 shrink-0" />
@@ -790,7 +781,7 @@ export default function ProviderRegisterPage() {
 
             {/* Profile photo */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#0D2B6B]">
                 {isFr ? "Photo de profil" : "Profile photo"}
               </p>
               <Label className="flex items-center gap-2 text-sm text-gray-700">
@@ -842,12 +833,22 @@ export default function ProviderRegisterPage() {
               </div>
             </div>
 
-            {/* ID document */}
+            {/* ID document — disclosure ; DÉPLIÉE + obligatoire si Beauté (Gate 5) */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                {isFr ? "Pièce d'identité" : "Identity document"}
-                <span className="ml-1 normal-case font-normal text-gray-300">({isFr ? "optionnelle" : "optional"})</span>
-              </p>
+              <button type="button" onClick={() => setShowIdDoc((v) => !v)}
+                className="w-full text-left text-sm font-semibold text-[#0D2B6B] min-h-[44px] flex items-center">
+                {showIdDoc ? "−" : "+"}&nbsp;{beautySelected
+                  ? (isFr ? "Pièce d'identité (obligatoire pour Beauté à domicile)" : "Identity document (required for Home beauty)")
+                  : (isFr ? "Pièce d'identité (optionnel)" : "Identity document (optional)")}
+              </button>
+              {showIdDoc && (<>
+              {beautySelected && (
+                <p className="text-xs text-[#185FA5] -mt-1">
+                  {isFr
+                    ? "Pour la sécurité des interventions à domicile, l'approbation des profils Beauté exige une pièce d'identité."
+                    : "For the safety of home visits, Beauty profiles require an identity document to be approved."}
+                </p>
+              )}
               <Label className="flex items-center gap-2 text-sm text-gray-700">
                 <CreditCard className="h-4 w-4 text-gray-500" />
                 {isFr ? "Type de document" : "Document type"}
@@ -896,14 +897,16 @@ export default function ProviderRegisterPage() {
                   <p className="text-xs text-gray-400">JPG, PNG, PDF</p>
                 </div>
               )}
+              </>)}
             </div>
 
-            {/* Mobile Money */}
+            {/* Mobile Money — disclosure repliée */}
             <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Mobile Money
-                <span className="ml-1 normal-case font-normal text-gray-300">({isFr ? "optionnel" : "optional"})</span>
-              </p>
+              <button type="button" onClick={() => setShowMomo((v) => !v)}
+                className="w-full text-left text-sm font-semibold text-[#0D2B6B] min-h-[44px] flex items-center">
+                {showMomo ? "−" : "+"}&nbsp;{isFr ? "Mobile Money (optionnel)" : "Mobile Money (optional)"}
+              </button>
+              {showMomo && (<>
               <Label className="flex items-center gap-2 text-sm text-gray-700">
                 <Smartphone className="h-4 w-4 text-gray-500" />
                 {isFr ? "Opérateur" : "Operator"}
@@ -958,10 +961,11 @@ export default function ProviderRegisterPage() {
                   />
                 </div>
               )}
+              </>)}
             </div>
 
             {/* CTA */}
-            <div className="space-y-3 pt-2">
+            <div className="space-y-3 pt-2 sticky bottom-0 z-10 bg-white -mx-1 px-1 pb-3 pt-2 shadow-[0_-6px_16px_-8px_rgba(13,43,107,0.25)] sm:static sm:mx-0 sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none">
               <Button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
