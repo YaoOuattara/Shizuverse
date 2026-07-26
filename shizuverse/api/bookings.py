@@ -14,6 +14,13 @@ bookings_bp = Blueprint("bookings", __name__)
 def list_bookings():
     # accept both ?phone= (public lookup) and ?client_phone= (legacy)
     phone  = request.args.get("phone") or request.args.get("client_phone")
+    # T-22 — bookings are stored with the E.164 form (+225…); the client types
+    # the LOCAL form (0707050154), with spaces, or an international prefix.
+    # Normalize the incoming value so every format matches the stored one —
+    # an exact-match lookup on raw input silently showed "no bookings".
+    if phone:
+        from shizuverse.utils.phone import normalize_phone
+        phone = normalize_phone(phone.strip())
     ref    = (request.args.get("ref") or "").strip().lstrip("#").upper()
     status = request.args.get("status")
     limit  = min(int(request.args.get("limit", 50)), 200)
