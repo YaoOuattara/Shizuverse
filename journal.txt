@@ -467,3 +467,39 @@ Provider endpoints (test_provider_endpoints.py): 5/5 passed
   5. PATCH /api/provider/bookings/<id>/decline
 
 NEXT: Tailwind production styling fix; wire client/provider pages to real API.
+
+---
+2026-07-26 — LOTS 1-3 CLIENT terminés (session reprise après coupure disque)
+
+LOT 1 — fiabilité client (backend 36e3958 sur staging, frontend d858771) :
+  - Backend: list_bookings normalise ?phone= via normalize_phone (T-22),
+    tests test_bookings_lookup.py 6/6 verts (local, +225, espaces, 00225, sans +)
+  - Front: helper normalizePhoneInput dans /bookings (miroir du backend),
+    appliqué à la saisie ET aux valeurs localStorage héritées
+  - src/lib/support.ts = source unique WhatsApp support, défaut +2250554018989
+    (sender public), env-overridable via NEXT_PUBLIC_SHIZU_WHATSAPP ;
+    littéral bidon 2250700000000 éradiqué (4 fichiers basculés)
+  - Route morte /api/booking-summary supprimée (jamais branchée)
+  - Warm-up dyno via NEXT_PUBLIC_FLASK_API_URL (plus d'URL en dur)
+  - Erreur de soumission humaine (panne 5xx/réseau vs erreur de validation)
+  - Rebook honnête: bandeau « Reprenez votre réservation en quelques
+    secondes », lien dashboard enrichi name/phone depuis client_info,
+    BookingForm seed ?name=&phone=
+
+LOT 2 — /client/dashboard entièrement bilingue (6db57cd) :
+  - Pattern isFr ternaires (pas de migration next-intl)
+  - Statuts, filtres, bandeaux, boutons, états vides, formulaire mot de
+    passe, SERVICE_MAP fr/en, dates fr-FR/en-US, messages WhatsApp localisés
+  - Grep de contrôle: zéro texte FR-hardcodé rendu en /en/client/dashboard
+
+LOT 3 — design system clair côté client (styles uniquement, zéro fonctionnel) :
+  - dd789e1 conversion: BookingForm + /booking/success + /devis/[token]
+  - ec5fdfb reste: /bookings + /client/dashboard + /login + /auth/register
+    + /review/[bookingId]
+  - Mapping (aligné sur provider 27cdd4f): fond #EDF4FC, cartes blanches
+    bordées #B5D4F4, titres #0D2B6B, secondaires #185FA5, sections #E8F0FB,
+    headers navy #0D2B6B, cibles ≥44px, vert/rouge/statuts inchangés
+  - tsc 0 erreur, 375px vérifié par surface
+
+NEXT: pousser staging backend sur Render (normalize lookup), tester le
+parcours devis→paiement en prod, Tailwind purge prod toujours à vérifier.
