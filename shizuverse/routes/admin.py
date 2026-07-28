@@ -497,7 +497,65 @@ def get_booking_detail(booking_id):
         'note': e.note,
         'created_at': e.created_at.isoformat()
     } for e in events]
+    # WhatsApp thread of this booking (both directions, chronological). Shipped
+    # with the detail so the drawer needs no extra request. Never blocking: the
+    # booking detail must still open if the messages table misbehaves.
+    try:
+        from shizuverse.models.whatsapp_message import WhatsAppMessage
+        msgs = (WhatsAppMessage.query.filter_by(booking_id=booking_id)
+                .order_by(WhatsAppMessage.received_at.asc()).all())
+        data['messages'] = [m.to_dict() for m in msgs]
+    except Exception as e:
+        current_app.logger.error(f"[get_booking_detail] messages WhatsApp illisibles: {e}",
+                                 exc_info=True)
+        data['messages'] = []
     return jsonify(data)
+
+
+@admin_bp.route('/messages', methods=['GET'])
+@admin_required
+def list_whatsapp_messages():
+    """Global WhatsApp queue — the ONLY place an unattached message is visible.
+
+    A message from an unknown number has booking_id NULL and appears in no
+    drawer; without this endpoint it would be captured and then invisible,
+    which is the exact failure we are fixing.
+
+    Query params: unread=1 (unread only), unmatched=1 (booking_id NULL only),
+    limit (default 100, max 500).
+    """
+    from shizuverse.models.whatsapp_message import WhatsAppMessage
+    q = WhatsAppMessage.query
+    if request.args.get('unread') in ('1', 'true'):
+        q = q.filter(WhatsAppMessage.is_read.is_(False))
+    if request.args.get('unmatched') in ('1', 'true'):
+        q = q.filter(WhatsAppMessage.booking_id.is_(None))
+    try:
+        limit = min(int(request.args.get('limit', 100)), 500)
+    except (TypeError, ValueError):
+        limit = 100
+    rows = q.order_by(WhatsAppMessage.received_at.desc()).limit(limit).all()
+    unread = (WhatsAppMessage.query
+              .filter(WhatsAppMessage.direction == 'inbound',
+                      WhatsAppMessage.is_read.is_(False)).count())
+    unmatched = (WhatsAppMessage.query
+                 .filter(WhatsAppMessage.direction == 'inbound',
+                         WhatsAppMessage.booking_id.is_(None)).count())
+    return jsonify({
+        'items': [m.to_dict() for m in rows],
+        'unread_count': unread,
+        'unmatched_count': unmatched,
+    })
+
+
+@admin_bp.route('/messages/<int:message_id>/read', methods=['PATCH'])
+@admin_required
+def mark_whatsapp_message_read(message_id):
+    from shizuverse.models.whatsapp_message import WhatsAppMessage
+    m = WhatsAppMessage.query.get_or_404(message_id)
+    m.is_read = True
+    db.session.commit()
+    return jsonify({'id': m.id, 'is_read': m.is_read})
 
 
 @admin_bp.route('/bookings/<int:booking_id>/service', methods=['PATCH'])

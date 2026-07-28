@@ -47,6 +47,27 @@ def is_twilio_enabled() -> bool:
     ])
 
 
+def _status_callback_kwargs(template_key: str = None) -> dict:
+    """Twilio delivery-status callback, OPT-IN via TWILIO_STATUS_CALLBACK_URL.
+
+    Returns {} when the variable is unset, so messages.create() is called with
+    exactly the arguments it received before this existed — sending behaviour
+    is strictly unchanged until the URL is configured.
+
+    The template key rides in the query string because Twilio's status payload
+    doesn't carry it; the webhook reads ?k= and stores it. That keeps this
+    module free of any database import.
+    """
+    url = os.environ.get("TWILIO_STATUS_CALLBACK_URL", "").strip()
+    if not url:
+        return {}
+    if template_key:
+        from urllib.parse import quote
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}k={quote(template_key)}"
+    return {"status_callback": url}
+
+
 # Single source of truth lives in utils.phone (kept as an alias for callers here).
 from shizuverse.utils.phone import normalize_phone as _normalize_phone
 # Payment-tier thresholds live in payment_rules — never re-implement them here.
@@ -85,7 +106,8 @@ def send_whatsapp(to_phone: str, message: str) -> bool:
         from_wa = os.environ["TWILIO_WHATSAPP_FROM"]  # e.g. "whatsapp:+14155238886"
         to_wa = f"whatsapp:{normalized}"
 
-        msg = client.messages.create(body=message, from_=from_wa, to=to_wa)
+        msg = client.messages.create(body=message, from_=from_wa, to=to_wa,
+                                     **_status_callback_kwargs())
         logger.info("WHATSAPP sent to %s — SID %s", normalized, msg.sid)
         return True
 
@@ -157,6 +179,7 @@ def send_whatsapp_template(to_phone: str, template_key: str, variables: dict,
             content_variables=json.dumps(variables),
             from_=from_wa,
             to=to_wa,
+            **_status_callback_kwargs(template_key),
         )
         logger.info("WHATSAPP TEMPLATE '%s' sent to %s — SID %s",
                     template_key, normalized, msg.sid)

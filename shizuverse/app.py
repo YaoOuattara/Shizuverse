@@ -254,29 +254,6 @@ def create_app():
         except Exception as e:
             return {"status": "unhealthy", "error": str(e)}, 500
 
-    # TODO(webhook): diagnostic TEMPORAIRE — à retirer au commit du webhook,
-    # une fois le nombre de hops confirmé en prod (x_for=1 vs x_for=2).
-    # Cette route ne doit pas survivre au lot webhook Twilio.
-    @app.route("/diag/proxy")
-    def diag_proxy():
-        """Proves what ProxyFix actually resolved — we don't guess the hop count.
-
-        `client_ip` is the rate-limiting key (flask_limiter reads remote_addr):
-        it must be YOUR public IP, not a Render-internal address, and it must
-        differ between two callers. `scheme` must be "https" — that's what the
-        Twilio signature is computed over. `forwarded_for` is the raw header,
-        shown so an extra proxy hop (more than one IP) is visible immediately.
-        Returns only the caller's own network position — no app data.
-        """
-        from flask import request as _request
-        return {
-            "client_ip": _request.remote_addr,
-            "forwarded_for": _request.headers.get("X-Forwarded-For"),
-            "forwarded_proto": _request.headers.get("X-Forwarded-Proto"),
-            "scheme": _request.scheme,
-            "url": _request.url,
-        }
-
     @app.route("/diag/schema")
     def diag_schema():
         try:
