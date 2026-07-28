@@ -21,6 +21,7 @@ from gevent import monkey
 monkey.patch_all()
 
 from flask import Flask, render_template, redirect, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
 from flask_login import LoginManager, current_user
 from flask_babel import Babel
@@ -41,6 +42,20 @@ logger = logging.getLogger(__name__)
 
 def create_app():
     app = Flask(__name__, template_folder="templates", static_folder="static")
+
+    # Render terminates TLS and forwards over HTTP, so without this the app sees
+    # the PROXY instead of the caller. Two consequences, both silent:
+    #   - request.remote_addr is the proxy's IP, so flask_limiter's
+    #     get_remote_address returns the SAME key for every visitor: all rate
+    #     limits are shared platform-wide (e.g. create_booking's "5 per hour"
+    #     capped the whole platform, not each client).
+    #   - request.url reports http://, so any signature computed over the URL
+    #     the caller actually requested (Twilio's X-Twilio-Signature) can never
+    #     match, and every authentic webhook would be rejected.
+    # One proxy hop on Render → x_for=1, x_proto=1. Verify with GET /diag/proxy
+    # after deploy: forwarded_for must show the real client IP, scheme "https".
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+
     Swagger(app)
 
     _secret = os.environ.get("SECRET_KEY", "")
@@ -234,6 +249,29 @@ def create_app():
             return {"status": "healthy", "database": "connected"}
         except Exception as e:
             return {"status": "unhealthy", "error": str(e)}, 500
+
+    # TODO(webhook): diagnostic TEMPORAIRE — à retirer au commit du webhook,
+    # une fois le nombre de hops confirmé en prod (x_for=1 vs x_for=2).
+    # Cette route ne doit pas survivre au lot webhook Twilio.
+    @app.route("/diag/proxy")
+    def diag_proxy():
+        """Proves what ProxyFix actually resolved — we don't guess the hop count.
+
+        `client_ip` is the rate-limiting key (flask_limiter reads remote_addr):
+        it must be YOUR public IP, not a Render-internal address, and it must
+        differ between two callers. `scheme` must be "https" — that's what the
+        Twilio signature is computed over. `forwarded_for` is the raw header,
+        shown so an extra proxy hop (more than one IP) is visible immediately.
+        Returns only the caller's own network position — no app data.
+        """
+        from flask import request as _request
+        return {
+            "client_ip": _request.remote_addr,
+            "forwarded_for": _request.headers.get("X-Forwarded-For"),
+            "forwarded_proto": _request.headers.get("X-Forwarded-Proto"),
+            "scheme": _request.scheme,
+            "url": _request.url,
+        }
 
     @app.route("/diag/schema")
     def diag_schema():
