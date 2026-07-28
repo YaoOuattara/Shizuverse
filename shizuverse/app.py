@@ -52,9 +52,13 @@ def create_app():
     #   - request.url reports http://, so any signature computed over the URL
     #     the caller actually requested (Twilio's X-Twilio-Signature) can never
     #     match, and every authentic webhook would be rejected.
-    # One proxy hop on Render → x_for=1, x_proto=1. Verify with GET /diag/proxy
-    # after deploy: forwarded_for must show the real client IP, scheme "https".
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+    # TWO hops in front of us — Cloudflare, then Render — measured in prod via
+    # /diag/proxy: X-Forwarded-For came back as "102.210.19.183, 172.71.191.3"
+    # (visitor, then Cloudflare). ProxyFix reads the Nth entry from the RIGHT,
+    # so x_for=2 selects the visitor; x_for=1 selected Cloudflare's IP and gave
+    # every visitor the same rate-limit key. Only one TLS terminator sets
+    # X-Forwarded-Proto, hence x_proto stays 1.
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=2, x_proto=1)
 
     Swagger(app)
 
