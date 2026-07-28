@@ -17,3 +17,4 @@ from shizuverse.models.booking_event import BookingEvent
 from shizuverse.models.review import Review
 from shizuverse.models.waitlist import Waitlist
 from shizuverse.models.anomaly_log import AnomalyLog
+from shizuverse.models.whatsapp_message import WhatsAppMessage
