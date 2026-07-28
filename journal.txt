@@ -503,3 +503,34 @@ LOT 3 — design system clair côté client (styles uniquement, zéro fonctionne
 
 NEXT: pousser staging backend sur Render (normalize lookup), tester le
 parcours devis→paiement en prod, Tailwind purge prod toujours à vérifier.
+
+---
+2026-07-28 — DETTE TECHNIQUE : REDIS_URL est un piège à retardement
+
+DEVELOPER_GUIDE.md documente REDIS_URL comme option du rate limiter
+(l.75, l.120, l.158) et shizuverse/limiter.py la lit bien
+(storage_uri = os.getenv("REDIS_URL", "memory://")).
+MAIS le paquet `redis` n'est PAS dans requirements.txt.
+
+Conséquence : poser REDIS_URL sur Render ferait lever une
+ConfigurationError à l'init du limiter — donc au boot. La porte de
+sortie documentée est condamnée, et rien ne le signale tant qu'on
+n'essaie pas.
+
+État réel du rate limiting aujourd'hui (memory://) :
+  - compteurs perdus à CHAQUE redéploiement / redémarrage / mise en
+    veille Render. Protège d'une rafale, pas d'un abus étalé.
+  - si gunicorn tourne avec N>1 workers, chaque worker a son compteur
+    (donc "5 per hour" devient 5×N). Nombre de workers NON vérifiable
+    depuis le repo : ni Procfile, ni render.yaml — c'est la Start
+    Command du dashboard Render. Le code implique 1 worker
+    (SocketIO sans message_queue, app.py:211 ; défaut gunicorn = 1)
+    mais ce n'est PAS confirmé.
+
+Correctif quand le lot sera pris : ajouter `redis` à requirements.txt
+AVANT de poser REDIS_URL. Ne jamais poser la variable seule.
+
+NEXT (lot webhook en cours) : commit 1 ProxyFix x_for=2 (Cloudflare +
+Render, mesuré via /diag/proxy), commit 2 table whatsapp_messages,
+commit 3 webhook + signature + rattachement + tests (et suppression de
+/diag/proxy), commit 4 frontend.
