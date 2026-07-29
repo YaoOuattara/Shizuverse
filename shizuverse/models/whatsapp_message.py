@@ -21,7 +21,15 @@ VALID_STATUSES = ('received', 'queued', 'sent', 'delivered', 'read', 'failed', '
 # favour of the provider; it is stored, not silently collapsed, so the ambiguity
 # stays visible in the admin. 'none' = unknown number, kept with booking_id NULL
 # rather than dropped — an unmatched message is exactly what we must not lose.
-VALID_MATCHED_ROLES = ('provider', 'client', 'both', 'none')
+#
+# DETTE ASSUMÉE — 'outbound' marks a row whose booking came from the sender
+# itself (?b= on the statusCallback), i.e. a CERTAIN attachment rather than a
+# resolved one. It overlaps with `direction`, which already says 'outbound':
+# the two columns partly encode the same fact. What matched_role should really
+# express is HOW the attachment was obtained (certainty vs guess), not the
+# direction. Kept as the smallest honest change; the vocabulary rework is
+# deferred, not forgotten.
+VALID_MATCHED_ROLES = ('provider', 'client', 'both', 'none', 'outbound')
 
 
 class WhatsAppMessage(db.Model):

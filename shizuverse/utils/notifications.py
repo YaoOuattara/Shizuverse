@@ -47,24 +47,34 @@ def is_twilio_enabled() -> bool:
     ])
 
 
-def _status_callback_kwargs(template_key: str = None) -> dict:
+def _status_callback_kwargs(template_key: str = None, *, booking_id=None) -> dict:
     """Twilio delivery-status callback, OPT-IN via TWILIO_STATUS_CALLBACK_URL.
 
     Returns {} when the variable is unset, so messages.create() is called with
     exactly the arguments it received before this existed — sending behaviour
     is strictly unchanged until the URL is configured.
 
-    The template key rides in the query string because Twilio's status payload
-    doesn't carry it; the webhook reads ?k= and stores it. That keeps this
-    module free of any database import.
+    Two things ride in the query string because Twilio's status payload carries
+    neither, and because putting them here keeps this module free of any
+    database import:
+      ?k=  the template key (the callback never reports which template was used)
+      &b=  the booking id. This one is a CORRECTION: the webhook used to resolve
+           the outbound row's booking from the recipient's phone, but that
+           resolver is built for INBOUND traffic and always prefers the provider
+           mission when a number holds both roles — so a message about booking
+           80 could land on booking 78. On the way out we already know the
+           booking; there is no reason to guess it on the way back.
     """
     url = os.environ.get("TWILIO_STATUS_CALLBACK_URL", "").strip()
     if not url:
         return {}
+    from urllib.parse import quote
     if template_key:
-        from urllib.parse import quote
         sep = "&" if "?" in url else "?"
         url = f"{url}{sep}k={quote(template_key)}"
+    if booking_id is not None:
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}b={quote(str(booking_id))}"
     return {"status_callback": url}
 
 
@@ -74,7 +84,7 @@ from shizuverse.utils.phone import normalize_phone as _normalize_phone
 from shizuverse.utils.payment_rules import get_payment_tier as _get_payment_tier
 
 
-def send_whatsapp(to_phone: str, message: str) -> bool:
+def send_whatsapp(to_phone: str, message: str, *, booking_id=None) -> bool:
     """
     Send a WhatsApp message via Twilio.
 
@@ -107,7 +117,7 @@ def send_whatsapp(to_phone: str, message: str) -> bool:
         to_wa = f"whatsapp:{normalized}"
 
         msg = client.messages.create(body=message, from_=from_wa, to=to_wa,
-                                     **_status_callback_kwargs())
+                                     **_status_callback_kwargs(booking_id=booking_id))
         logger.info("WHATSAPP sent to %s — SID %s", normalized, msg.sid)
         return True
 
@@ -117,7 +127,7 @@ def send_whatsapp(to_phone: str, message: str) -> bool:
 
 
 def send_whatsapp_template(to_phone: str, template_key: str, variables: dict,
-                           log_body: str = None) -> bool:
+                           log_body: str = None, *, booking_id=None) -> bool:
     """Send an approved WhatsApp *template* (business-initiated) via Twilio.
 
     Free-form send_whatsapp is only allowed inside the 24h customer-service
@@ -179,7 +189,7 @@ def send_whatsapp_template(to_phone: str, template_key: str, variables: dict,
             content_variables=json.dumps(variables),
             from_=from_wa,
             to=to_wa,
-            **_status_callback_kwargs(template_key),
+            **_status_callback_kwargs(template_key, booking_id=booking_id),
         )
         logger.info("WHATSAPP TEMPLATE '%s' sent to %s — SID %s",
                     template_key, normalized, msg.sid)
@@ -231,13 +241,16 @@ def _shizu_wa_link() -> str:
 # "Twilio not configured" logs reflect exactly what would go out. No emoji —
 # the approved texts carry none.
 CLIENT_TEMPLATES = {
+    # Realigned on the approved v2 templates (Meta-approved; the SIDs still have
+    # to point at v2 in the WHATSAPP_TEMPLATE_SIDS registry for the real message
+    # to match this text — env-side, not code-side).
     "booking_created": {
         "fr": ("Bonjour {client_name}, votre demande Shizu a bien été reçue. "
-               "Référence : {booking_ref}. Nous vous confirmons un prestataire "
-               "sous 2 heures."),
+               "Référence : {booking_ref}. Votre prestataire vous sera confirmé "
+               "sous deux heures au maximum."),
         "en": ("Hello {client_name}, your Shizu request has been received. "
-               "Reference: {booking_ref}. We will confirm a provider within "
-               "2 hours."),
+               "Reference: {booking_ref}. Your provider will be confirmed "
+               "within two hours at most."),
     },
     "booking_confirmed_client": {
         "fr": ("Bonjour {client_name}, votre réservation {booking_ref} est "
@@ -333,13 +346,13 @@ _TIER_LABELS = {
 # ═════════════════════════════════════════════════════════════════════════════
 
 def notify_booking_created(*, client_name: str, client_phone: str, booking_ref: str,
-                           locale: str = "fr") -> bool:
+                           locale: str = "fr", booking_id: int = None) -> bool:
     loc = _norm_locale(locale)
     variables = {"1": client_name, "2": booking_ref}
     body = _render_client("booking_created", loc,
                           client_name=client_name, booking_ref=booking_ref)
     return send_whatsapp_template(client_phone, f"shizu_booking_created_{loc}",
-                                  variables, log_body=body)
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 def notify_booking_confirmed_client(

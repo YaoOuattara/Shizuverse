@@ -129,7 +129,29 @@ def twilio_status():
 
         msg = WhatsAppMessage.query.filter_by(message_sid=sid).first()
         if msg is None:
-            booking_id, provider_id, matched_role = resolve_phone(to_raw)
+            # ?b= carries the booking the SENDER knew about. Prefer it over
+            # resolve_phone: that resolver is built for inbound traffic and, on a
+            # number holding both roles, always returns the provider mission —
+            # which attached a message about booking 80 to booking 78. Guessing
+            # is the fallback, never the default, and it says so in the log.
+            raw_b = (request.args.get("b") or "").strip()
+            booking_id = provider_id = matched_role = None
+            if raw_b:
+                try:
+                    booking_id = int(raw_b)
+                    provider_id = None
+                    matched_role = "outbound"
+                except (TypeError, ValueError):
+                    logger.warning("[whatsapp-status] ?b=%r illisible pour %s — "
+                                   "retour à la résolution par téléphone", raw_b, sid)
+            if matched_role is None:
+                booking_id, provider_id, matched_role = resolve_phone(to_raw)
+                logger.warning(
+                    "[whatsapp-status] %s rattaché PAR DEVINETTE (téléphone %s → "
+                    "réservation %s, rôle=%s) : aucun ?b= reçu. L'appelant devrait "
+                    "transmettre booking_id à l'envoi.",
+                    sid, to_raw, booking_id or "aucune", matched_role,
+                )
             msg = WhatsAppMessage(
                 message_sid=sid,
                 direction="outbound",

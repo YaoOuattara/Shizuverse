@@ -157,6 +157,9 @@ def create_booking():
             client_phone=booking.client_phone,
             booking_ref=make_booking_ref(booking),
             locale=booking.locale,
+            # Travels to the statusCallback (?b=) so the outbound row attaches to
+            # THIS booking instead of being guessed back from the phone number.
+            booking_id=booking.id,
         )
     except Exception as e:
         current_app.logger.error(f"[create_booking] Unexpected error: {e}", exc_info=True)

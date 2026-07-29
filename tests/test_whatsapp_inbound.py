@@ -360,3 +360,94 @@ def test_status_callback_carries_template_key(monkeypatch):
         "status_callback": "https://shizu-verse.onrender.com/api/webhooks/twilio/status"}
     out = _status_callback_kwargs("shizu_provider_new_mission_fr")["status_callback"]
     assert out.endswith("?k=shizu_provider_new_mission_fr")
+
+
+def test_status_callback_carries_booking_id(monkeypatch):
+    monkeypatch.setenv("TWILIO_STATUS_CALLBACK_URL",
+                       "https://shizu-verse.onrender.com/api/webhooks/twilio/status")
+    from shizuverse.utils.notifications import _status_callback_kwargs
+    out = _status_callback_kwargs("shizu_booking_created_fr", booking_id=80)["status_callback"]
+    assert "k=shizu_booking_created_fr" in out
+    assert out.endswith("&b=80"), out
+    # booking_id alone (free-form send) uses '?' since there is no k= yet
+    alone = _status_callback_kwargs(booking_id=80)["status_callback"]
+    assert alone.endswith("?b=80"), alone
+
+
+def test_status_callback_without_booking_id_is_unchanged(monkeypatch):
+    """Non-regression: every existing caller passes no booking_id."""
+    monkeypatch.setenv("TWILIO_STATUS_CALLBACK_URL",
+                       "https://shizu-verse.onrender.com/api/webhooks/twilio/status")
+    from shizuverse.utils.notifications import _status_callback_kwargs
+    assert _status_callback_kwargs()["status_callback"] == \
+        "https://shizu-verse.onrender.com/api/webhooks/twilio/status"
+    assert "b=" not in _status_callback_kwargs("shizu_devis_fr")["status_callback"]
+
+
+def test_status_callback_booking_id_absent_when_env_empty(monkeypatch):
+    """The opt-in guard wins over booking_id — no env var, no callback at all."""
+    monkeypatch.delenv("TWILIO_STATUS_CALLBACK_URL", raising=False)
+    from shizuverse.utils.notifications import _status_callback_kwargs
+    assert _status_callback_kwargs("shizu_booking_created_fr", booking_id=80) == {}
+
+
+# ── statusCallback : rattachement par ?b= plutôt que par devinette ───────────
+
+def test_status_b_param_wins_over_phone_resolution(app, client):
+    """The sender knew the booking — the resolver must not override it.
+
+    BOTH_PHONE resolves to the provider mission (by design, for inbound). A
+    message actually sent about that number's CLIENT booking must still land on
+    the client booking when ?b= says so.
+    """
+    ids = app.config["_IDS"]
+    assert ids["both_client"] != ids["both_mission"], "les deux dossiers doivent différer"
+    params = {"MessageSid": "SM_B_1", "MessageStatus": "delivered",
+              "To": f"whatsapp:{BOTH_PHONE}", "From": "whatsapp:+14155238886"}
+    r = _post_status(client, params,
+                     query=f"?k=shizu_booking_created_fr&b={ids['both_client']}")
+    assert r.status_code == 204
+    with app.app_context():
+        m = WhatsAppMessage.query.filter_by(message_sid="SM_B_1").one()
+        assert m.booking_id == ids["both_client"], "?b= doit primer"
+        assert m.booking_id != ids["both_mission"], "sans ?b=, resolve_phone aurait pris la mission"
+        assert m.matched_role == "outbound"
+        assert m.provider_id is None
+        assert m.template_key == "shizu_booking_created_fr"
+
+
+def test_status_without_b_falls_back_to_phone_resolution(app, client):
+    """No ?b= → previous behaviour, unchanged (and logged as a guess)."""
+    ids = app.config["_IDS"]
+    params = {"MessageSid": "SM_B_2", "MessageStatus": "delivered",
+              "To": f"whatsapp:{BOTH_PHONE}", "From": "whatsapp:+14155238886"}
+    assert _post_status(client, params).status_code == 204
+    with app.app_context():
+        m = WhatsAppMessage.query.filter_by(message_sid="SM_B_2").one()
+        assert m.booking_id == ids["both_mission"], "fallback = résolution par téléphone"
+        assert m.matched_role == "both"
+
+
+def test_status_with_unreadable_b_falls_back(app, client):
+    """A malformed ?b= must not 500 nor write a bogus booking_id."""
+    ids = app.config["_IDS"]
+    params = {"MessageSid": "SM_B_3", "MessageStatus": "sent",
+              "To": f"whatsapp:{BOTH_PHONE}", "From": "whatsapp:+14155238886"}
+    assert _post_status(client, params, query="?b=quatre-vingts").status_code == 204
+    with app.app_context():
+        m = WhatsAppMessage.query.filter_by(message_sid="SM_B_3").one()
+        assert m.booking_id == ids["both_mission"], "retour au fallback"
+        assert m.matched_role == "both"
+
+
+def test_status_b_param_on_unknown_number_still_attaches(app, client):
+    """?b= works even when the phone matches nobody — that's the whole point."""
+    ids = app.config["_IDS"]
+    params = {"MessageSid": "SM_B_4", "MessageStatus": "failed", "ErrorCode": "63016",
+              "To": f"whatsapp:{UNKNOWN_PHONE}", "From": "whatsapp:+14155238886"}
+    assert _post_status(client, params, query=f"?b={ids['client_booking']}").status_code == 204
+    with app.app_context():
+        m = WhatsAppMessage.query.filter_by(message_sid="SM_B_4").one()
+        assert m.booking_id == ids["client_booking"]
+        assert m.matched_role == "outbound"
+        assert m.error_code == "63016"
