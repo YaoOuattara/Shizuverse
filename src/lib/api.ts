@@ -105,9 +105,23 @@ export const adminApi = {
     const qs = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => !!v).map(([k, v]) => [k, v as string])).toString() : "";
     return adminFetch(`/admin/bookings${qs ? `?${qs}` : ""}`);
   },
-  // Full detail incl. the real BookingEvent history (the list endpoint omits events).
+  // Full detail incl. the real BookingEvent history AND the WhatsApp thread
+  // (the list endpoint omits both — messages ride along so the drawer needs
+  // no second request).
   portalGetBookingDetail: (bookingId: string | number) =>
     adminFetch(`/admin/bookings/${bookingId}`),
+  // Global WhatsApp queue. This is the ONLY place a message from an unknown
+  // number (booking_id null) is visible — it belongs to no drawer.
+  portalGetMessages: (opts?: { unread?: boolean; unmatched?: boolean; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (opts?.unread) qs.set("unread", "1");
+    if (opts?.unmatched) qs.set("unmatched", "1");
+    if (opts?.limit) qs.set("limit", String(opts.limit));
+    const s = qs.toString();
+    return adminFetch(`/admin/messages${s ? `?${s}` : ""}`);
+  },
+  portalMarkMessageRead: (messageId: number) =>
+    adminFetch(`/admin/messages/${messageId}/read`, { method: "PATCH" }),
   portalGetOverview: () => adminFetch("/admin/overview"),
   portalGetFinanceSummary: () => adminFetch("/admin/finance/summary"),
   portalUpdateFinance: (bookingId: string, body: { payment_status?: string; payout_status?: string; final_amount?: number; reason?: string }) =>

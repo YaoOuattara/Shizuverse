@@ -52,6 +52,7 @@ import {
   Building2,
   CalendarClock,
   MessageSquare,
+  MessageCircle,
   AlertCircle,
   AlertTriangle,
   Sparkles,
@@ -62,7 +63,7 @@ import {
   Star,
   Eye,
 } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useAdminStore, type AdminBooking } from "@/data/adminStore";
 import { useAdminBookings, useAdminProviders, useAdminServices, type ApiBooking, type ApiProvider, type ApiService } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
@@ -261,6 +262,34 @@ interface BookingEventItem {
   created_at: string;
 }
 
+// One WhatsApp message of this booking's thread (GET /admin/bookings/<id> →
+// messages[]). Both directions live in the same list, ordered chronologically.
+interface WhatsAppMessageItem {
+  id: number;
+  direction: "inbound" | "outbound";
+  from_phone: string | null;
+  to_phone: string | null;
+  body: string | null;
+  num_media: number;
+  template_key: string | null;
+  status: string;
+  error_code: string | null;
+  matched_role: string;
+  received_at: string | null;
+}
+
+// Twilio delivery codes we can explain. Anything else still shows its raw code
+// rather than being hidden — an unexplained failure must stay visible.
+const WA_ERROR_HINTS: Record<string, { fr: string; en: string }> = {
+  "63016": {
+    fr: "hors fenêtre 24h — un message libre ne passe que si la personne a écrit dans les 24h",
+    en: "outside the 24h window — free-form only reaches people who wrote in the last 24h",
+  },
+  "63028": { fr: "variables du template incorrectes", en: "template variable mismatch" },
+  "63003": { fr: "destinataire introuvable sur WhatsApp", en: "recipient not reachable on WhatsApp" },
+  "63024": { fr: "numéro invalide", en: "invalid phone number" },
+};
+
 // Readable labels for every event_type the backend emits. An unknown type is
 // NEVER hidden — the renderer falls back to the raw value (that silent masking
 // is exactly what made the history invisible before).
@@ -373,8 +402,139 @@ function EventHistory({ events, loading, error, createdAt, isFr }: {
 }
 
 
+// WhatsApp thread of this booking — inbound replies and the delivery status of
+// what we sent, in one chronological list. Outbound rows carry no text (Twilio's
+// status callback doesn't return the body), so they show the template name and
+// how far the message actually got.
+function ConversationThread({ messages, loading, isFr }: {
+  messages: WhatsAppMessageItem[];
+  loading: boolean;
+  isFr: boolean;
+}) {
+  const title = isFr ? "Conversation WhatsApp" : "WhatsApp conversation";
+
+  const statusLabel = (s: string) => {
+    const m: Record<string, { fr: string; en: string }> = {
+      received:    { fr: "reçu",      en: "received" },
+      queued:      { fr: "en file",   en: "queued" },
+      sent:        { fr: "envoyé",    en: "sent" },
+      delivered:   { fr: "remis",     en: "delivered" },
+      read:        { fr: "lu",        en: "read" },
+      failed:      { fr: "ÉCHEC",     en: "FAILED" },
+      undelivered: { fr: "NON REMIS", en: "UNDELIVERED" },
+    };
+    return m[s] ? m[s][isFr ? "fr" : "en"] : s;
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        <h4 className="font-medium text-sm text-muted-foreground">{title}</h4>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          {isFr ? "Chargement…" : "Loading…"}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1.5">
+        <MessageCircle className="h-3.5 w-3.5" />
+        {title}
+        {messages.length > 0 && (
+          <span className="text-xs font-normal">({messages.length})</span>
+        )}
+      </h4>
+
+      {messages.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {isFr
+            ? "Aucun message échangé sur ce dossier."
+            : "No messages exchanged on this booking."}
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {messages.map((m) => {
+            const inbound = m.direction === "inbound";
+            const failed = m.status === "failed" || m.status === "undelivered";
+            const hint = m.error_code ? WA_ERROR_HINTS[m.error_code] : undefined;
+            return (
+              <div
+                key={m.id}
+                className={`rounded-lg border px-3 py-2 text-sm ${
+                  inbound
+                    ? "bg-muted/50 border-border"
+                    : failed
+                      ? "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-900"
+                      : "bg-blue-50/60 border-blue-100 dark:bg-blue-900/20 dark:border-blue-900"
+                }`}
+                data-testid={`wa-message-${m.id}`}
+              >
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-xs font-medium">
+                    {inbound
+                      ? (isFr ? "Reçu de " : "From ") + (m.from_phone ?? "—")
+                      : (isFr ? "Envoyé à " : "Sent to ") + (m.to_phone ?? "—")}
+                  </span>
+                  <span className={`text-[10px] uppercase tracking-wide shrink-0 ${
+                    failed ? "text-red-600 font-semibold" : "text-muted-foreground"
+                  }`}>
+                    {statusLabel(m.status)}
+                  </span>
+                </div>
+
+                {inbound ? (
+                  <p className="whitespace-pre-wrap break-words">
+                    {m.body || (
+                      <span className="italic text-muted-foreground">
+                        {isFr ? "(sans texte)" : "(no text)"}
+                      </span>
+                    )}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground font-mono break-all">
+                    {m.template_key || (isFr ? "message libre" : "free-form message")}
+                  </p>
+                )}
+
+                {m.num_media > 0 && (
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                    {isFr
+                      ? `${m.num_media} pièce(s) jointe(s) — non téléchargée(s), consultez WhatsApp`
+                      : `${m.num_media} attachment(s) — not downloaded, check WhatsApp`}
+                  </p>
+                )}
+
+                {failed && (
+                  <p className="text-xs text-red-700 dark:text-red-400 mt-1">
+                    {isFr ? "Non délivré" : "Not delivered"}
+                    {m.error_code ? ` — code ${m.error_code}` : ""}
+                    {hint ? ` (${hint[isFr ? "fr" : "en"]})` : ""}
+                  </p>
+                )}
+
+                {m.received_at && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {new Date(m.received_at).toLocaleString(isFr ? "fr-FR" : "en-US", {
+                      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+                    })}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 export default function AdminBookings() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const isFr = (params?.locale as string) === "fr";
   const statusLabels = getStatusLabels(isFr);
   const paymentStatusLabels = getPaymentStatusLabels(isFr);
@@ -527,6 +687,8 @@ export default function AdminBookings() {
   const [bookingEvents, setBookingEvents] = useState<BookingEventItem[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState(false);
+  // WhatsApp thread — travels in the SAME detail response as events[].
+  const [bookingMessages, setBookingMessages] = useState<WhatsAppMessageItem[]>([]);
 
   // Reschedule modal state (admin-only date/slot change)
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
@@ -541,8 +703,9 @@ export default function AdminBookings() {
     setEventsLoading(true);
     setEventsError(false);
     return adminApi.portalGetBookingDetail(bookingId)
-      .then((data: { events?: BookingEventItem[] }) => {
+      .then((data: { events?: BookingEventItem[]; messages?: WhatsAppMessageItem[] }) => {
         setBookingEvents(Array.isArray(data?.events) ? data.events : []);
+        setBookingMessages(Array.isArray(data?.messages) ? data.messages : []);
       })
       .catch(() => { setEventsError(true); })
       .finally(() => { setEventsLoading(false); });
@@ -552,6 +715,7 @@ export default function AdminBookings() {
   useEffect(() => {
     if (!selectedBooking?.id) {
       setBookingEvents([]);
+      setBookingMessages([]);
       setEventsError(false);
       return;
     }
@@ -607,6 +771,19 @@ export default function AdminBookings() {
       return aU - bU;
     });
   }, [bookings, searchQuery, statusFilter, urgencyMap]);
+
+  // Deep link from the WhatsApp queue (?open=<id>): open that booking's drawer
+  // once the list has loaded. Without this the "Réservation #N" button would
+  // land on the list and leave the admin to hunt for the row — a button that
+  // doesn't do what it says.
+  const openIdParam = searchParams?.get("open");
+  const [deepLinkHandled, setDeepLinkHandled] = useState(false);
+  useEffect(() => {
+    if (!openIdParam || deepLinkHandled || bookings.length === 0) return;
+    const target = bookings.find((b) => b.id === String(openIdParam));
+    if (target) setSelectedBooking(target);
+    setDeepLinkHandled(true);
+  }, [openIdParam, bookings, deepLinkHandled]);
 
   const getReviewForBooking = (bookingId: string) => {
     return reviews.find(r => r.bookingId === bookingId);
@@ -1404,6 +1581,12 @@ export default function AdminBookings() {
                 loading={eventsLoading}
                 error={eventsError}
                 createdAt={selectedBooking.createdAt}
+                isFr={isFr}
+              />
+
+              <ConversationThread
+                messages={bookingMessages}
+                loading={eventsLoading}
                 isFr={isFr}
               />
 
