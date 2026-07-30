@@ -225,6 +225,24 @@ def _fmt_amount(amount) -> str:
     return f"{int(amount):,}".replace(",", " ")
 
 
+def _slot_fallback(locale) -> str:
+    """Label used when a reschedule carries no time slot.
+
+    Reads the EXISTING slot vocabulary instead of hardcoding a string: an empty
+    {{n}} would make Meta reject the whole send, and a literal "Flexible" here
+    would be a second definition of a label that already lives in _SLOT_LABELS —
+    it would drift the day the wording changes. Same reason the phone
+    normalization and the pricing thresholds each have exactly one home.
+
+    Imported lazily on purpose: routes.admin imports THIS module lazily inside
+    its handlers, so a module-level import here would turn a latent cycle into a
+    real one.
+    """
+    loc = _norm_locale(locale)
+    from shizuverse.routes.admin import _SLOT_LABELS
+    return _SLOT_LABELS["anytime"][loc]
+
+
 def _shizu_wa_link() -> str:
     """wa.me link to Shizu support from env. Returns '' when the number is
     unset — an absent link is safer than a wrong number sent to real clients."""
@@ -241,13 +259,11 @@ def _shizu_wa_link() -> str:
 # "Twilio not configured" logs reflect exactly what would go out. No emoji —
 # the approved texts carry none.
 CLIENT_TEMPLATES = {
-    # Realigned on the approved v2 templates (Meta-approved; the SIDs still have
-    # to point at v2 in the WHATSAPP_TEMPLATE_SIDS registry for the real message
-    # to match this text — env-side, not code-side).
+    # Copied verbatim from the text actually received in production.
     "booking_created": {
         "fr": ("Bonjour {client_name}, votre demande Shizu a bien été reçue. "
-               "Référence : {booking_ref}. Votre prestataire vous sera confirmé "
-               "sous deux heures au maximum."),
+               "Référence : {booking_ref}. Le délai de confirmation de votre "
+               "prestataire n'excédera pas deux heures."),
         "en": ("Hello {client_name}, your Shizu request has been received. "
                "Reference: {booking_ref}. Your provider will be confirmed "
                "within two hours at most."),
@@ -358,7 +374,7 @@ def notify_booking_created(*, client_name: str, client_phone: str, booking_ref: 
 def notify_booking_confirmed_client(
     *, client_name: str, client_phone: str,
     booking_ref: str, provider_name: str,
-    date: str, time: str, locale: str = "fr",
+    date: str, time: str, locale: str = "fr", booking_id: int = None,
 ) -> bool:
     loc = _norm_locale(locale)
     variables = {"1": client_name, "2": booking_ref, "3": provider_name,
@@ -367,7 +383,7 @@ def notify_booking_confirmed_client(
                           client_name=client_name, booking_ref=booking_ref,
                           provider_name=provider_name, date=date, time=time)
     return send_whatsapp_template(client_phone, f"shizu_booking_confirmed_{loc}",
-                                  variables, log_body=body)
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 def notify_booking_completed(
@@ -380,13 +396,13 @@ def notify_booking_completed(
     variables = {"1": provider_name, "2": str(booking_id)}
     body = _render_client("booking_completed", loc, provider_name=provider_name)
     return send_whatsapp_template(client_phone, f"shizu_booking_completed_{loc}",
-                                  variables, log_body=body)
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 def notify_provider_assigned(
     *, client_name: str, client_phone: str,
     booking_ref: str, provider_name: str,
-    date: str, commune: str, locale: str = "fr",
+    date: str, commune: str, locale: str = "fr", booking_id: int = None,
 ) -> bool:
     """Sent TO THE CLIENT when a provider has been found (despite the name)."""
     loc = _norm_locale(locale)
@@ -396,45 +412,74 @@ def notify_provider_assigned(
                           client_name=client_name, booking_ref=booking_ref,
                           provider_name=provider_name, date=date, commune=commune)
     return send_whatsapp_template(client_phone, f"shizu_provider_assigned_{loc}",
-                                  variables, log_body=body)
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 def notify_provider_started(
     *, client_name: str, client_phone: str, provider_name: str,
-    locale: str = "fr",
+    locale: str = "fr", booking_id: int = None,
 ) -> bool:
-    msg = _render_client("provider_started", locale,
-                         provider_name=provider_name, wa_link=_shizu_wa_link())
-    return send_whatsapp(client_phone, msg)
+    """Sent TO THE CLIENT when the provider arrives on site.
+
+    Approved template positions: {{1}} client name, {{2}} provider name.
+    """
+    loc = _norm_locale(locale)
+    variables = {"1": client_name, "2": provider_name}
+    # log_body only — CLIENT_TEMPLATES still holds the pre-template wording (the
+    # approved v2 text was not provided); the Content SID owns what really goes out.
+    body = _render_client("provider_started", loc,
+                          provider_name=provider_name, wa_link=_shizu_wa_link())
+    return send_whatsapp_template(client_phone, f"shizu_provider_started_{loc}",
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 def notify_booking_cancelled_client(
     *, client_name: str, client_phone: str,
-    booking_ref: str, reason: str, locale: str = "fr",
+    booking_ref: str, reason: str = "", locale: str = "fr", booking_id: int = None,
 ) -> bool:
+    """Sent TO THE CLIENT when a booking is cancelled.
+
+    Approved template positions: {{1}} client name, {{2}} booking ref.
+    `reason` has NO slot in the approved template and is deliberately not sent
+    (accepted loss — the motive stays visible in the admin dashboard). Kept in
+    the signature so callers don't have to change.
+    """
     loc = _norm_locale(locale)
-    display_reason = reason.strip() or CLIENT_TEMPLATES["reason_unspecified"][loc]
-    msg = _render_client("booking_cancelled_client", loc,
-                         booking_ref=booking_ref, reason=display_reason,
-                         wa_link=_shizu_wa_link())
-    return send_whatsapp(client_phone, msg)
+    variables = {"1": client_name, "2": booking_ref}
+    display_reason = (reason or "").strip() or CLIENT_TEMPLATES["reason_unspecified"][loc]
+    body = _render_client("booking_cancelled_client", loc,
+                          booking_ref=booking_ref, reason=display_reason,
+                          wa_link=_shizu_wa_link())
+    return send_whatsapp_template(client_phone, f"shizu_booking_cancelled_client_{loc}",
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 def notify_booking_rescheduled_client(
     *, client_name: str, client_phone: str, booking_ref: str,
-    new_date: str, new_slot: str = "", locale: str = "fr",
+    new_date: str, new_slot: str = "", locale: str = "fr", booking_id: int = None,
 ) -> bool:
-    """Sent TO THE CLIENT when an admin reschedules the booking (locale-aware)."""
-    slot_part = f" ({new_slot})" if new_slot else ""
-    msg = _render_client("booking_rescheduled_client", locale,
-                         booking_ref=booking_ref, new_date=new_date,
-                         slot_part=slot_part, wa_link=_shizu_wa_link())
-    return send_whatsapp(client_phone, msg)
+    """Sent TO THE CLIENT when an admin reschedules the booking (locale-aware).
+
+    Approved template positions: {{1}} client name, {{2}} booking ref,
+    {{3}} long date, {{4}} time slot.
+
+    An empty {{4}} would make send_whatsapp_template refuse the whole send (Meta
+    rejects empty variables), so a missing slot falls back to the existing
+    'anytime' label, read from _SLOT_LABELS in the client's locale.
+    """
+    loc = _norm_locale(locale)
+    slot = (new_slot or "").strip() or _slot_fallback(loc)
+    variables = {"1": client_name, "2": booking_ref, "3": new_date, "4": slot}
+    body = _render_client("booking_rescheduled_client", loc,
+                          booking_ref=booking_ref, new_date=new_date,
+                          slot_part=f" ({slot})", wa_link=_shizu_wa_link())
+    return send_whatsapp_template(client_phone, f"shizu_booking_rescheduled_client_{loc}",
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 def notify_payment_confirmed(
     *, client_name: str, client_phone: str, booking_ref: str, amount: int,
-    locale: str = "fr",
+    locale: str = "fr", booking_id: int = None,
 ) -> bool:
     """Sent when admin records payment as confirmed/paid.
     NB: approved order is {{1}} name, {{2}} amount, {{3}} ref — amount BEFORE ref."""
@@ -445,12 +490,12 @@ def notify_payment_confirmed(
                           client_name=client_name, booking_ref=booking_ref,
                           amount=amount_fmt)
     return send_whatsapp_template(client_phone, f"shizu_payment_confirmed_{loc}",
-                                  variables, log_body=body)
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 def notify_deposit_received(
     *, client_name: str, client_phone: str, booking_ref: str,
-    amount: int, amount_due: int, locale: str = "fr",
+    amount: int, amount_due: int, locale: str = "fr", booking_id: int = None,
 ) -> bool:
     """Sent when a PARTIAL payment (deposit) is recorded — distinct from
     notify_payment_confirmed. Announcing "payment received, service confirmed"
@@ -473,14 +518,14 @@ def notify_deposit_received(
         f"for booking {booking_ref}. Remaining balance: {due_fmt} FCFA."
     )
     return send_whatsapp_template(client_phone, f"shizu_deposit_received_{loc}",
-                                  variables, log_body=body)
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 def notify_payment_instructions(
     *, client_name: str, client_phone: str,
     booking_ref: str, amount: int,
     service_name: str = None, payment_tier: str = None, note: str = None,
-    quote_token: str = None, locale: str = "fr",
+    quote_token: str = None, locale: str = "fr", booking_id: int = None,
 ) -> bool:
     """Sent when admin sets a quote — THE most critical client message.
     Goes out as the approved template shizu_devis_{loc}; the accept/decline link
@@ -518,7 +563,7 @@ def notify_payment_instructions(
                           client_name=client_name, booking_ref=booking_ref,
                           amount=amount_fmt, tier_label=tier_label)
     return send_whatsapp_template(client_phone, f"shizu_devis_{loc}",
-                                  variables, log_body=body)
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -528,7 +573,7 @@ def notify_payment_instructions(
 
 def notify_booking_confirmed_provider(
     *, provider_phone: str, booking_ref: str, client_name: str,
-    service: str, date: str, time: str, commune: str,
+    service: str, date: str, time: str, commune: str, booking_id: int = None,
 ) -> bool:
     variables = {"1": booking_ref, "2": client_name, "3": service,
                  "4": date, "5": time, "6": commune}
@@ -539,13 +584,22 @@ def notify_booking_confirmed_provider(
     )
     return send_whatsapp_template(provider_phone,
                                   "shizu_provider_booking_confirmed_fr",
-                                  variables, log_body=body)
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 def notify_provider_approved(
     *, provider_phone: str, provider_name: str, approved_date: str,
 ) -> bool:
-    variables = {"1": provider_name, "2": approved_date}
+    """The approved template carries NO variable — its text is fully static.
+
+    The code used to send {{1}} name and {{2}} date to a zero-placeholder
+    template, a mismatch Twilio either ignores or rejects with 63028. Aligned on
+    the template: nothing is sent. The provider loses nothing (neither the name
+    nor the date appeared in the approved text). `provider_name` and
+    `approved_date` are kept in the signature — callers are unchanged and both
+    still feed the log body — until a re-personalised template ships.
+    """
+    variables = {}
     body = (
         f"Bonjour {provider_name}, votre profil prestataire Shizu a été approuvé "
         f"le {approved_date}. Vous pouvez désormais recevoir des demandes de "
@@ -557,6 +611,15 @@ def notify_provider_approved(
 
 
 def notify_provider_rejected(*, provider_phone: str, reason: str) -> bool:
+    """DELIBERATELY still free-form — do NOT migrate to a template.
+
+    shizu_provider_rejected_fr exists in the registry but carries only {{1}} the
+    provider name: it has no slot for the rejection reason. That reason is
+    produced by the "smart rejection" AI feature (locked decision), and it is
+    the whole point of the message — a provider must learn WHY so they can fix
+    their profile and resubmit. Switching to the template would silently destroy
+    that feature. Revisit only once a template with a reason slot is approved.
+    """
     msg = (
         f"Bonjour, votre profil Shizu n'a pas pu être validé pour la raison suivante: {reason}. "
         f"Vous pouvez modifier votre profil et soumettre à nouveau: "
@@ -565,31 +628,31 @@ def notify_provider_rejected(*, provider_phone: str, reason: str) -> bool:
     return send_whatsapp(provider_phone, msg)
 
 
-def notify_payment_recorded(
-    *, provider_phone: str, booking_ref: str, provider_payout: int,
+def notify_payout_sent(
+    *, provider_phone: str, provider_payout: int,
+    payout_date: str, booking_id: int = None,
 ) -> bool:
-    payout_fmt = _fmt_amount(provider_payout)
-    msg = (
-        f"Paiement enregistré pour la mission #{booking_ref}. "
-        f"Montant: {payout_fmt} FCFA. "
-        f"Versement en cours de traitement."
-    )
-    return send_whatsapp(provider_phone, msg)
+    """Approved template positions: {{1}} amount, {{2}} date.
 
-
-def notify_payout_sent(*, provider_phone: str, provider_payout: int) -> bool:
+    The template carries NO booking reference — the provider is told an amount
+    was sent, not which mission it settles. `payout_date` is the moment the admin
+    marked the payout as sent (no payout_date column exists; BookingEvent already
+    holds the audit trail and the two timestamps coincide).
+    """
     payout_fmt = _fmt_amount(provider_payout)
-    msg = (
-        f"Votre versement de {payout_fmt} FCFA a été envoyé. "
+    variables = {"1": payout_fmt, "2": payout_date}
+    body = (
+        f"Votre versement de {payout_fmt} FCFA a été envoyé le {payout_date}. "
         f"Merci pour votre travail avec Shizu !"
     )
-    return send_whatsapp(provider_phone, msg)
+    return send_whatsapp_template(provider_phone, "shizu_payout_sent_fr",
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 def notify_provider_new_mission(
     *, provider_phone: str, booking_ref: str, service_name: str,
     date: str, commune: str,
-    time_slot: str = None, provider_payout: int = None,
+    time_slot: str = None, provider_payout: int = None, booking_id: int = None,
 ) -> bool:
     """Sent TO THE PROVIDER when a mission is assigned to them.
     The approved template makes the payout ({{5}}) mandatory: a mission with no
@@ -610,42 +673,61 @@ def notify_provider_new_mission(
         f"disponibilité depuis votre tableau de bord."
     )
     return send_whatsapp_template(provider_phone, "shizu_provider_new_mission_fr",
-                                  variables, log_body=body)
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 def notify_review_received(
-    *, provider_phone: str, client_name: str,
-    rating: int, comment_preview: str,
+    *, provider_phone: str, booking_ref: str, rating: int, booking_id: int = None,
 ) -> bool:
-    preview = comment_preview[:80].rstrip() + ("…" if len(comment_preview) > 80 else "")
-    msg = (
-        f"Nouvel avis ! {client_name} vous a donné {rating}/5 : '{preview}'. "
+    """Approved template positions: {{1}} booking ref, {{2}} rating.
+
+    The client's name and the comment excerpt have no slot and are no longer
+    sent (accepted loss — both stay readable in the admin dashboard).
+    """
+    variables = {"1": booking_ref, "2": str(rating)}
+    body = (
+        f"Nouvel avis sur la mission {booking_ref} : {rating}/5. "
         f"Merci pour votre excellent travail avec Shizu !"
     )
-    return send_whatsapp(provider_phone, msg)
+    return send_whatsapp_template(provider_phone, "shizu_review_received_fr",
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 def notify_booking_rescheduled_provider(
-    *, provider_phone: str, booking_ref: str, new_date: str, new_slot: str = "",
+    *, provider_phone: str, booking_ref: str, new_date: str,
+    new_slot: str = "", booking_id: int = None,
 ) -> bool:
-    """Sent TO THE PROVIDER (always FR) when a mission is rescheduled."""
-    slot_part = f" ({new_slot})" if new_slot else ""
-    msg = (
+    """Sent TO THE PROVIDER (always FR) when a mission is rescheduled.
+
+    Approved template positions: {{1}} booking ref, {{2}} long date, {{3}} slot.
+    An empty {{3}} would have the whole send refused (Meta rejects empty
+    variables), so a missing slot falls back to the existing 'anytime' label —
+    read in French, never in the client's locale (T-19).
+    """
+    slot = (new_slot or "").strip() or _slot_fallback("fr")
+    variables = {"1": booking_ref, "2": new_date, "3": slot}
+    body = (
         f"La mission #{booking_ref} a été reprogrammée. "
-        f"Nouvelle date : {new_date}{slot_part}. "
+        f"Nouvelle date : {new_date} ({slot}). "
         f"Merci de noter le changement."
     )
-    return send_whatsapp(provider_phone, msg)
+    return send_whatsapp_template(provider_phone,
+                                  "shizu_booking_rescheduled_provider_fr",
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 def notify_booking_cancelled_provider(
-    *, provider_phone: str, booking_ref: str, date: str,
+    *, provider_phone: str, booking_ref: str, date: str, booking_id: int = None,
 ) -> bool:
-    msg = (
+    """Approved template positions: {{1}} booking ref, {{2}} date."""
+    variables = {"1": booking_ref, "2": date}
+    body = (
         f"La mission #{booking_ref} du {date} a été annulée par le client. "
         f"Votre tableau de bord a été mis à jour: www.shizu.pro/fr/provider"
     )
-    return send_whatsapp(provider_phone, msg)
+    return send_whatsapp_template(provider_phone,
+                                  "shizu_booking_cancelled_provider_fr",
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 def notify_registration_submitted(*, provider_name: str, provider_phone: str) -> bool:
@@ -659,19 +741,9 @@ def notify_registration_submitted(*, provider_name: str, provider_phone: str) ->
                                   variables, log_body=body)
 
 
-def notify_new_booking_request(
-    *, provider_phone: str, service_type: str,
-    commune: str, date: str, time_preference: str,
-) -> bool:
-    pref_map = {
-        "morning": "matin 8h–12h",
-        "afternoon": "après-midi 12h–17h",
-        "evening": "soirée 17h–20h",
-        "anytime": "flexible",
-    }
-    pref_label = pref_map.get(time_preference, time_preference or "flexible")
-    msg = (
-        f"Nouvelle demande ! {service_type} à {commune} le {date} ({pref_label}). "
-        f"Connectez-vous pour accepter: www.shizu.pro/fr/provider"
-    )
-    return send_whatsapp(provider_phone, msg)
+# notify_new_booking_request and notify_payment_recorded were REMOVED here.
+# The first broadcast every new booking to the whole approved pool — the T-26
+# short-circuit that let providers self-accept and skip the quote flow; its only
+# caller has been commented out in api/bookings.py since then. The second had no
+# caller at all. Dead code that encodes a closed bug is worse than no code: it
+# invites someone to "re-enable" it. Git history keeps both if ever needed.

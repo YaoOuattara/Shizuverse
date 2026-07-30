@@ -658,6 +658,7 @@ def set_booking_quote(booking_id):
             note=note,
             quote_token=b.quote_token,
             locale=b.locale,
+            booking_id=b.id,
         )
     except Exception as e:
         current_app.logger.error(f"[set_booking_quote] notification error: {e}", exc_info=True)
@@ -708,13 +709,16 @@ def cancel_booking(booking_id):
             booking_ref=make_booking_ref(b),
             reason=reason or '',
             locale=b.locale,
+            booking_id=b.id,
         )
         if b.provider_phone:
-            apt = b.appointment_date
+            from shizuverse.utils.dates import format_long_date
             notify_booking_cancelled_provider(
                 provider_phone=b.provider_phone,
                 booking_ref=make_booking_ref(b),
-                date=apt.strftime('%d/%m/%Y') if apt else '',
+                # Provider is always addressed in French (T-19).
+                date=format_long_date(b.appointment_date, 'fr'),
+                booking_id=b.id,
             )
     except Exception as e:
         current_app.logger.error(f"[cancel_booking] Unexpected error: {e}", exc_info=True)
@@ -790,28 +794,32 @@ def reschedule_booking(booking_id):
     db.session.commit()
 
     # WhatsApp: client (locale) + provider if assigned (always FR). Never blocking.
-    date_only = new_dt.strftime('%d/%m/%Y')
+    # The approved templates carry a LONG date ("mardi 4 août 2026") — formatted
+    # through utils.dates, the single source of truth for date rendering.
     try:
         from shizuverse.utils.notifications import (
             notify_booking_rescheduled_client,
             notify_booking_rescheduled_provider,
         )
+        from shizuverse.utils.dates import format_long_date
         client_slot = _SLOT_LABELS.get(new_slot, {}).get('en' if b.locale == 'en' else 'fr', '') if new_slot else ''
         notify_booking_rescheduled_client(
             client_name=b.client_name,
             client_phone=b.client_phone,
             booking_ref=make_booking_ref(b),
-            new_date=date_only,
+            new_date=format_long_date(new_dt, b.locale),
             new_slot=client_slot,
             locale=b.locale,
+            booking_id=b.id,
         )
         if b.provider_phone:
             provider_slot = _SLOT_LABELS.get(new_slot, {}).get('fr', '') if new_slot else ''
             notify_booking_rescheduled_provider(
                 provider_phone=b.provider_phone,
                 booking_ref=make_booking_ref(b),
-                new_date=date_only,
+                new_date=format_long_date(new_dt, 'fr'),   # T-19
                 new_slot=provider_slot,
+                booking_id=b.id,
             )
     except Exception as e:
         current_app.logger.error(f"[reschedule_booking] notification error: {e}", exc_info=True)
@@ -908,9 +916,14 @@ def update_finance(booking_id):
             round((b.final_amount or b.amount_xof or 0) * 0.85)
         )
         if payout == 'sent' and b.provider_phone and eff_payout:
+            from shizuverse.utils.dates import format_long_date
             notify_payout_sent(
                 provider_phone=b.provider_phone,
                 provider_payout=eff_payout,
+                # No payout_date column exists: the payout date IS the moment the
+                # admin marks it sent, which is also this request's BookingEvent.
+                payout_date=format_long_date(datetime.utcnow(), 'fr'),   # T-19
+                booking_id=b.id,
             )
     except Exception as e:
         current_app.logger.error(f"[update_finance] Unexpected error: {e}", exc_info=True)
@@ -1238,6 +1251,7 @@ def confirm_payment(booking_id):
                 booking_ref=make_booking_ref(b),
                 amount=b.amount_collected,
                 locale=b.locale,
+                booking_id=b.id,
             )
         else:
             from shizuverse.utils.notifications import notify_deposit_received
@@ -1248,6 +1262,7 @@ def confirm_payment(booking_id):
                 amount=amount,
                 amount_due=b.amount_due,
                 locale=b.locale,
+                booking_id=b.id,
             )
     except Exception as e:
         current_app.logger.error(f"[confirm_payment] Unexpected error: {e}", exc_info=True)
@@ -1293,6 +1308,7 @@ def send_payment_instructions(booking_id):
             note=b.quote_note,
             quote_token=b.quote_token,
             locale=b.locale,
+            booking_id=b.id,
         )
     except Exception as e:
         current_app.logger.error(f"[send_payment_instructions] error: {e}", exc_info=True)
