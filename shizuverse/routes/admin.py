@@ -1364,6 +1364,21 @@ def open_dispute(booking_id):
     if not reason:
         return jsonify({'error': 'reason is required'}), 400
 
+    # Re-opening was implicit and destructive: a second call overwrote the reason
+    # and dispute_opened_at while leaving dispute_resolved_at set, producing a
+    # booking that was simultaneously re-opened and resolved. Refuse instead.
+    # NOTE: there is no re-open path at all today — dispute_flag is never set
+    # back to False anywhere. A genuine second dispute on the same booking is
+    # therefore impossible; that is a product gap, not something this guard
+    # creates.
+    if b.dispute_flag:
+        return jsonify({
+            'error': "Un litige est déjà ouvert sur cette réservation.",
+            'dispute_reason': b.dispute_reason,
+            'dispute_opened_at': b.dispute_opened_at.isoformat() if b.dispute_opened_at else None,
+            'dispute_resolution': b.dispute_resolution,
+        }), 409
+
     b.dispute_flag = True
     b.dispute_reason = reason
     b.dispute_opened_at = datetime.utcnow()
@@ -1389,6 +1404,19 @@ def resolve_dispute_new(booking_id):
     if not b.dispute_flag:
         return jsonify({'error': 'No active dispute on this booking'}), 400
 
+    # dispute_flag stays True after a resolution (nothing ever clears it), so
+    # the guard above does NOT prevent a replay: without this, calling the
+    # endpoint again silently overwrote the resolution and re-applied its
+    # financial effects — a refund could become a payout release, with both
+    # recorded as fact. The admin UI hides the buttons once resolved, but that
+    # is display, not API: a retry or a double-click still went through.
+    if b.dispute_resolution or b.dispute_resolved_at:
+        return jsonify({
+            'error': "Ce litige a déjà été résolu.",
+            'dispute_resolution': b.dispute_resolution,
+            'dispute_resolved_at': b.dispute_resolved_at.isoformat() if b.dispute_resolved_at else None,
+        }), 409
+
     data = request.get_json() or {}
     resolution = (data.get('resolution') or '').strip()
     valid = ('refund_client', 'release_provider', 'split')
@@ -1403,12 +1431,23 @@ def resolve_dispute_new(booking_id):
     elif resolution == 'release_provider':
         b.payout_status = 'due'
 
+    # refund_client and release_provider move real money (payment_status /
+    # payout_status just above), yet the event recorded no figure — the same
+    # blind spot 4d06e64 closed on the quote/lock/unlock events. Raw amount, for
+    # the same reason: an audit note is parsed, not read aloud.
+    amount_at_stake = b.amount_due_total
+    RESOLUTION_LABELS = {
+        'refund_client':    'remboursement client',
+        'release_provider': 'paiement libéré au prestataire',
+        'split':            'partage',
+    }
     event = BookingEvent(
         booking_id=b.id,
         event_type='dispute_resolved',
         from_status=b.status,
         to_status=b.status,
-        note=f'Resolution: {resolution}',
+        note=f'Litige résolu — {RESOLUTION_LABELS[resolution]} '
+             f'({resolution}) sur {amount_at_stake} XOF',
     )
     db.session.add(event)
     db.session.commit()
