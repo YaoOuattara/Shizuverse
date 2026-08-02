@@ -1765,11 +1765,14 @@ export default function AdminBookings() {
                               onClick={() => handleResolveDispute('release_provider')}>
                               {isFr ? "Libérer prestataire" : "Release provider"}
                             </Button>
-                            <Button size="sm" variant="outline" className="text-xs h-7 border-red-300 text-red-700"
-                              disabled={isUpdating}
-                              onClick={() => handleResolveDispute('split')}>
-                              {isFr ? "Partager" : "Split"}
-                            </Button>
+                            {/* « Partager » retiré : l'API l'enregistrait sans
+                                produire le moindre effet financier ni aucune
+                                donnée de répartition — un bouton qui consigne
+                                une décision sans effet. Une vraie répartition
+                                demande des colonnes, une règle de commission et
+                                un template Meta : lot produit séparé. Le libellé
+                                reste dans DISPUTE_RESOLUTION_LABELS pour que les
+                                dossiers déjà résolus ainsi restent lisibles. */}
                           </div>
                         )}
                         {rawBooking?.dispute_resolution && (
