@@ -193,6 +193,11 @@ def assign_booking(booking_id):
     prev_status = booking.status
     booking.provider_name = provider_name
     booking.provider_phone = provider_phone
+    # Carry the PERSON's id, not the service row's: sp is one of the provider's
+    # rows (one per service, T-20), they all share user_id. Written here because
+    # this is the only place a booking gains a provider — the phone must never
+    # again be the sole link (see the column comment on the model).
+    booking.provider_user_id = sp.user_id
     booking.status = 'assigned'
 
     from shizuverse.models.booking_event import BookingEvent
@@ -1066,6 +1071,10 @@ def decline_provider_booking(booking_id):
         booking.status = 'under_review'
         booking.provider_name = None
         booking.provider_phone = None
+        # Cleared with the rest: leaving the id behind would make the booking
+        # look assigned to a provider who declined it, and would still count
+        # towards their payouts.
+        booking.provider_user_id = None
         booking.decline_reason = reason or None
         booking.reviewed_by = 'admin'
         db.session.commit()

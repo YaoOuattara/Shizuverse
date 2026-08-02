@@ -92,6 +92,17 @@ class ClientBooking(db.Model):
     # Provider assignment fields (set when admin assigns a provider)
     provider_name  = db.Column(db.String(100), nullable=True)
     provider_phone = db.Column(db.String(20),  nullable=True)
+    # STABLE link to the provider — the PERSON, not one of their service rows.
+    # T-20: a provider holds one ServiceProvider row per service offered (three
+    # for most), all sharing a user_id; aggregating on sp.id would count them
+    # three times. Before this column the only link was provider_phone, a
+    # string: joining money on it would repeat, on payouts, the very bug
+    # 6a89893 fixed for WhatsApp — resolving by phone instead of carrying the
+    # id. A provider who changes number would lose their payout history.
+    # Nullable: an unassigned booking has none, and back-history may stay
+    # incomplete where the phone resolves to nothing (never guessed).
+    provider_user_id = db.Column(db.Integer, db.ForeignKey('users.id'),
+                                 nullable=True, index=True)
     reviewed_by    = db.Column(db.String(50),  nullable=True)
 
     service = db.relationship("Service", backref="client_bookings", lazy="joined")
@@ -143,6 +154,7 @@ class ClientBooking(db.Model):
             "notes":                self.notes,
             "provider_name":        self.provider_name,
             "provider_phone":       self.provider_phone,
+            "provider_user_id":     self.provider_user_id,
             "reviewed_by":          self.reviewed_by,
             "created_at":           self.created_at.isoformat() if self.created_at else None,
             "payment_status":       self.payment_status,
