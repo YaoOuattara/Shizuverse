@@ -16,6 +16,12 @@ class AnomalyLog(db.Model):
     last_seen_at     = db.Column(db.DateTime, nullable=True)
     occurrence_count = db.Column(db.Integer, nullable=False, default=1, server_default='1')
     last_notified_at = db.Column(db.DateTime, nullable=True)
+    # Result of the LAST send attempt. last_notified_at stamps the ATTEMPT (not
+    # the success): stamping on success only made a structurally failing send
+    # (outside the 24h window) retry every cron run — the observed one-alert-
+    # per-hour storm. A failure stays visible here and in the logs, but the 6h
+    # reminder keeps its role instead of being bypassed.
+    last_send_ok     = db.Column(db.Boolean, nullable=True)
     resolved_at  = db.Column(db.DateTime, nullable=True)
     resolved_by  = db.Column(db.String(100), nullable=True)
 
@@ -33,6 +39,7 @@ class AnomalyLog(db.Model):
             "detected_at":  self.detected_at.isoformat() if self.detected_at else None,
             "last_seen_at": self.last_seen_at.isoformat() if self.last_seen_at else None,
             "occurrence_count": self.occurrence_count,
+            "last_send_ok": self.last_send_ok,
             "resolved_at":  self.resolved_at.isoformat() if self.resolved_at else None,
             "resolved_by":  self.resolved_by,
         }

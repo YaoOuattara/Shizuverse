@@ -131,28 +131,45 @@ def _run_checks() -> list:
         ClientBooking.status.in_(['accepted', 'declined', 'in_progress', 'completed']),
     ).all()
 
+    # Key on the PERSON (provider_user_id, the stable link from 48a2831), the
+    # name being display-only. Keying on the name left provider_id=None on a
+    # per-provider anomaly: two providers in low acceptance shared the dedup key
+    # (low_provider_acceptance, None, None) — ONE AnomalyLog row, the second
+    # description overwriting the first. Legacy rows without the id fall back
+    # to the name as key (still better than a shared None).
     provider_counts: dict = {}
     for b in recent_assigned:
-        stats = provider_counts.setdefault(b.provider_name, {'accepted': 0, 'declined': 0})
+        key = b.provider_user_id if b.provider_user_id is not None else b.provider_name
+        stats = provider_counts.setdefault(
+            key, {'accepted': 0, 'declined': 0, 'name': b.provider_name})
         if b.status == 'declined':
             stats['declined'] += 1
         else:
             stats['accepted'] += 1
 
-    for name, stats in provider_counts.items():
+    for key, stats in provider_counts.items():
         total = stats['accepted'] + stats['declined']
         if total >= 3:
             acceptance_rate = stats['accepted'] / total
             if acceptance_rate < t['provider_acceptance_rate']:
+                # AnomalyLog.provider_id is an FK to service_providers.id, not
+                # to the person: pick the person's LOWEST row id (T-20 gives one
+                # row per service) so the dedup key stays deterministic.
+                provider_row_id = None
+                if isinstance(key, int):
+                    from shizuverse.models.service_provider import ServiceProvider
+                    sp = (ServiceProvider.query.filter_by(user_id=key)
+                          .order_by(ServiceProvider.id.asc()).first())
+                    provider_row_id = sp.id if sp else None
                 anomalies.append({
                     'type':            'low_provider_acceptance',
                     'severity':        'warning',
                     'description':     (
-                        f"{name} a refusé {stats['declined']}/{total} missions "
+                        f"{stats['name']} a refusé {stats['declined']}/{total} missions "
                         f"ces 7 derniers jours ({(1-acceptance_rate)*100:.0f}% de refus)"
                     ),
                     'booking_id':      None,
-                    'provider_id':     None,
+                    'provider_id':     provider_row_id,
                     'action_required': 'Contacter le prestataire pour vérifier sa disponibilité',
                     'detected_at':     now.isoformat(),
                 })
@@ -290,11 +307,22 @@ def run_anomaly_check() -> dict:
         alert = generate_anomaly_alert(to_notify_anoms)
         if admin_phone:
             alert_sent = send_whatsapp(admin_phone, alert)
-            if alert_sent:
-                # Stamp last_notified_at only on a successful send, so a failed
-                # send retries next run instead of going silent for 6h.
-                for row in to_notify_rows:
-                    row.last_notified_at = now
+            # Stamp the ATTEMPT, not the success. The old success-only stamp
+            # was sound for a TRANSIENT failure but wrong for a STRUCTURAL one:
+            # a free-form WhatsApp outside the 24h window fails on every run,
+            # so the row never got stamped and the alert re-fired hourly
+            # forever — the observed storm (~44 alerts on booking 77). A
+            # transient failure now costs at most one 6h reminder cycle; the
+            # outcome stays visible in last_send_ok and in the logs.
+            for row in to_notify_rows:
+                row.last_notified_at = now
+                row.last_send_ok = alert_sent
+            if not alert_sent:
+                logger.warning(
+                    "Alerte anomalies NON délivrée (%d anomalie(s)) — pas de "
+                    "réémission avant le rappel 6h. Cause probable : fenêtre "
+                    "24h fermée (envoi free-form sans template).",
+                    len(to_notify_anoms))
         else:
             logger.warning("Neither SHIZU_ADMIN_PHONE nor NEXT_PUBLIC_SHIZU_WHATSAPP set — WhatsApp alert skipped")
 
