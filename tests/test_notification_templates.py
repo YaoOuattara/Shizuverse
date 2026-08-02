@@ -289,6 +289,8 @@ def test_no_provider_wrapper_builds_an_en_key():
         "notify_provider_new_mission", "notify_registration_submitted",
         "notify_payout_sent", "notify_review_received",
         "notify_booking_rescheduled_provider", "notify_booking_cancelled_provider",
+        "notify_dispute_opened_provider", "notify_dispute_no_payment_provider",
+        "notify_dispute_released_provider",
     ]
     for name in provider_wrappers:
         src = inspect.getsource(getattr(n, name))

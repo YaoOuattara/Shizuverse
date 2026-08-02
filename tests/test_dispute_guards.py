@@ -227,7 +227,7 @@ def test_an_invalid_resolution_is_still_rejected(app, client, admin_headers):
 
 # ── A3/A4 — la note consigne le montant, en français ─────────────────────────
 
-@pytest.mark.parametrize("resolution", ["refund_client", "release_provider", "split"])
+@pytest.mark.parametrize("resolution", ["refund_client", "release_provider"])
 def test_resolution_event_records_the_amount(app, client, admin_headers, resolution):
     bid = _make_booking(app)
     _open(client, admin_headers, bid)
@@ -255,6 +255,17 @@ def test_amount_recorded_is_the_effective_one(app, client, admin_headers):
     justifié est ce qui est réellement en jeu dans le litige."""
     bid = _make_booking(app, final_amount=52000)
     _open(client, admin_headers, bid)
-    _resolve(client, admin_headers, bid, "split")
+    _resolve(client, admin_headers, bid, "release_provider")
     note = _events(app, bid, "dispute_resolved")[0].note
     assert "52000 XOF" in note, note
+
+
+def test_split_is_no_longer_an_accepted_resolution(app, client, admin_headers):
+    """Retiré : accepté et enregistré, il ne produisait AUCUN effet financier.
+    Le bouton correspondant est retiré de l'interface admin dans le même lot."""
+    bid = _make_booking(app)
+    _open(client, admin_headers, bid)
+    r = _resolve(client, admin_headers, bid, "split")
+    assert r.status_code == 400, r.get_data(as_text=True)
+    assert _booking(app, bid).dispute_resolution is None
+    assert _events(app, bid, "dispute_resolved") == []

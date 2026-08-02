@@ -1393,6 +1393,30 @@ def open_dispute(booking_id):
     db.session.add(event)
     db.session.commit()
 
+    # WhatsApp: both sides are told a dispute is open. Never blocking — a failed
+    # notification must not prevent a dispute from being recorded.
+    try:
+        from shizuverse.utils.notifications import (
+            notify_dispute_opened_client, notify_dispute_opened_provider,
+        )
+        notify_dispute_opened_client(
+            client_name=b.client_name,
+            client_phone=b.client_phone,
+            booking_ref=make_booking_ref(b),
+            locale=b.locale,
+            booking_id=b.id,
+        )
+        # A dispute can be opened on a booking with no provider yet (a client can
+        # contest a quote or a delay) — hence the guard, not a systematic send.
+        if b.provider_phone:
+            notify_dispute_opened_provider(
+                provider_phone=b.provider_phone,
+                booking_ref=make_booking_ref(b),
+                booking_id=b.id,
+            )
+    except Exception as e:
+        current_app.logger.error(f"[open_dispute] notification error: {e}", exc_info=True)
+
     return jsonify({'success': True, 'dispute_flag': True, 'dispute_reason': b.dispute_reason})
 
 
@@ -1419,7 +1443,14 @@ def resolve_dispute_new(booking_id):
 
     data = request.get_json() or {}
     resolution = (data.get('resolution') or '').strip()
-    valid = ('refund_client', 'release_provider', 'split')
+    # 'split' REMOVED — it was accepted, stored and displayed "Partagé" while
+    # producing no financial effect whatsoever: no payment_status, no
+    # payout_status, no amount, and no column to hold a share. An admin believed
+    # they had arbitrated and nothing moved, so no message could honestly tell
+    # either party what they were getting. A real split needs columns, a
+    # commission rule and an approved Meta template — separate product lot.
+    # Verified in production before removal: zero rows carry it.
+    valid = ('refund_client', 'release_provider')
     if resolution not in valid:
         return jsonify({'error': f'resolution must be one of {list(valid)}'}), 400
 
@@ -1439,7 +1470,6 @@ def resolve_dispute_new(booking_id):
     RESOLUTION_LABELS = {
         'refund_client':    'remboursement client',
         'release_provider': 'paiement libéré au prestataire',
-        'split':            'partage',
     }
     event = BookingEvent(
         booking_id=b.id,
@@ -1451,6 +1481,37 @@ def resolve_dispute_new(booking_id):
     )
     db.session.add(event)
     db.session.commit()
+
+    # WhatsApp: each resolution tells BOTH sides the same story from their own
+    # angle — a refund for the client is "no payout" for the provider. Never
+    # blocking: the resolution is already committed above.
+    try:
+        from shizuverse.utils.notifications import (
+            notify_dispute_refund_client, notify_dispute_no_payment_provider,
+            notify_dispute_closed_client, notify_dispute_released_provider,
+        )
+        ref = make_booking_ref(b)
+        if resolution == 'refund_client':
+            notify_dispute_refund_client(
+                client_name=b.client_name, client_phone=b.client_phone,
+                booking_ref=ref, locale=b.locale, booking_id=b.id,
+            )
+            if b.provider_phone:
+                notify_dispute_no_payment_provider(
+                    provider_phone=b.provider_phone, booking_ref=ref, booking_id=b.id,
+                )
+        elif resolution == 'release_provider':
+            notify_dispute_closed_client(
+                client_name=b.client_name, client_phone=b.client_phone,
+                booking_ref=ref, locale=b.locale, booking_id=b.id,
+            )
+            if b.provider_phone:
+                notify_dispute_released_provider(
+                    provider_phone=b.provider_phone, booking_ref=ref, booking_id=b.id,
+                )
+    except Exception as e:
+        current_app.logger.error(f"[resolve_dispute_new] notification error: {e}",
+                                 exc_info=True)
 
     return jsonify({'success': True, 'dispute_resolution': b.dispute_resolution})
 

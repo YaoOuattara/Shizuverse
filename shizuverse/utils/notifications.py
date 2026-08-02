@@ -566,6 +566,71 @@ def notify_payment_instructions(
                                   variables, log_body=body, booking_id=booking_id)
 
 
+# ── Dispute wrappers, CLIENT side ────────────────────────────────────────────
+# All three carry the same two positions: {{1}} client name, {{2}} booking ref.
+# No amount and no reason: the approved templates have no slot for them, and a
+# dispute message is a "we are handling it" signal, not a statement of account.
+# log_body is our own wording — the approved v2 texts were not supplied, and the
+# Content SID owns what actually goes out.
+
+def notify_dispute_opened_client(
+    *, client_name: str, client_phone: str, booking_ref: str,
+    locale: str = "fr", booking_id: int = None,
+) -> bool:
+    loc = _norm_locale(locale)
+    variables = {"1": client_name, "2": booking_ref}
+    body = (
+        f"Bonjour {client_name}, votre réservation {booking_ref} fait l'objet "
+        f"d'un examen par notre équipe. Nous vous contactons rapidement pour "
+        f"faire le point avec vous."
+        if loc == "fr" else
+        f"Hello {client_name}, your booking {booking_ref} is being reviewed by "
+        f"our team. We will contact you shortly to go through it with you."
+    )
+    return send_whatsapp_template(client_phone, f"shizu_dispute_opened_client_{loc}",
+                                  variables, log_body=body, booking_id=booking_id)
+
+
+def notify_dispute_refund_client(
+    *, client_name: str, client_phone: str, booking_ref: str,
+    locale: str = "fr", booking_id: int = None,
+) -> bool:
+    """Resolution 'refund_client' — the client is refunded."""
+    loc = _norm_locale(locale)
+    variables = {"1": client_name, "2": booking_ref}
+    body = (
+        f"Bonjour {client_name}, l'examen de votre réservation {booking_ref} est "
+        f"terminé. Un remboursement a été décidé. Notre équipe vous contacte "
+        f"pour le détail et le délai."
+        if loc == "fr" else
+        f"Hello {client_name}, the review of your booking {booking_ref} is "
+        f"complete. A refund has been decided. Our team will contact you with "
+        f"the details and timing."
+    )
+    return send_whatsapp_template(client_phone, f"shizu_dispute_refund_client_{loc}",
+                                  variables, log_body=body, booking_id=booking_id)
+
+
+def notify_dispute_closed_client(
+    *, client_name: str, client_phone: str, booking_ref: str,
+    locale: str = "fr", booking_id: int = None,
+) -> bool:
+    """Resolution 'release_provider' — closed WITHOUT a refund for the client."""
+    loc = _norm_locale(locale)
+    variables = {"1": client_name, "2": booking_ref}
+    body = (
+        f"Bonjour {client_name}, l'examen de votre réservation {booking_ref} est "
+        f"terminé et le dossier est clôturé. Pour toute question, notre équipe "
+        f"reste disponible."
+        if loc == "fr" else
+        f"Hello {client_name}, the review of your booking {booking_ref} is "
+        f"complete and the case is closed. Our team remains available for any "
+        f"question."
+    )
+    return send_whatsapp_template(client_phone, f"shizu_dispute_closed_client_{loc}",
+                                  variables, log_body=body, booking_id=booking_id)
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # PROVIDER-facing wrappers — ALWAYS French (providers are local & francophone).
 # Do NOT add a `locale` argument to any function below.
@@ -739,6 +804,51 @@ def notify_registration_submitted(*, provider_name: str, provider_phone: str) ->
     )
     return send_whatsapp_template(provider_phone, "shizu_provider_registration_fr",
                                   variables, log_body=body)
+
+
+# ── Dispute wrappers, PROVIDER side ──────────────────────────────────────────
+# One position each: {{1}} booking ref. Literal _fr keys — no _en variant exists
+# in the registry, and T-19 forbids addressing a provider in anything but French.
+
+def notify_dispute_opened_provider(
+    *, provider_phone: str, booking_ref: str, booking_id: int = None,
+) -> bool:
+    variables = {"1": booking_ref}
+    body = (
+        f"Mission Shizu {booking_ref} : un examen est en cours par notre équipe. "
+        f"Le règlement est suspendu le temps de la vérification. Nous vous "
+        f"contactons rapidement."
+    )
+    return send_whatsapp_template(provider_phone, "shizu_dispute_opened_provider_fr",
+                                  variables, log_body=body, booking_id=booking_id)
+
+
+def notify_dispute_no_payment_provider(
+    *, provider_phone: str, booking_ref: str, booking_id: int = None,
+) -> bool:
+    """Resolution 'refund_client' — the provider is NOT paid for this mission."""
+    variables = {"1": booking_ref}
+    body = (
+        f"Mission Shizu {booking_ref} : l'examen est terminé. La mission est "
+        f"clôturée sans règlement. Notre équipe vous contacte pour vous expliquer."
+    )
+    return send_whatsapp_template(provider_phone,
+                                  "shizu_dispute_no_payment_provider_fr",
+                                  variables, log_body=body, booking_id=booking_id)
+
+
+def notify_dispute_released_provider(
+    *, provider_phone: str, booking_ref: str, booking_id: int = None,
+) -> bool:
+    """Resolution 'release_provider' — the payout is released to the provider."""
+    variables = {"1": booking_ref}
+    body = (
+        f"Mission Shizu {booking_ref} : l'examen est terminé. Votre règlement "
+        f"est débloqué et sera traité normalement."
+    )
+    return send_whatsapp_template(provider_phone,
+                                  "shizu_dispute_released_provider_fr",
+                                  variables, log_body=body, booking_id=booking_id)
 
 
 # notify_new_booking_request and notify_payment_recorded were REMOVED here.
