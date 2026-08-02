@@ -304,6 +304,7 @@ const EVENT_LABELS: Record<string, { fr: string; en: string }> = {
   final_amount_set:  { fr: "Montant final enregistré",       en: "Final amount recorded" },
   amount_unlocked:   { fr: "Montant déverrouillé (litige)",  en: "Amount unlocked (dispute)" },
   payment_confirmed: { fr: "Paiement confirmé",              en: "Payment confirmed" },
+  finance_updated:   { fr: "Finances mises à jour",          en: "Finance updated" },
   payment_recorded:  { fr: "Versement enregistré",           en: "Payment recorded" },
   service_classified:{ fr: "Demande classée",                en: "Request classified" },
   dispute_opened:    { fr: "Litige ouvert",                  en: "Dispute opened" },

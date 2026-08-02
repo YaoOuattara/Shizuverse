@@ -390,7 +390,7 @@ export default function ProviderProfilePage() {
     if (momoInvalid) {
       toast({
         title: isFr ? 'Numéro Mobile Money invalide' : 'Invalid Mobile Money number',
-        description: isFr ? 'Il doit contenir 10 chiffres (ex. 0707050154).' : 'It must have 10 digits (e.g. 0707050154).',
+        description: isFr ? 'Il doit contenir 10 chiffres (ex. 07 XX XX XX XX).' : 'It must have 10 digits (e.g. 07 XX XX XX XX).',
         variant: 'destructive',
       })
       return
@@ -445,7 +445,7 @@ export default function ProviderProfilePage() {
     if (momoInvalid) {
       toast({
         title: isFr ? 'Numéro Mobile Money invalide' : 'Invalid Mobile Money number',
-        description: isFr ? 'Il doit contenir 10 chiffres (ex. 0707050154).' : 'It must have 10 digits (e.g. 0707050154).',
+        description: isFr ? 'Il doit contenir 10 chiffres (ex. 07 XX XX XX XX).' : 'It must have 10 digits (e.g. 07 XX XX XX XX).',
         variant: 'destructive',
       })
       return
@@ -747,7 +747,7 @@ export default function ProviderProfilePage() {
               inputMode="tel"
               value={profile.mobile_money_number}
               onChange={e => set('mobile_money_number', e.target.value.slice(0, 20))}
-              placeholder="0707050154"
+              placeholder="07 XX XX XX XX"
               aria-invalid={momoInvalid}
               className="w-full rounded-lg border border-input bg-background text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring"
             />
@@ -759,8 +759,8 @@ export default function ProviderProfilePage() {
             {momoInvalid && (
               <p className="mt-1 text-xs text-red-600">
                 {isFr
-                  ? 'Le numéro doit contenir 10 chiffres et commencer par 0 (ex. 0707050154).'
-                  : 'The number must have 10 digits and start with 0 (e.g. 0707050154).'}
+                  ? 'Le numéro doit contenir 10 chiffres et commencer par 0 (ex. 07 XX XX XX XX).'
+                  : 'The number must have 10 digits and start with 0 (e.g. 07 XX XX XX XX).'}
               </p>
             )}
           </div>
@@ -772,9 +772,17 @@ export default function ProviderProfilePage() {
           type="text"
           value={profile.mobile_money_name}
           onChange={e => set('mobile_money_name', e.target.value)}
-          placeholder={isFr ? 'Kouassi Marie' : 'Full name'}
+          placeholder={isFr ? 'Nom complet sur le compte' : 'Full name on the account'}
           className={inputCls}
         />
+        {/* Pas requis (les comptes existants n'en ont pas tous), mais un champ
+            vide produit le badge « Titulaire inconnu » côté admin : sans nom,
+            on ignore à qui appartient le numéro vers lequel part l'argent. */}
+        <p className="mt-1 text-xs text-amber-700">
+          {isFr
+            ? 'Ce nom sera vérifié avant tout versement.'
+            : 'This name will be checked before any payout.'}
+        </p>
       </Section>
 
       {/* ── Verification checklist + action buttons ───────────────────────── */}
