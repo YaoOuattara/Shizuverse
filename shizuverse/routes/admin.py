@@ -868,11 +868,32 @@ def update_finance(booking_id):
     if payment and payment not in valid_payment:
         return jsonify({'error': f'Invalid payment_status: {payment}. '
                                  f'Le paiement encaissé se gère via confirm-payment.'}), 400
+    # 'refunded' is TERMINAL, on the a5b4cd1 model. Nothing guarded this before:
+    # the write was unconditional, so a second click on "Rembourser" silently
+    # rewrote the flag, and a direct call could just as silently walk it back to
+    # 'open' — with no trace either way. payout_status stays editable: a refunded
+    # file may still need its payout marked failed or cancelled.
+    if payment and b.payment_status == 'refunded':
+        return jsonify({
+            'error': "Ce dossier a déjà été remboursé — le statut de paiement "
+                     "n'est plus modifiable.",
+            'payment_status': b.payment_status,
+        }), 409
     if payout and payout not in valid_payout:
         return jsonify({'error': f'Invalid payout_status: {payout}'}), 400
     # Payout can only become due once the client has FULLY paid (derived).
     if payout == 'due' and b.collection_status != 'paid':
         return jsonify({'error': 'Cannot set payout to due until the client has fully paid'}), 400
+    # …and never on a refunded file. The guard above cannot catch this: a refund
+    # leaves amount_collected intact (T-29), so collection_status stays 'paid'
+    # and the check passes. Paying the provider while refunding the client means
+    # Shizu pays twice out of its own funds.
+    if payout == 'due' and b.payment_status == 'refunded':
+        return jsonify({
+            'error': "Ce dossier a été remboursé au client : aucun versement ne "
+                     "peut lui être dû.",
+            'payment_status': b.payment_status,
+        }), 409
 
     if final_amount is not None:
         # Validate before touching the row: a non-numeric or non-positive value
@@ -914,10 +935,34 @@ def update_finance(booking_id):
             note=' '.join(note_bits),
         ))
 
+    # A payment_status / payout_status change moves real money and left NO trace
+    # at all: the only event this endpoint ever wrote was final_amount_set, and
+    # only when a final_amount was supplied. Same blind spot 4d06e64 closed on
+    # the quote/lock/unlock events — with the amount in force, raw, because an
+    # audit note is parsed rather than read aloud.
+    changes = []
+    if payment and payment != b.payment_status:
+        changes.append(f'paiement {b.payment_status} → {payment}')
+    if payout and payout != b.payout_status:
+        changes.append(f'versement {b.payout_status} → {payout}')
+
     if payment:
         b.payment_status = payment
     if payout:
         b.payout_status = payout
+
+    if changes:
+        note = f"Finance : {', '.join(changes)} sur {b.amount_due_total} XOF"
+        if reason:
+            note += f" — motif : {reason}"
+        db.session.add(BookingEvent(
+            booking_id=b.id,
+            event_type='finance_updated',
+            from_status=b.status,
+            to_status=b.status,
+            actor_id=None,
+            note=note,
+        ))
 
     db.session.commit()
 
@@ -1039,56 +1084,59 @@ def get_overview():
     now = datetime.utcnow()
     first_of_month = datetime(now.year, now.month, 1)
 
-    # Effective per-row amount: prefer final_amount, fall back to amount_xof.
-    # All columns are Integer so arithmetic stays integer (no ROUND/NUMERIC needed).
-    eff_amt = func.coalesce(
-        ClientBooking.final_amount,
-        ClientBooking.amount_xof,
-        0
+    # Money expressions live in ONE place (utils/finance_expressions): they used
+    # to be redefined here and in finance_summary, and the two drifted.
+    from shizuverse.utils.finance_expressions import (
+        eff_amt as _eff_amt, eff_commission as _eff_commission,
+        eff_payout as _eff_payout, fully_paid as _fully_paid,
+        not_refunded as _not_refunded,
     )
-    # 15% commission using integer arithmetic (truncates, fine for FCFA integers)
-    eff_commission = func.coalesce(
-        ClientBooking.shizu_commission,
-        eff_amt * 15 / 100
-    )
-    # 85% payout = amount − 15% commission
-    eff_payout = func.coalesce(
-        ClientBooking.provider_payout,
-        eff_amt - eff_amt * 15 / 100
-    )
+    eff_amt, eff_commission = _eff_amt(), _eff_commission()
+    eff_payout, fully_paid, not_refunded = _eff_payout(), _fully_paid(), _not_refunded()
 
-    # "Fully paid" is DERIVED (payment_status no longer stores it): the client
-    # has collected money AND reached the amount due (coalesce(final, quote)).
-    fully_paid = (ClientBooking.amount_collected > 0) & (ClientBooking.amount_collected >= eff_amt)
+    # Every revenue aggregate below excludes refunded files. A refund leaves
+    # amount_collected untouched (T-29: money really did come in), so nothing in
+    # the collected amount will drop the file on its own — it has to be excluded
+    # explicitly, or refunded bookings keep inflating the totals forever.
 
     # ── GMV ───────────────────────────────────────────────────
     gmv_total = db.session.query(
         func.coalesce(func.sum(eff_amt), 0)
-    ).filter(fully_paid).scalar()
+    ).filter(fully_paid, not_refunded).scalar()
 
     gmv_month = db.session.query(
         func.coalesce(func.sum(eff_amt), 0)
     ).filter(
         fully_paid,
+        not_refunded,
         ClientBooking.created_at >= first_of_month
     ).scalar()
 
     # ── Revenue Shizu (15% commission) ────────────────────────
     revenue_shizu = db.session.query(
         func.coalesce(func.sum(eff_commission), 0)
-    ).filter(fully_paid).scalar()
+    ).filter(fully_paid, not_refunded).scalar()
 
     # ── Provider payouts ──────────────────────────────────────
+    # 'due' only — 'not_due' used to pass the previous `!= 'sent'` filter, so
+    # payouts that were explicitly NOT due were counted as due.
     payouts_due = db.session.query(
         func.coalesce(func.sum(eff_payout), 0)
     ).filter(
         fully_paid,
-        ClientBooking.payout_status != 'sent'
+        not_refunded,
+        ClientBooking.payout_status == 'due'
     ).scalar()
 
+    # Same predicates as payouts_due, minus the status — a sent payout is a fact,
+    # but it belongs to the same population.
     payouts_sent = db.session.query(
         func.coalesce(func.sum(eff_payout), 0)
-    ).filter(ClientBooking.payout_status == 'sent').scalar()
+    ).filter(
+        fully_paid,
+        not_refunded,
+        ClientBooking.payout_status == 'sent'
+    ).scalar()
 
     # ── Booking counts ────────────────────────────────────────
     total_bookings     = db.session.query(func.count(ClientBooking.id)).scalar()
@@ -1459,6 +1507,11 @@ def resolve_dispute_new(booking_id):
 
     if resolution == 'refund_client':
         b.payment_status = 'refunded'
+        # Cancel any pending payout. shizu_dispute_no_payment_provider_fr tells
+        # the provider the mission is closed WITHOUT payment — until now nothing
+        # in the code made that true: a booking already marked payout 'due' kept
+        # saying so, and the row contradicted the message we had just sent.
+        b.payout_status = 'not_due'
     elif resolution == 'release_provider':
         b.payout_status = 'due'
 
@@ -1542,14 +1595,29 @@ def get_admin_config():
 @admin_required
 def finance_summary():
     from sqlalchemy import func
-    eff_amt = func.coalesce(ClientBooking.final_amount, ClientBooking.amount_xof, 0)
+    # Same expressions as /admin/overview — see utils/finance_expressions for why
+    # they are shared rather than restated.
+    from shizuverse.utils.finance_expressions import (
+        eff_payout as _eff_payout, fully_paid as _fully_paid,
+        not_refunded as _not_refunded,
+    )
     collected = func.coalesce(ClientBooking.amount_collected, 0)
     completed   = db.session.query(func.count(ClientBooking.id)).filter_by(status='completed').scalar()
     # Real cash in: sum of what was actually collected (deposits included), not a
-    # count of fully-paid rows.
+    # count of fully-paid rows. Deliberately NOT the same metric as overview's
+    # gmv_total (GMV of settled files) — both are legitimate, they answer
+    # different questions, and neither should be derived from the other.
     total_paid  = db.session.query(func.coalesce(func.sum(collected), 0)).scalar()
     payouts_due_count = db.session.query(func.count(ClientBooking.id)).filter_by(payout_status='due').scalar()
-    payouts_due_value = db.session.query(func.coalesce(func.sum(eff_amt), 0)).filter(ClientBooking.payout_status == 'due').scalar()
+    # The PROVIDER's 85% share, not the gross amount: the commission was never
+    # owed to them. This used to sum eff_amt here while overview summed
+    # eff_payout — the same label showing two numbers 15% apart.
+    payouts_due_value = db.session.query(
+        func.coalesce(func.sum(_eff_payout()), 0)
+    ).filter(
+        _fully_paid(), _not_refunded(),
+        ClientBooking.payout_status == 'due',
+    ).scalar()
     failed_payouts = db.session.query(func.count(ClientBooking.id)).filter_by(payout_status='failed').scalar()
     # Completed but nothing collected yet (derived 'unpaid').
     unpaid_completed = db.session.query(func.count(ClientBooking.id)).filter(
