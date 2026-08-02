@@ -974,7 +974,7 @@ export default function AdminBookings() {
   };
 
   const openPaymentModal = () => {
-    if (!selectedBooking || selectedBooking.status === 'cancelled' || (selectedBooking.collectionStatus ?? selectedBooking.paymentStatus) === 'paid') return;
+    if (!selectedBooking || selectedBooking.status === 'cancelled' || selectedBooking.collectionStatus === 'paid') return;
     // Pre-fill: final_amount (if already set) → baseAmount (= amount_xof quoted price) → 0
     // Pre-fill with the remaining balance due (falls back to the booking amount
     // for legacy rows that don't expose amountDue).
@@ -1467,9 +1467,20 @@ export default function AdminBookings() {
                         <Badge className={`text-xs ${statusColors[booking.status] || statusColors.pending}`}>
                           {statusLabels[booking.status] || booking.status}
                         </Badge>
-                        <Badge className={`text-xs ${paymentColors[booking.collectionStatus ?? booking.paymentStatus]}`}>
-                          {paymentStatusLabels[booking.collectionStatus ?? booking.paymentStatus]}
+                        {/* Deux axes ORTHOGONAUX, deux badges. Le ?? fusionnait
+                            « combien encaissé » (collection_status, dérivé
+                            d'amount_collected) et « état du dossier »
+                            (payment_status) : un dossier soldé PUIS remboursé
+                            s'affichait « Payé », le remboursement invisible.
+                            'open' est le défaut neutre, on ne l'affiche pas. */}
+                        <Badge className={`text-xs ${paymentColors[booking.collectionStatus ?? 'unpaid']}`}>
+                          {paymentStatusLabels[booking.collectionStatus ?? 'unpaid']}
                         </Badge>
+                        {booking.paymentStatus && booking.paymentStatus !== 'open' && (
+                          <Badge className={`text-xs ${paymentColors[booking.paymentStatus]}`}>
+                            {paymentStatusLabels[booking.paymentStatus]}
+                          </Badge>
+                        )}
                       </div>
                     </div>
 
@@ -1601,9 +1612,14 @@ export default function AdminBookings() {
                     </div>
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-muted-foreground">{isFr ? "Paiement\u00a0:" : "Payment:"}</span>
-                      <Badge className={`${paymentColors[selectedBooking.collectionStatus ?? selectedBooking.paymentStatus]}`}>
-                        {paymentStatusLabels[selectedBooking.collectionStatus ?? selectedBooking.paymentStatus]}
+                      <Badge className={`${paymentColors[selectedBooking.collectionStatus ?? 'unpaid']}`}>
+                        {paymentStatusLabels[selectedBooking.collectionStatus ?? 'unpaid']}
                       </Badge>
+                      {selectedBooking.paymentStatus && selectedBooking.paymentStatus !== 'open' && (
+                        <Badge className={`${paymentColors[selectedBooking.paymentStatus]}`}>
+                          {paymentStatusLabels[selectedBooking.paymentStatus]}
+                        </Badge>
+                      )}
                     </div>
                     {selectedBooking.status === 'completed' && (
                       <div className="flex items-center gap-1">
@@ -1841,7 +1857,7 @@ export default function AdminBookings() {
                     {/* Payment: two clearly separated intents.
                         (1) Consultation — show the Mobile Money numbers, no effect.
                         (2) Financial action — mark the money as actually received. */}
-                    {isLocked && (selectedBooking.collectionStatus ?? selectedBooking.paymentStatus) !== 'paid' && !isClosed && (
+                    {isLocked && selectedBooking.collectionStatus !== 'paid' && !isClosed && (
                       <div className="space-y-2">
                         <Button variant="outline" size="sm" className="w-full"
                           onClick={() => setPaymentInstructionsOpen(true)}>
@@ -2093,7 +2109,7 @@ export default function AdminBookings() {
                 )}
 
                 {/* Payment Actions - show for unpaid non-cancelled bookings with accepted quote */}
-                {(selectedBooking.collectionStatus ?? selectedBooking.paymentStatus) !== 'paid' && selectedBooking.status !== 'cancelled' && (selectedBooking.quoteStatus === 'accepted' || selectedBooking.status === 'confirmed' || selectedBooking.status === 'completed') && (
+                {selectedBooking.collectionStatus !== 'paid' && selectedBooking.status !== 'cancelled' && (selectedBooking.quoteStatus === 'accepted' || selectedBooking.status === 'confirmed' || selectedBooking.status === 'completed') && (
                   <div className="space-y-2">
                     <Button
                       variant="outline"

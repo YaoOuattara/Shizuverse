@@ -228,13 +228,24 @@ export default function AdminPayments() {
         b.serviceName.toLowerCase().includes(searchLower) ||
         b.providerName.toLowerCase().includes(searchLower) ||
         b.id.includes(searchLower);
-      const matchesStatus = paymentStatusFilter === "all" || (b.collectionStatus ?? b.paymentStatus) === paymentStatusFilter;
+      // Aiguillage par VALEUR : les onglets mélangent les deux axes. unpaid /
+      // partial / paid interrogent l'encaissement, refunded l'état du dossier.
+      // Un dossier soldé PUIS remboursé sort sous « Remboursé » uniquement :
+      // l'état terminal prime pour le filtrage, le second badge dit le reste.
+      const matchesStatus =
+        paymentStatusFilter === "all" ? true
+        : paymentStatusFilter === "refunded" ? b.paymentStatus === "refunded"
+        : b.paymentStatus === "refunded" ? false
+        : b.collectionStatus === paymentStatusFilter;
       return matchesSearch && matchesStatus;
     });
   }, [bookings, searchQuery, paymentStatusFilter]);
 
   const payoutsBookings = useMemo(() => {
-    return bookings.filter(b => b.status === 'completed' && (b.collectionStatus ?? b.paymentStatus) === 'paid').filter(b => {
+    // Un dossier remboursé ne doit rien au prestataire : verser ET rembourser,
+    // c'est Shizu qui paie deux fois sur ses fonds propres.
+    return bookings.filter(b => b.status === 'completed' && b.collectionStatus === 'paid'
+                                && b.paymentStatus !== 'refunded').filter(b => {
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch = !searchQuery ||
         b.providerName.toLowerCase().includes(searchLower) ||
@@ -369,8 +380,11 @@ export default function AdminPayments() {
                   <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400" data-testid="live-stat-paid">
                     {new Intl.NumberFormat('fr-FR').format(overview?.gmv_total ?? 0)} FCFA
                   </p>
+                  {/* Ce chiffre est un GMV de dossiers SOLDÉS, pas du cash
+                      encaissé : les acomptes n'y sont pas et les remboursés en
+                      sont exclus. L'ancien libellé annonçait de la trésorerie. */}
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {isFr ? "Montant final payé" : "Final amount paid"}
+                    {isFr ? "Dossiers soldés, hors remboursés" : "Settled bookings, refunds excluded"}
                   </p>
                 </>
               )}
@@ -522,9 +536,15 @@ export default function AdminPayments() {
                             <p className="text-xs text-muted-foreground">ID: {booking.id}</p>
                           </div>
                           <div className="flex items-center gap-2 sm:justify-end">
-                            <Badge className={`text-xs ${paymentStatusColors[booking.collectionStatus ?? booking.paymentStatus]}`}>
-                              {paymentStatusLabels[booking.collectionStatus ?? booking.paymentStatus]}
+                            {/* Deux axes orthogonaux, deux badges — voir AdminBookings. */}
+                            <Badge className={`text-xs ${paymentStatusColors[booking.collectionStatus ?? 'unpaid']}`}>
+                              {paymentStatusLabels[booking.collectionStatus ?? 'unpaid']}
                             </Badge>
+                            {booking.paymentStatus && booking.paymentStatus !== 'open' && (
+                              <Badge className={`text-xs ${paymentStatusColors[booking.paymentStatus]}`}>
+                                {paymentStatusLabels[booking.paymentStatus]}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </button>
@@ -647,9 +667,14 @@ export default function AdminPayments() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground">{isFr ? "Paiement :" : "Payment:"}</span>
-                    <Badge className={`${paymentStatusColors[selectedBooking.collectionStatus ?? selectedBooking.paymentStatus]}`}>
-                      {paymentStatusLabels[selectedBooking.collectionStatus ?? selectedBooking.paymentStatus]}
+                    <Badge className={`${paymentStatusColors[selectedBooking.collectionStatus ?? 'unpaid']}`}>
+                      {paymentStatusLabels[selectedBooking.collectionStatus ?? 'unpaid']}
                     </Badge>
+                    {selectedBooking.paymentStatus && selectedBooking.paymentStatus !== 'open' && (
+                      <Badge className={`${paymentStatusColors[selectedBooking.paymentStatus]}`}>
+                        {paymentStatusLabels[selectedBooking.paymentStatus]}
+                      </Badge>
+                    )}
                   </div>
                   {selectedBooking.payoutStatus && (
                     <div className="flex items-center gap-1">
@@ -720,7 +745,7 @@ export default function AdminPayments() {
                 <h4 className="font-medium text-sm text-muted-foreground">Actions</h4>
                 
                 {/* Record Payment - for unpaid bookings that are past the pending stage */}
-                {(selectedBooking.collectionStatus ?? selectedBooking.paymentStatus) !== 'paid' &&
+                {selectedBooking.collectionStatus !== 'paid' &&
                  !['cancelled', 'pending', 'requested'].includes(selectedBooking.status) && (
                   <Button
                     className="w-full"
@@ -734,14 +759,14 @@ export default function AdminPayments() {
                 )}
 
                 {/* Pending bookings need confirmation first */}
-                {(selectedBooking.collectionStatus ?? selectedBooking.paymentStatus) !== 'paid' && ['pending', 'requested'].includes(selectedBooking.status) && (
+                {selectedBooking.collectionStatus !== 'paid' && ['pending', 'requested'].includes(selectedBooking.status) && (
                   <p className="text-sm text-muted-foreground text-center py-2">
                     {isFr ? "Confirmez la réservation avant d'enregistrer le paiement." : "Confirm the booking before recording payment."}
                   </p>
                 )}
 
                 {/* Issue Refund - only for paid bookings (not refunded, not already processing payout) */}
-                {(selectedBooking.collectionStatus ?? selectedBooking.paymentStatus) === 'paid' && selectedBooking.payoutStatus !== 'sent' && (
+                {selectedBooking.collectionStatus === 'paid' && selectedBooking.paymentStatus !== 'refunded' && selectedBooking.payoutStatus !== 'sent' && (
                   <Button
                     variant="outline"
                     className="w-full"
@@ -755,7 +780,7 @@ export default function AdminPayments() {
                 )}
 
                 {/* Mark Payout Sent - only for due payouts with paid status */}
-                {selectedBooking.payoutStatus === 'due' && (selectedBooking.collectionStatus ?? selectedBooking.paymentStatus) === 'paid' && (
+                {selectedBooking.payoutStatus === 'due' && selectedBooking.collectionStatus === 'paid' && selectedBooking.paymentStatus !== 'refunded' && (
                   <Button
                     className="w-full bg-emerald-600 hover:bg-emerald-700"
                     onClick={openPayoutModal}

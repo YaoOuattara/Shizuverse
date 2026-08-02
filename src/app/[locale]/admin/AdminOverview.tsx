@@ -317,7 +317,7 @@ export default function AdminOverview() {
                       {formatFCFA(overview?.gmv_total ?? 0)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {isFr ? "Encaissé (final)" : "Collected (final)"}
+                      {isFr ? "Dossiers soldés" : "Settled bookings"}
                     </p>
                   </div>
                   <Banknote className="h-7 w-7 text-emerald-500/60 shrink-0 mt-0.5" />
