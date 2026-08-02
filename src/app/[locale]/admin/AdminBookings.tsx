@@ -295,6 +295,7 @@ const WA_ERROR_HINTS: Record<string, { fr: string; en: string }> = {
 // is exactly what made the history invisible before).
 const EVENT_LABELS: Record<string, { fr: string; en: string }> = {
   payment_declared:  { fr: "Paiement déclaré par le client", en: "Payment declared by client" },
+  quote_set:         { fr: "Devis posé",                     en: "Quote set" },
   quote_accepted:    { fr: "Devis accepté par le client",    en: "Quote accepted by client" },
   amount_locked:     { fr: "Montant verrouillé",             en: "Amount locked" },
   quote_declined:    { fr: "Devis refusé par le client",     en: "Quote declined by client" },
