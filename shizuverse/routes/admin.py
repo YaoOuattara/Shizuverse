@@ -1633,6 +1633,165 @@ def finance_summary():
     })
 
 
+@admin_bp.route('/payouts/by-provider', methods=['GET'])
+@admin_required
+def payouts_by_provider():
+    """Payouts grouped by provider PERSON — what the payouts tab should have been.
+
+    Groups on ClientBooking.provider_user_id, never on ServiceProvider.id: T-20
+    gives a person one SP row per service offered (three for most), all sharing
+    a user_id — grouping on the service row would count them three times. The
+    per-row payout amount comes from the SAME SQL expression as the aggregates
+    (finance_expressions.eff_payout), selected alongside the row, so this view
+    can never disagree with the tiles by construction.
+
+    Three blocks per person, three different actions:
+      eligible — completed, settled, not refunded, payout not_due: what COULD be
+                 marked due (the grouped action; the update_finance guards keep
+                 applying per call).
+      due      — payout_status='due': to pay now.
+      upcoming — completed but not settled yet: visibility, no action.
+    'sent' rows are done and excluded from the blocks, but their total is kept
+    per person; 'failed' rows likewise get their own count — a failed payout
+    that silently vanished from every list would be a lie by omission.
+
+    ORPHANS are counted, not just excluded: a completed, settled booking whose
+    provider_user_id is NULL is money without a recipient (booking 75). If the
+    header said "total to pay: X" while 25 500 float unattached, the number
+    would lie by omission. The cause is labelled — no phone at all vs a phone
+    the backfill could not resolve — because the two call for different fixes.
+    """
+    from sqlalchemy import or_
+    from shizuverse.utils.finance_expressions import (
+        eff_payout, fully_paid, not_refunded,
+    )
+    payout_expr = eff_payout()
+
+    # Population: everything payout-relevant — completed missions, plus any row
+    # already carrying a payout status that demands attention. Refunded files
+    # are out entirely: a refunded client means no payout (c744d55).
+    rows = (
+        db.session.query(ClientBooking, payout_expr, fully_paid())
+        .filter(
+            not_refunded(),
+            or_(
+                ClientBooking.status == 'completed',
+                ClientBooking.payout_status.in_(('due', 'failed')),
+            ),
+        )
+        .order_by(ClientBooking.id.asc())
+        .all()
+    )
+
+    def item(b, payout):
+        return {
+            'id': b.id,
+            'service_name': b.service_name,
+            'appointment_date': b.appointment_date.isoformat() if b.appointment_date else None,
+            'payout': int(payout or 0),
+            'collection_status': b.collection_status,
+            'payout_status': b.payout_status,
+            'status': b.status,
+        }
+
+    groups = {}      # user_id -> {'eligible': [...], 'due': [...], ...}
+    orphans = []
+    for b, payout, is_paid in rows:
+        if b.provider_user_id is None:
+            # Two causes, two different fixes: no phone at all means the booking
+            # was never assigned (retroactive assignment); a phone the backfill
+            # left unresolved means a number to correct or attach by hand.
+            entry = item(b, payout)
+            entry['cause'] = 'unresolved_provider' if b.provider_phone else 'no_provider'
+            entry['provider_name'] = b.provider_name
+            entry['provider_phone'] = b.provider_phone
+            orphans.append(entry)
+            continue
+
+        g_ = groups.setdefault(b.provider_user_id, {
+            'eligible': [], 'due': [], 'upcoming': [],
+            'sent_total': 0, 'failed_count': 0,
+        })
+        if b.payout_status == 'due':
+            g_['due'].append(item(b, payout))
+        elif b.payout_status == 'sent':
+            g_['sent_total'] += int(payout or 0)
+        elif b.payout_status == 'failed':
+            g_['failed_count'] += 1
+            g_['due'].append(item(b, payout))   # failed = to pay again, not done
+        elif b.status == 'completed' and is_paid:
+            g_['eligible'].append(item(b, payout))
+        elif b.status == 'completed':
+            g_['upcoming'].append(item(b, payout))
+
+    # Coordinates: any SP row of the group works — mobile_money_* and
+    # company_name are synchronized across a person's rows (_sync_provider_rows
+    # and the profile-update sibling copy).
+    providers = []
+    if groups:
+        sp_by_user = {}
+        for sp in ServiceProvider.query.filter(
+                ServiceProvider.user_id.in_(list(groups.keys()))).all():
+            sp_by_user.setdefault(sp.user_id, sp)
+        users = {u.id: u for u in User.query.filter(User.id.in_(list(groups.keys()))).all()}
+
+        for user_id, g_ in groups.items():
+            sp = sp_by_user.get(user_id)
+            u = users.get(user_id)
+            name = (sp.company_name if sp and sp.company_name else None) or \
+                   (u.full_name if u and u.full_name else None) or f'user #{user_id}'
+            momo_number = (sp.mobile_money_number or '').strip() if sp else ''
+            momo_name = (sp.mobile_money_name or '').strip() if sp else ''
+            momo_operator = (sp.mobile_money_operator or '').strip() if sp else ''
+
+            # Surfaced, never masked: money due with no way to pay it, a number
+            # whose holder is unknown, or a holder who is a DIFFERENT person
+            # than the provider (the holder is always displayed regardless —
+            # the admin must see where the money goes).
+            anomalies = []
+            if not momo_number:
+                anomalies.append('missing_momo_number')
+            if momo_number and not momo_name:
+                anomalies.append('missing_momo_name')
+            if momo_name and momo_name.casefold() != name.casefold():
+                anomalies.append('momo_holder_differs')
+
+            providers.append({
+                'user_id': user_id,
+                'name': name,
+                'company_name': sp.company_name if sp else None,
+                'mobile_money_number': momo_number or None,
+                'mobile_money_name': momo_name or None,
+                'mobile_money_operator': momo_operator or None,
+                'anomalies': anomalies,
+                'eligible': {'count': len(g_['eligible']),
+                             'total': sum(i['payout'] for i in g_['eligible']),
+                             'items': g_['eligible']},
+                'due': {'count': len(g_['due']),
+                        'total': sum(i['payout'] for i in g_['due']),
+                        'items': g_['due']},
+                'upcoming': {'count': len(g_['upcoming']),
+                             'total': sum(i['payout'] for i in g_['upcoming']),
+                             'items': g_['upcoming']},
+                'sent_total': g_['sent_total'],
+                'failed_count': g_['failed_count'],
+            })
+        # Biggest amounts due first — that is the action list.
+        providers.sort(key=lambda p: (-p['due']['total'], -p['eligible']['total']))
+
+    orphans_total = sum(o['payout'] for o in orphans)
+    return jsonify({
+        'providers': providers,
+        'orphans': {'count': len(orphans), 'total': orphans_total, 'items': orphans},
+        'totals': {
+            'due': sum(p['due']['total'] for p in providers),
+            'eligible': sum(p['eligible']['total'] for p in providers),
+            'upcoming': sum(p['upcoming']['total'] for p in providers),
+            'orphans': orphans_total,
+        },
+    })
+
+
 # ── WhatsApp / Twilio test ────────────────────────────────────
 
 @admin_bp.route('/notifications/test', methods=['POST'])
