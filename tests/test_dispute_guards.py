@@ -92,6 +92,10 @@ def _make_booking(app, **overrides):
             service_id=app.config["_SVC"],
             appointment_date=datetime.utcnow() + timedelta(days=3),
             status="requested", amount_xof=QUOTE,
+            # Le décor nominal : le client a payé. Les gardes « pas de
+            # remboursement sans encaissement » ont leurs propres tests avec
+            # collected=0 explicite.
+            amount_collected=QUOTE,
         )
         for k, v in overrides.items():
             setattr(b, k, v)
@@ -269,3 +273,86 @@ def test_split_is_no_longer_an_accepted_resolution(app, client, admin_headers):
     assert r.status_code == 400, r.get_data(as_text=True)
     assert _booking(app, bid).dispute_resolution is None
     assert _events(app, bid, "dispute_resolved") == []
+
+
+# ── Cohérence argent / litige (lot gardes finance) ──────────────────────────
+
+def _finance(client, headers, bid, **body):
+    return client.post(f"/admin/bookings/{bid}/finance", json=body, headers=headers)
+
+
+def test_no_refund_on_a_never_collected_file(app, client, admin_headers):
+    """Le dossier 76 en prod : « Non payé + Remboursé ». On ne rembourse pas
+    un argent jamais reçu."""
+    bid = _make_booking(app, amount_collected=0)
+    r = _finance(client, admin_headers, bid, payment_status='refunded')
+    assert r.status_code == 400, r.get_data(as_text=True)
+    assert "rien à rembourser" in r.get_json()["error"]
+    assert _booking(app, bid).payment_status != 'refunded'
+
+
+def test_a_partial_collection_can_be_refunded(app, client, admin_headers):
+    """Un acompte encaissé suffit — on ne compare jamais au montant du devis."""
+    bid = _make_booking(app, amount_collected=10000)   # 10000 < QUOTE
+    r = _finance(client, admin_headers, bid, payment_status='refunded')
+    assert r.status_code == 200, r.get_data(as_text=True)
+    assert _booking(app, bid).payment_status == 'refunded'
+
+
+def test_refund_client_on_a_never_collected_file(app, client, admin_headers):
+    """L'arbitrage reste valide, mais payment_status ne passe PAS à refunded :
+    il n'y a rien à rembourser. Le versement est bien annulé."""
+    bid = _make_booking(app, amount_collected=0, payout_status='due')
+    _open(client, admin_headers, bid)
+    r = _resolve(client, admin_headers, bid, "refund_client")
+    assert r.status_code == 200, r.get_data(as_text=True)
+
+    b = _booking(app, bid)
+    assert b.dispute_resolution == "refund_client", "l'arbitrage est enregistré"
+    assert b.payment_status != 'refunded', "rien encaissé → rien de remboursé"
+    assert b.payout_status == 'not_due', "le prestataire n'est pas payé pour autant"
+    note = _events(app, bid, "dispute_resolved")[0].note
+    assert "rien encaissé" in note, note
+
+
+def test_opening_a_dispute_suspends_a_due_payout(app, client, admin_headers):
+    """shizu_dispute_opened_provider_fr promet « le règlement est suspendu » —
+    la promesse a maintenant un mécanisme."""
+    bid = _make_booking(app, payout_status='due')
+    assert _open(client, admin_headers, bid).status_code == 200
+
+    b = _booking(app, bid)
+    assert b.payout_status == 'not_due'
+    evs = _events(app, bid, "finance_updated")
+    assert len(evs) == 1
+    assert "Versement suspendu" in evs[0].note
+    assert f"{QUOTE} XOF" in evs[0].note, "le montant suspendu est consigné (4d06e64)"
+
+
+def test_opening_a_dispute_on_a_sent_payout_touches_nothing(app, client, admin_headers):
+    """L'argent est déjà parti : un fait, jamais écrasé. Le litige s'ouvre
+    quand même, et l'événement en garde la trace pour un futur bandeau."""
+    bid = _make_booking(app, payout_status='sent')
+    assert _open(client, admin_headers, bid).status_code == 200
+
+    b = _booking(app, bid)
+    assert b.payout_status == 'sent', "sent n'est jamais écrasé"
+    assert b.dispute_flag is True, "le litige s'ouvre malgré tout"
+    assert _events(app, bid, "finance_updated") == [], "aucun faux événement finance"
+    note = _events(app, bid, "dispute_opened")[0].note
+    assert "déjà envoyé" in note, note
+
+
+def test_the_full_suspend_release_cycle(app, client, admin_headers):
+    """due → litige (suspendu) → release_provider → due. Le cycle est complet
+    et chaque étape laisse sa trace."""
+    bid = _make_booking(app, payout_status='due')
+
+    _open(client, admin_headers, bid)
+    assert _booking(app, bid).payout_status == 'not_due', "suspendu à l'ouverture"
+
+    assert _resolve(client, admin_headers, bid, "release_provider").status_code == 200
+    b = _booking(app, bid)
+    assert b.payout_status == 'due', "débloqué à la résolution en faveur du prestataire"
+    assert b.dispute_resolution == "release_provider"
+    assert len(_events(app, bid, "finance_updated")) == 1, "la suspension est tracée"

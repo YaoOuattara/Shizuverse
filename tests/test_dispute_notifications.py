@@ -132,7 +132,8 @@ def _make_booking(app, *, with_provider=True, locale="fr"):
             client_location="Cocody, Abidjan", service_name="Menage",
             service_id=app.config["_SVC"],
             appointment_date=datetime.utcnow() + timedelta(days=3),
-            status="requested", amount_xof=40000, locale=locale,
+            status="requested", amount_xof=40000, amount_collected=40000,
+            locale=locale,
         )
         if with_provider:
             b.provider_name = "Koffi Plomberie"
@@ -305,3 +306,26 @@ def test_a_refused_replay_sends_nothing(app, client, admin_headers, twilio):
     assert _open(client, admin_headers, bid).status_code == 409
     assert _resolve(client, admin_headers, bid, "release_provider").status_code == 409
     assert twilio.sent() == [], "un appel refusé ne doit déclencher aucun message"
+
+
+# ── Rien encaissé : on ne promet pas un remboursement qui ne viendra pas ─────
+
+def test_refund_client_on_never_collected_sends_closed_not_refund(app, client,
+                                                                  admin_headers, twilio):
+    """shizu_dispute_refund_client dit « un remboursement a été décidé ». Sur un
+    dossier jamais encaissé cette promesse serait fausse : le client reçoit le
+    template neutre de clôture. Le prestataire, lui, reçoit bien « sans
+    règlement » — vrai dans les deux cas."""
+    bid = _make_booking(app)
+    with app.app_context():
+        b = db.session.get(ClientBooking, bid)
+        b.amount_collected = 0
+        db.session.commit()
+
+    _open(client, admin_headers, bid)
+    twilio.calls.clear()
+    assert _resolve(client, admin_headers, bid, "refund_client").status_code == 200
+
+    keys = [s["key"] for s in twilio.sent()]
+    assert keys == ["shizu_dispute_closed_client_fr",
+                    "shizu_dispute_no_payment_provider_fr"], keys

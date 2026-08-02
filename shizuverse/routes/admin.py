@@ -879,6 +879,16 @@ def update_finance(booking_id):
                      "n'est plus modifiable.",
             'payment_status': b.payment_status,
         }), 409
+    # No refund of money never received. Booking 76 in prod showed
+    # « Non payé + Remboursé » : refunded had been written on a file whose
+    # amount_collected was 0. A PARTIAL refund stays possible — any collection
+    # at all suffices, we never compare to the quote.
+    if payment == 'refunded' and (b.amount_collected or 0) == 0:
+        return jsonify({
+            'error': "Rien n'a été encaissé sur ce dossier — il n'y a rien à "
+                     "rembourser.",
+            'amount_collected': 0,
+        }), 400
     if payout and payout not in valid_payout:
         return jsonify({'error': f'Invalid payout_status: {payout}'}), 400
     # Payout can only become due once the client has FULLY paid (derived).
@@ -1431,12 +1441,39 @@ def open_dispute(booking_id):
     b.dispute_reason = reason
     b.dispute_opened_at = datetime.utcnow()
 
+    # shizu_dispute_opened_provider_fr announces « le règlement est suspendu le
+    # temps de la vérification » — until now nothing implemented it. A pending
+    # payout is put on hold; release_provider re-opens it, so the suspend →
+    # release cycle is complete. Traced with the amount (4d06e64 model).
+    dispute_note = reason
+    if b.payout_status == 'due':
+        b.payout_status = 'not_due'
+        db.session.add(BookingEvent(
+            booking_id=b.id,
+            event_type='finance_updated',
+            from_status=b.status,
+            to_status=b.status,
+            actor_id=None,
+            note=f'Versement suspendu — litige ouvert (due → not_due) '
+                 f'sur {b.amount_due_total} XOF',
+        ))
+    elif b.payout_status == 'sent':
+        # Money already left: a fact, never overwritten. The dispute still
+        # opens — recovering a sent payout is a human conversation, not a
+        # status write. Kept in the event note so a future dispute banner can
+        # surface it without re-deriving history.
+        current_app.logger.warning(
+            "[open_dispute] litige ouvert sur #%s alors que le versement est "
+            "DÉJÀ PARTI (payout_status=sent, %s XOF) — rien n'est écrasé, "
+            "récupération à traiter à la main.", b.id, b.amount_due_total)
+        dispute_note += ' — versement déjà envoyé avant l\'ouverture'
+
     event = BookingEvent(
         booking_id=b.id,
         event_type='dispute_opened',
         from_status=b.status,
         to_status=b.status,
-        note=reason,
+        note=dispute_note,
     )
     db.session.add(event)
     db.session.commit()
@@ -1506,7 +1543,12 @@ def resolve_dispute_new(booking_id):
     b.dispute_resolved_at = datetime.utcnow()
 
     if resolution == 'refund_client':
-        b.payment_status = 'refunded'
+        # The arbitration stands either way — but 'refunded' is only written
+        # when money actually came in. On a never-collected file there is
+        # nothing to give back: writing refunded would recreate the
+        # « Non payé + Remboursé » contradiction this lot closes.
+        if (b.amount_collected or 0) > 0:
+            b.payment_status = 'refunded'
         # Cancel any pending payout. shizu_dispute_no_payment_provider_fr tells
         # the provider the mission is closed WITHOUT payment — until now nothing
         # in the code made that true: a booking already marked payout 'due' kept
@@ -1524,13 +1566,16 @@ def resolve_dispute_new(booking_id):
         'refund_client':    'remboursement client',
         'release_provider': 'paiement libéré au prestataire',
     }
+    note = (f'Litige résolu — {RESOLUTION_LABELS[resolution]} '
+            f'({resolution}) sur {amount_at_stake} XOF')
+    if resolution == 'refund_client' and (b.amount_collected or 0) == 0:
+        note += ' — rien encaissé, aucun remboursement à émettre'
     event = BookingEvent(
         booking_id=b.id,
         event_type='dispute_resolved',
         from_status=b.status,
         to_status=b.status,
-        note=f'Litige résolu — {RESOLUTION_LABELS[resolution]} '
-             f'({resolution}) sur {amount_at_stake} XOF',
+        note=note,
     )
     db.session.add(event)
     db.session.commit()
@@ -1545,10 +1590,20 @@ def resolve_dispute_new(booking_id):
         )
         ref = make_booking_ref(b)
         if resolution == 'refund_client':
-            notify_dispute_refund_client(
-                client_name=b.client_name, client_phone=b.client_phone,
-                booking_ref=ref, locale=b.locale, booking_id=b.id,
-            )
+            # shizu_dispute_refund_client says « un remboursement a été décidé » —
+            # on a never-collected file that promise would be false. The client
+            # gets the neutral closed-case template instead: arbitrated in their
+            # favour, nothing to transfer back.
+            if (b.amount_collected or 0) > 0:
+                notify_dispute_refund_client(
+                    client_name=b.client_name, client_phone=b.client_phone,
+                    booking_ref=ref, locale=b.locale, booking_id=b.id,
+                )
+            else:
+                notify_dispute_closed_client(
+                    client_name=b.client_name, client_phone=b.client_phone,
+                    booking_ref=ref, locale=b.locale, booking_id=b.id,
+                )
             if b.provider_phone:
                 notify_dispute_no_payment_provider(
                     provider_phone=b.provider_phone, booking_ref=ref, booking_id=b.id,
