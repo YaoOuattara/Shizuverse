@@ -534,3 +534,27 @@ NEXT (lot webhook en cours) : commit 1 ProxyFix x_for=2 (Cloudflare +
 Render, mesuré via /diag/proxy), commit 2 table whatsapp_messages,
 commit 3 webhook + signature + rattachement + tests (et suppression de
 /diag/proxy), commit 4 frontend.
+
+---
+2026-08-05 — DETTE : matrice de transition de statut ABSENTE (décision différée)
+
+Constat (investigation dossier 75, mission completed sans prestataire) :
+update_booking_status (api/admin.py:265) autorise n'importe quel statut
+vers n'importe quel autre — seule 'assigned' est gardée. Conséquences :
+  - completed et confirmed sont possibles SANS prestataire (aucune
+    vérification de provider_user_id) ; c'est l'origine du dossier 75,
+    marqué terminé par l'admin sans assignation (event status_changed,
+    pas completed) ;
+  - un dossier peut passer directement de pending à completed, en
+    sautant devis, verrouillage et assignation ;
+  - les retours arrière sont libres (completed → pending) sans rien
+    invalider.
+
+POURQUOI on ne pose PAS de garde sèche maintenant : à Abidjan une
+prestation peut être négociée et exécutée HORS parcours, l'admin
+régularise après coup. Une garde stricte casserait ce cas réel. La porte
+de sortie (motif obligatoire ? assignation rétroactive préalable ?) est
+à trancher avec Marie-Paule, qui connaît ces cas.
+
+Le dossier 75 n'est PAS rétro-corrigé : fait historique, rendu visible
+par le bloc ORPHELINS de la vue versements — pas maquillé.
