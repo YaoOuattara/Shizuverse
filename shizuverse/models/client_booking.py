@@ -16,7 +16,30 @@ from datetime import datetime
 #     booking set to it could never be moved out again;
 #   - the client-facing screens class it with the cancellations, so a live
 #     dispute would show the client "Annulée".
-VALID_STATUSES = ['requested', 'accepted', 'declined', 'in_progress', 'completed', 'cancelled', 'pending_payment']
+# THE canonical vocabulary — the union of every status the code actually
+# writes, in lifecycle order. Do NOT "simplify" this list: it has been wrongly
+# shortened once already. The fork's history, so nobody repeats it:
+#   - 0e059ef (11 March) created VALID_STATUSES with the ADMIN vocabulary
+#     (pending/under_review/assigned/confirmed/…) AND, in the same commit, the
+#     inline copy inside update_booking_status;
+#   - b7b1e6c (15 March) — an infrastructure commit about auto-upgrade, nothing
+#     to do with statuses — wholesale REPLACED this list with the client-facing
+#     vocabulary (requested/accepted/declined/in_progress/…) instead of taking
+#     the union. The endpoint's inline copy kept the old list. From that day the
+#     two vocabularies coexisted, each missing the other's half, and the public
+#     lookup filter returned 400 on statuses that existed in production.
+#
+# 'pending' is deliberately absent: no organic writer (creation defaults to
+# 'requested'), zero rows in production — only update_booking_status can pose
+# it. Its fate is tied to the transition-matrix decision (debt ecf84f0).
+VALID_STATUSES = ['requested', 'under_review', 'assigned', 'accepted',
+                  'confirmed', 'in_progress', 'pending_payment',
+                  'completed', 'cancelled', 'declined']
+
+# A terminal status ends the file's story — nothing is expected to happen next.
+# LIVE (still-discussable) statuses are DERIVED as VALID − TERMINAL, never
+# listed by hand (see phone_match.LIVE_STATUSES).
+TERMINAL_STATUSES = ('completed', 'cancelled', 'declined')
 
 # payment_status is a DOSSIER FLAG only — it never carries an amount. How much
 # was collected lives in amount_collected (single source of truth), from which

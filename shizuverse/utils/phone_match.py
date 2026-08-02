@@ -15,14 +15,20 @@ from shizuverse.utils.phone import normalize_phone
 
 logger = logging.getLogger(__name__)
 
-# A file is "live" while it can still be discussed. Both status vocabularies of
-# the codebase are covered on purpose (the public flow writes 'requested', the
-# admin flow writes 'under_review'/'assigned'/'confirmed'): a message must never
-# fail to attach because of which endpoint last touched the booking.
-LIVE_STATUSES = (
-    'requested', 'pending', 'under_review', 'assigned',
-    'accepted', 'confirmed', 'in_progress', 'pending_payment',
-)
+# A file is "live" while it can still be discussed. This used to be a manual
+# list covering "both status vocabularies" — a workaround for the canonical
+# list being incomplete. The canonical is now the real union, so live derives
+# from it: VALID − TERMINAL, never listed by hand again.
+#
+# 'pending' rides along explicitly: it is OUT of the canonical (no organic
+# writer, zero rows in production) but update_booking_status can still pose it,
+# and a message on such a file must keep attaching. It leaves with the
+# transition-matrix decision (debt ecf84f0), same day 'pending' does.
+from shizuverse.models.client_booking import VALID_STATUSES, TERMINAL_STATUSES
+
+LIVE_STATUSES = tuple(
+    s for s in VALID_STATUSES if s not in TERMINAL_STATUSES
+) + ('pending',)
 
 
 def _most_recent(query):

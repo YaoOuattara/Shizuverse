@@ -265,6 +265,11 @@ def assign_booking(booking_id):
 @admin_bp.route('/bookings/<int:booking_id>/status', methods=['PATCH', 'PUT'])
 @require_admin_token
 def update_booking_status(booking_id):
+    # DELIBERATELY narrower than models.client_booking.VALID_STATUSES (the real
+    # vocabulary, now complete). This list is what the ADMIN may set by hand —
+    # widening it means allowing manual jumps to in_progress/accepted/declined…,
+    # which is exactly the transition-matrix decision (debt ecf84f0, to settle
+    # with Marie-Paule). Do not align it on the canonical without that decision.
     VALID = ['pending', 'under_review', 'assigned', 'confirmed', 'completed', 'cancelled']
     booking = ClientBooking.query.get_or_404(booking_id)
     data = request.get_json() or {}
@@ -1677,6 +1682,11 @@ def get_client_bookings():
         # 'disputed' deliberately absent — see VALID_STATUSES in
         # models/client_booking.py: a dispute lives on dispute_flag, not on the
         # status, and nothing has written 'disputed' since f79f1c6.
+        # This list is ALSO missing under_review/assigned/confirmed/
+        # pending_payment vs the (now complete) canonical — a client filtering
+        # on those gets a 400 on statuses that exist. Left as-is on purpose:
+        # widening what a CLIENT may query is part of the transition-matrix lot
+        # (debt ecf84f0), not of the canonical-list fix.
         if status not in ['requested', 'accepted', 'declined', 'in_progress',
                           'completed', 'cancelled']:
             return jsonify({'error': 'Invalid status'}), 400
