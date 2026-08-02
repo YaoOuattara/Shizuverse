@@ -7,7 +7,7 @@
  * 2. Provider Payouts - Track outgoing payments to providers
  */
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import AdminLayout from "./AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,6 +46,7 @@ import {
   CheckCircle2,
   Loader2,
   AlertCircle,
+  AlertTriangle,
   ArrowUpRight,
   ArrowDownLeft,
   Receipt,
@@ -108,6 +109,42 @@ function extractApiError(err: unknown): string | null {
     /* not JSON — fall through */
   }
   return null;
+}
+
+// Miroir de GET /admin/payouts/by-provider (payouts_by_provider, routes/admin.py).
+interface PayoutItem {
+  id: number;
+  service_name: string;
+  appointment_date: string | null;
+  payout: number;
+  collection_status: string;
+  payout_status: string;
+  status: string;
+}
+interface PayoutBlock { count: number; total: number; items: PayoutItem[] }
+interface PayoutProvider {
+  user_id: number;
+  name: string;
+  company_name: string | null;
+  mobile_money_number: string | null;
+  mobile_money_name: string | null;
+  mobile_money_operator: string | null;
+  anomalies: string[];
+  eligible: PayoutBlock;
+  due: PayoutBlock;
+  upcoming: PayoutBlock;
+  sent_total: number;
+  failed_count: number;
+}
+interface PayoutOrphan extends PayoutItem {
+  cause: 'no_provider' | 'unresolved_provider';
+  provider_name: string | null;
+  provider_phone: string | null;
+}
+interface PayoutsByProvider {
+  providers: PayoutProvider[];
+  orphans: { count: number; total: number; items: PayoutOrphan[] };
+  totals: { due: number; eligible: number; upcoming: number; orphans: number };
 }
 
 function toPaymentBooking(b: ApiBooking): PaymentBooking {
@@ -197,7 +234,11 @@ export default function AdminPayments() {
   const [activeTab, setActiveTab] = useState("payments");
   const [searchQuery, setSearchQuery] = useState("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
-  const [payoutStatusFilter, setPayoutStatusFilter] = useState("all");
+  // Vue versements par PERSONNE (remplace l'ancienne liste par réservation)
+  const [payoutView, setPayoutView] = useState<PayoutsByProvider | null>(null);
+  const [payoutViewLoading, setPayoutViewLoading] = useState(true);
+  const [payoutViewError, setPayoutViewError] = useState(false);
+  const [markingDueFor, setMarkingDueFor] = useState<number | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<PaymentBooking | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [refundModalOpen, setRefundModalOpen] = useState(false);
@@ -241,20 +282,44 @@ export default function AdminPayments() {
     });
   }, [bookings, searchQuery, paymentStatusFilter]);
 
-  const payoutsBookings = useMemo(() => {
-    // Un dossier remboursé ne doit rien au prestataire : verser ET rembourser,
-    // c'est Shizu qui paie deux fois sur ses fonds propres.
-    return bookings.filter(b => b.status === 'completed' && b.collectionStatus === 'paid'
-                                && b.paymentStatus !== 'refunded').filter(b => {
-      const searchLower = searchQuery.toLowerCase();
-      const matchesSearch = !searchQuery ||
-        b.providerName.toLowerCase().includes(searchLower) ||
-        b.serviceName.toLowerCase().includes(searchLower) ||
-        b.id.includes(searchLower);
-      const matchesStatus = payoutStatusFilter === "all" || b.payoutStatus === payoutStatusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [bookings, searchQuery, payoutStatusFilter]);
+  const loadPayoutView = useCallback(async () => {
+    setPayoutViewLoading(true);
+    setPayoutViewError(false);
+    try {
+      setPayoutView(await adminApi.portalGetPayoutsByProvider());
+    } catch {
+      // Jamais un écran vide silencieux : une panne n'est pas une absence de dus.
+      setPayoutViewError(true);
+    } finally {
+      setPayoutViewLoading(false);
+    }
+  }, []);
+  useEffect(() => { loadPayoutView(); }, [loadPayoutView]);
+
+  // Action groupée : passer à « dû » tous les dossiers éligibles d'une personne.
+  // Un appel update_finance PAR dossier — les gardes backend (soldé, non
+  // remboursé) s'appliquent à chacun, rien n'est contourné.
+  const markEligibleDue = async (provider: PayoutProvider) => {
+    setMarkingDueFor(provider.user_id);
+    let ok = 0, ko = 0;
+    for (const it of provider.eligible.items) {
+      try {
+        await adminApi.portalUpdateFinance(String(it.id), { payout_status: 'due' });
+        ok += 1;
+      } catch {
+        ko += 1;
+      }
+    }
+    setMarkingDueFor(null);
+    toast(ko === 0
+      ? { title: isFr ? `${ok} dossier(s) marqué(s) à verser` : `${ok} booking(s) marked due` }
+      : { title: isFr ? `${ok} réussi(s), ${ko} refusé(s)` : `${ok} succeeded, ${ko} refused`,
+          description: isFr
+            ? "Les refus viennent des gardes backend (non soldé ou remboursé)."
+            : "Refusals come from the backend guards (unsettled or refunded).",
+          variant: "destructive" });
+    loadPayoutView();
+  };
 
   const openPaymentModal = () => {
     // Pre-fill with the remaining balance due (falls back to price for legacy rows).
@@ -557,86 +622,174 @@ export default function AdminPayments() {
 
           {/* Provider Payouts Tab */}
           <TabsContent value="payouts" className="space-y-4 mt-4">
-            <Card>
-              <CardContent className="py-4">
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder={isFr ? "Rechercher par prestataire, service, ID..." : "Search by provider, service, or ID..."}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9"
-                      data-testid="input-search-payouts"
-                    />
-                  </div>
-                  
-                  <div className="flex gap-1 flex-wrap">
-                    {['all', 'due', 'sent', 'failed'].map((status) => (
-                      <Button
-                        key={status}
-                        variant={payoutStatusFilter === status ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setPayoutStatusFilter(status)}
-                        data-testid={`filter-payout-${status}`}
-                      >
-                        {status === "all" ? (isFr ? "Tous" : "All") : payoutStatusLabels[status] || status}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {payoutViewLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : payoutViewError || !payoutView ? (
+              <Card>
+                <CardContent className="py-12 text-center space-y-3">
+                  <AlertTriangle className="h-8 w-8 mx-auto text-destructive" />
+                  <p className="text-sm text-muted-foreground">
+                    {isFr
+                      ? "Impossible de charger les versements. Ce n'est pas une absence de dus."
+                      : "Could not load payouts. This is not an empty list."}
+                  </p>
+                  <Button variant="outline" size="sm" onClick={loadPayoutView}>
+                    {isFr ? "Réessayer" : "Try again"}
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {/* ORPHELINS en tête : de l'argent sans destinataire. Comptés,
+                    jamais masqués — sinon le total ment par omission. */}
+                {payoutView.orphans.count > 0 && (
+                  <Card className="border-red-200 bg-red-50/60 dark:bg-red-900/10">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2 text-red-700">
+                        <AlertTriangle className="h-4 w-4" />
+                        {isFr
+                          ? `${payoutView.orphans.count} dossier(s) sans destinataire — ${new Intl.NumberFormat('fr-FR').format(payoutView.orphans.total)} FCFA`
+                          : `${payoutView.orphans.count} booking(s) with no recipient — ${new Intl.NumberFormat('fr-FR').format(payoutView.orphans.total)} FCFA`}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {payoutView.orphans.items.map((o) => (
+                        <div key={o.id} className="flex items-center justify-between gap-3 text-sm flex-wrap">
+                          <span>#{o.id} · {o.service_name} · {new Intl.NumberFormat('fr-FR').format(o.payout)} FCFA</span>
+                          <Badge variant="outline" className="text-red-700 border-red-300">
+                            {o.cause === 'no_provider'
+                              ? (isFr ? "Aucun prestataire" : "No provider")
+                              : (isFr ? `Prestataire non résolu (${o.provider_phone ?? '—'})` : `Unresolved provider (${o.provider_phone ?? '—'})`)}
+                          </Badge>
+                        </div>
+                      ))}
+                      <p className="text-xs text-red-700/80 pt-1">
+                        {isFr
+                          ? "« Aucun prestataire » : mission jamais assignée, à régulariser par une assignation. « Non résolu » : numéro à corriger ou rattacher à la main."
+                          : "\u201CNo provider\u201D: never assigned, fix via retroactive assignment. \u201CUnresolved\u201D: phone to correct or attach manually."}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">
-                  {isFr ? "Versements" : "Payouts"} ({payoutsBookings.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {payoutsBookings.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Banknote className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>{isFr ? "Aucun paiement prestataire" : "No payouts found"}</p>
-                    <p className="text-xs mt-1">{isFr ? "Réservations complétées et payées uniquement" : "Payouts appear for completed & paid bookings"}</p>
-                  </div>
-                ) : (
-                  <div className="divide-y" data-testid="payouts-list">
-                    {payoutsBookings.map((booking) => (
-                      <button
-                        key={booking.id}
-                        className="w-full flex items-center justify-between gap-4 p-3 hover-elevate text-left"
-                        onClick={() => setSelectedBooking(booking)}
-                        data-testid={`payout-row-${booking.id}`}
-                      >
-                        <div className="min-w-0 flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2 sm:gap-4">
-                          <div>
-                            <p className="font-medium text-sm truncate">{booking.providerName}</p>
-                            <p className="text-xs text-muted-foreground">{booking.providerCompany || (isFr ? 'Indépendant' : 'Individual')}</p>
-                          </div>
-                          <div className="hidden sm:block">
-                            <p className="text-sm truncate">{booking.serviceName}</p>
-                            <p className="text-xs text-muted-foreground">{booking.date}</p>
-                          </div>
-                          <div className="hidden sm:block">
-                            <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                              {formatMoney(booking.providerPayoutAmount, booking.currency)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">ID: {booking.id}</p>
-                          </div>
-                          <div className="flex items-center gap-2 sm:justify-end">
-                            <Badge className={`text-xs ${payoutStatusColors[booking.payoutStatus]}`}>
-                              {payoutStatusLabels[booking.payoutStatus]}
+                {/* Totaux de la vue — l'orphelin y figure, visiblement. */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  {([
+                    { label: isFr ? "À verser (dû)" : "Due now", value: payoutView.totals.due, cls: "text-amber-600" },
+                    { label: isFr ? "Éligible" : "Eligible", value: payoutView.totals.eligible, cls: "text-emerald-600" },
+                    { label: isFr ? "À venir" : "Upcoming", value: payoutView.totals.upcoming, cls: "text-muted-foreground" },
+                    { label: isFr ? "Sans destinataire" : "No recipient", value: payoutView.totals.orphans, cls: "text-red-600" },
+                  ]).map((t) => (
+                    <Card key={t.label}>
+                      <CardContent className="p-4">
+                        <p className="text-xs text-muted-foreground">{t.label}</p>
+                        <p className={`text-lg font-bold ${t.cls}`}>
+                          {new Intl.NumberFormat('fr-FR').format(t.value)} FCFA
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {payoutView.providers.length === 0 ? (
+                  <Card>
+                    <CardContent className="text-center py-10 text-muted-foreground">
+                      <Banknote className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">{isFr ? "Aucun versement prestataire à suivre." : "No provider payouts to track."}</p>
+                    </CardContent>
+                  </Card>
+                ) : payoutView.providers.map((prov) => (
+                  <Card key={prov.user_id} data-testid={`payout-provider-${prov.user_id}`}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div>
+                          <CardTitle className="text-base">{prov.name}</CardTitle>
+                          {/* Le titulaire est TOUJOURS affiché : Marie-Paule doit
+                              voir vers qui l'argent part, écart ou pas. */}
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {prov.mobile_money_number
+                              ? <>
+                                  {prov.mobile_money_number}
+                                  {" · "}{prov.mobile_money_operator ?? (isFr ? "opérateur ?" : "operator?")}
+                                  {" · "}{isFr ? "titulaire : " : "holder: "}
+                                  <span className={prov.anomalies.includes('momo_holder_differs') ? "font-semibold text-amber-700" : ""}>
+                                    {prov.mobile_money_name ?? (isFr ? "inconnu" : "unknown")}
+                                  </span>
+                                </>
+                              : (isFr ? "Aucun numéro Mobile Money" : "No Mobile Money number")}
+                          </p>
+                        </div>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {prov.anomalies.includes('missing_momo_number') && (
+                            <Badge variant="outline" className="text-red-700 border-red-300">
+                              {isFr ? "Aucun moyen de payer" : "No way to pay"}
                             </Badge>
+                          )}
+                          {prov.anomalies.includes('missing_momo_name') && (
+                            <Badge variant="outline" className="text-amber-700 border-amber-300">
+                              {isFr ? "Titulaire inconnu" : "Unknown holder"}
+                            </Badge>
+                          )}
+                          {prov.anomalies.includes('momo_holder_differs') && (
+                            <Badge variant="outline" className="text-amber-700 border-amber-300">
+                              {isFr ? "Titulaire ≠ prestataire" : "Holder ≠ provider"}
+                            </Badge>
+                          )}
+                          {prov.failed_count > 0 && (
+                            <Badge variant="outline" className="text-red-700 border-red-300">
+                              {isFr ? `${prov.failed_count} versement(s) échoué(s)` : `${prov.failed_count} failed payout(s)`}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {([
+                        { key: 'due', block: prov.due, label: isFr ? "À verser maintenant" : "Due now", cls: "text-amber-700" },
+                        { key: 'eligible', block: prov.eligible, label: isFr ? "Éligible (peut passer à dû)" : "Eligible (can be marked due)", cls: "text-emerald-700" },
+                        { key: 'upcoming', block: prov.upcoming, label: isFr ? "À venir (pas encore soldé)" : "Upcoming (not settled yet)", cls: "text-muted-foreground" },
+                      ]).filter(({ block }) => block.count > 0).map(({ key, block, label, cls }) => (
+                        <div key={key} className="rounded-md border p-3">
+                          <div className="flex items-center justify-between gap-3 flex-wrap mb-1.5">
+                            <p className={`text-sm font-medium ${cls}`}>
+                              {label} — {new Intl.NumberFormat('fr-FR').format(block.total)} FCFA
+                            </p>
+                            {key === 'eligible' && (
+                              <Button size="sm" variant="outline"
+                                disabled={markingDueFor !== null}
+                                onClick={() => markEligibleDue(prov)}
+                                data-testid={`mark-due-${prov.user_id}`}>
+                                {markingDueFor === prov.user_id
+                                  ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                  : <ArrowUpRight className="h-3.5 w-3.5 mr-1.5" />}
+                                {isFr ? `Marquer ${block.count} dossier(s) comme dus` : `Mark ${block.count} booking(s) due`}
+                              </Button>
+                            )}
+                          </div>
+                          <div className="space-y-0.5">
+                            {block.items.map((it) => (
+                              <p key={it.id} className="text-xs text-muted-foreground">
+                                #{it.id} · {it.service_name} · {new Intl.NumberFormat('fr-FR').format(it.payout)} FCFA
+                                {key === 'upcoming' && ` · ${it.collection_status === 'partial' ? (isFr ? 'acompte reçu' : 'deposit received') : (isFr ? 'non payé' : 'unpaid')}`}
+                                {it.payout_status === 'failed' && (isFr ? ' · ÉCHEC précédent' : ' · previous FAILURE')}
+                              </p>
+                            ))}
                           </div>
                         </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      ))}
+                      {prov.sent_total > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {isFr ? "Déjà versé (cumul) : " : "Already sent (total): "}
+                          {new Intl.NumberFormat('fr-FR').format(prov.sent_total)} FCFA
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </>
+            )}
           </TabsContent>
         </Tabs>
       </div>

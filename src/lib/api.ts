@@ -122,6 +122,9 @@ export const adminApi = {
   },
   portalMarkMessageRead: (messageId: number) =>
     adminFetch(`/admin/messages/${messageId}/read`, { method: "PATCH" }),
+  // Payouts grouped by provider PERSON (user_id — never the service row, T-20).
+  // Orphans (money without a recipient) ride along with their own total.
+  portalGetPayoutsByProvider: () => adminFetch("/admin/payouts/by-provider"),
   portalGetOverview: () => adminFetch("/admin/overview"),
   portalGetFinanceSummary: () => adminFetch("/admin/finance/summary"),
   portalUpdateFinance: (bookingId: string, body: { payment_status?: string; payout_status?: string; final_amount?: number; reason?: string }) =>
