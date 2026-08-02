@@ -134,10 +134,14 @@ def accept_quote(token):
     if not b.amount_locked:
         b.amount_locked = True
         b.amount_locked_at = datetime.utcnow()
+        # Raw amount in the note (see lock_booking_amount): the audit trail must
+        # stay replayable, and the two lock paths stay distinguishable by wording.
         db.session.add(BookingEvent(
             booking_id=b.id, event_type="amount_locked",
             from_status="under_review", to_status="under_review",
-            actor_id=None, note="Verrouillé à l'acceptation du devis par le client",
+            actor_id=None,
+            note=f"Verrouillé à {b.amount_xof} XOF à l'acceptation du devis "
+                 f"par le client",
         ))
 
     db.session.commit()

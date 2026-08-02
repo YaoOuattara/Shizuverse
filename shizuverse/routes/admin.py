@@ -643,6 +643,20 @@ def set_booking_quote(booking_id):
     b.quote_token = secrets.token_urlsafe(32)
     b.quote_token_expires_at = _dt.utcnow() + _td(days=7)
     # Do NOT touch amount_locked here: a quote never unlocks a locked amount.
+
+    # Quoting was invisible in the history: the widest hole of the three. The
+    # amount the client is ASKED to accept is the origin of the whole money
+    # trail — without this event, a re-quote after a dispute unlock leaves no
+    # trace of what was proposed. Raw amount, same reason as the lock events.
+    db.session.add(BookingEvent(
+        booking_id=b.id,
+        event_type='quote_set',
+        from_status=b.status,
+        to_status=b.status,
+        actor_id=None,
+        note=f'Devis posé à {amt} XOF (palier {tier})'
+             + (f' — {note}' if note else ''),
+    ))
     db.session.commit()
 
     # WhatsApp: send the quote to the client (service + amount + tier + note + link).
@@ -1140,13 +1154,18 @@ def lock_booking_amount(booking_id):
     b.amount_locked = True
     b.amount_locked_at = _dt.utcnow()
 
+    # The note carries the RAW amount, never a display format: this row is an
+    # audit record, and a dispute must be able to replay which amount was locked
+    # at each step. _fmt_amount (notifications) renders "20 000" for humans in a
+    # WhatsApp message — wrong tool here, and unparseable back into a number.
     event = BookingEvent(
         booking_id=b.id,
         event_type='amount_locked',
         from_status=b.status,
         to_status=b.status,
         actor_id=None,
-        note='Verrouillé manuellement — acceptation hors app confirmée par l\'admin',
+        note=f'Verrouillé manuellement à {amt} XOF — acceptation hors app '
+             f'confirmée par l\'admin',
     )
     db.session.add(event)
     db.session.commit()
@@ -1171,6 +1190,11 @@ def unlock_booking_amount(booking_id):
     if not reason:
         return jsonify({'error': 'reason is required to unlock an amount'}), 400
 
+    # Record the amount BEING unlocked, not just the reason. Without it the
+    # dispute sequence (lock at X → unlock → re-lock at Y) cannot be replayed:
+    # the row only ever holds the latest value.
+    unlocked_amount = b.amount_xof
+
     b.amount_locked = False
     b.amount_locked_at = None
 
@@ -1180,7 +1204,7 @@ def unlock_booking_amount(booking_id):
         from_status=b.status,
         to_status=b.status,
         actor_id=None,
-        note=f'Montant déverrouillé (litige): {reason}',
+        note=f'Montant déverrouillé (litige) à {unlocked_amount} XOF : {reason}',
     )
     db.session.add(event)
     db.session.commit()
