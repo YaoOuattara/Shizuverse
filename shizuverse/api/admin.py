@@ -1665,8 +1665,11 @@ def get_client_bookings():
 
     query = ClientBooking.query.filter_by(client_phone=phone)
     if status:
+        # 'disputed' deliberately absent — see VALID_STATUSES in
+        # models/client_booking.py: a dispute lives on dispute_flag, not on the
+        # status, and nothing has written 'disputed' since f79f1c6.
         if status not in ['requested', 'accepted', 'declined', 'in_progress',
-                          'completed', 'cancelled', 'disputed']:
+                          'completed', 'cancelled']:
             return jsonify({'error': 'Invalid status'}), 400
         query = query.filter_by(status=status)
 

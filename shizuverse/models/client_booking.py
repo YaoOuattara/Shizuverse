@@ -1,7 +1,22 @@
 from . import db
 from datetime import datetime
 
-VALID_STATUSES = ['requested', 'accepted', 'declined', 'in_progress', 'completed', 'cancelled', 'disputed', 'pending_payment']
+# 'disputed' is NOT in this list, and must not be added back.
+#
+# A dispute is carried by dispute_flag / dispute_reason / dispute_resolution,
+# never by the status. The old design did use a status: a duplicate /dispute
+# route (removed in f79f1c6, it shadowed open_dispute) required
+# status == 'disputed' and moved the booking to 'completed' or 'cancelled' on
+# resolution. Removing that route removed the only writer of 'disputed', and the
+# value survived here for months with nothing ever producing it — verified in
+# production, zero rows carry it.
+#
+# Re-adding it would break two things that still assume it can't appear:
+#   - update_booking_status (api/admin.py) does not accept 'disputed', so a
+#     booking set to it could never be moved out again;
+#   - the client-facing screens class it with the cancellations, so a live
+#     dispute would show the client "Annulée".
+VALID_STATUSES = ['requested', 'accepted', 'declined', 'in_progress', 'completed', 'cancelled', 'pending_payment']
 
 # payment_status is a DOSSIER FLAG only — it never carries an amount. How much
 # was collected lives in amount_collected (single source of truth), from which
