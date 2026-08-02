@@ -128,7 +128,10 @@ interface StatusInfo { label: string; bg: string; text: string; dot: string }
 function getStatusInfo(status: string, providerName: string | null): StatusInfo {
   if (status === "completed")
     return { label: "Terminée",      bg: "bg-green-50",  text: "text-green-700", dot: "bg-green-500" };
-  if (status === "cancelled" || status === "declined" || status === "disputed")
+  // 'disputed' n'est plus un statut (retiré côté backend) : un litige vit sur
+  // dispute_flag. Le laisser ici affichait « Annulée » à un client dont le
+  // dossier était en cours de litige.
+  if (status === "cancelled" || status === "declined")
     return { label: "Annulée",       bg: "bg-red-50",    text: "text-red-700",   dot: "bg-red-500"   };
   if (status === "accepted" || status === "in_progress")
     return { label: "En cours",      bg: "bg-amber-50",  text: "text-amber-700", dot: "bg-amber-500" };

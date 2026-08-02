@@ -110,7 +110,10 @@ interface StatusBadge { label: string; bg: string; text: string; dot: string }
 function statusBadge(status: string, provider: string | null, isFr: boolean): StatusBadge {
   if (status === "completed")
     return { label: isFr ? "Terminée" : "Completed",                     bg: "bg-green-50",  text: "text-green-700",  dot: "bg-green-500"  };
-  if (status === "cancelled" || status === "declined" || status === "disputed")
+  // 'disputed' n'est plus un statut (retiré côté backend) : un litige vit sur
+  // dispute_flag. Le laisser ici affichait « Annulée » à un client dont le
+  // dossier était en cours de litige.
+  if (status === "cancelled" || status === "declined")
     return { label: isFr ? "Annulée" : "Cancelled",                      bg: "bg-red-50",    text: "text-red-700",    dot: "bg-red-500"    };
   if (status === "pending_payment")
     return { label: isFr ? "Paiement en attente" : "Payment pending",    bg: "bg-amber-50",  text: "text-amber-700",  dot: "bg-amber-500"  };
@@ -122,7 +125,7 @@ function statusBadge(status: string, provider: string | null, isFr: boolean): St
 }
 
 const ACTIVE_STATUSES = new Set(["requested", "pending", "accepted", "in_progress", "pending_payment"]);
-const CANCELLED_STATUSES = new Set(["cancelled", "declined", "disputed"]);
+const CANCELLED_STATUSES = new Set(["cancelled", "declined"]);
 
 function waShizuHref(b: ApiBooking, isFr: boolean): string {
   const msg = isFr

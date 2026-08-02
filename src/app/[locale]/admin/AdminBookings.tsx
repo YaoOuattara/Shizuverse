@@ -112,7 +112,6 @@ const statusColors: Record<string, string> = {
   completed:    "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
   cancelled:    "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
   declined:     "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  disputed:     "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
 };
 
 const formatDate = (iso: string, locale = 'fr', includeWeekday = false) => {
@@ -240,7 +239,6 @@ const STATUS_LABELS: Record<string, { fr: string; en: string }> = {
   completed:    { fr: 'Terminée',      en: 'Completed'    },
   cancelled:    { fr: 'Annulée',       en: 'Cancelled'    },
   declined:     { fr: 'Refusée',       en: 'Declined'     },
-  disputed:     { fr: 'En litige',     en: 'Disputed'     },
   pending_payment: { fr: 'En attente de paiement', en: 'Pending payment' },
   rescheduled:  { fr: 'Reprogrammée',  en: 'Rescheduled'  },
 };
@@ -3131,9 +3129,12 @@ export default function AdminBookings() {
               {isFr ? "Ouvrir un litige" : "Open Dispute"}
             </DialogTitle>
             <DialogDescription>
+              {/* Le statut ne change PAS : open_dispute pose dispute_flag et
+                  laisse le statut intact. L'ancien texte annonçait une
+                  transition qui n'a jamais eu lieu. */}
               {isFr
-                ? "Décrivez le problème. Le statut passera en 'litige'."
-                : "Describe the issue. Status will move to 'disputed'."}
+                ? "Décrivez le problème. La réservation sera signalée en litige ; son statut reste inchangé."
+                : "Describe the issue. The booking will be flagged as disputed; its status stays unchanged."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
