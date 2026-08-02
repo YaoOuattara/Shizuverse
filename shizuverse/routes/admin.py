@@ -1241,7 +1241,15 @@ def lock_booking_amount(booking_id):
 @admin_bp.route('/bookings/<int:booking_id>/unlock-amount', methods=['POST'])
 @admin_required
 def unlock_booking_amount(booking_id):
-    """Explicitly unlock a locked amount (dispute case only). Requires a reason."""
+    """Explicitly unlock a locked amount. Reason REQUIRED — dispute or renegotiation.
+
+    Not dispute-only, despite what this docstring long claimed: the admin UI
+    shows the unlock button whenever the amount is locked, and the amiable
+    renegotiation flow (unlock → re-quote → client re-accepts) is a real,
+    legitimate path — at Abidjan a price is often renegotiated outside any
+    formal dispute. The reason string is the audit trail either way; the
+    amount being unlocked is recorded in the event (4d06e64).
+    """
     b = ClientBooking.query.get_or_404(booking_id)
     data = request.get_json() or {}
     reason = (data.get('reason') or '').strip()

@@ -52,6 +52,11 @@ zope.event==5.1.1
 zope.interface==7.2
 
 Flask-Limiter==3.5.0
+# Backend de stockage du limiter. REDIS_URL était documenté comme option
+# (DEVELOPER_GUIDE) alors que le paquet manquait : poser la variable faisait
+# crasher l'app au boot (ConfigurationError de `limits`). Le paquet doit être
+# présent AVANT la variable — jamais l'inverse.
+redis==5.0.8
 
 # --- AI ---
 anthropic>=0.40.0
