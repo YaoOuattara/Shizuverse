@@ -527,9 +527,20 @@ def list_whatsapp_messages():
     from shizuverse.models.whatsapp_message import WhatsAppMessage
     q = WhatsAppMessage.query
     if request.args.get('unread') in ('1', 'true'):
-        q = q.filter(WhatsAppMessage.is_read.is_(False))
+        # SAME definition as unread_count below — one predicate, one place. An
+        # outbound row is born is_read=False and nobody ever "reads" it: without
+        # the direction filter, the tab listed every sent notification while the
+        # badge stayed at the inbound count — the list outgrew its own badge
+        # forever. Two definitions of one concept born in two places is the
+        # VALID_STATUSES fork in miniature.
+        q = q.filter(WhatsAppMessage.is_read.is_(False),
+                     WhatsAppMessage.direction == 'inbound')
     if request.args.get('unmatched') in ('1', 'true'):
-        q = q.filter(WhatsAppMessage.booking_id.is_(None))
+        # Same rule as unread above: the tab shares the badge's definition —
+        # inbound orphans to attach. An outbound whose ?b= was missing is
+        # tracing debt, not a message awaiting attachment.
+        q = q.filter(WhatsAppMessage.booking_id.is_(None),
+                     WhatsAppMessage.direction == 'inbound')
     try:
         limit = min(int(request.args.get('limit', 100)), 500)
     except (TypeError, ValueError):
