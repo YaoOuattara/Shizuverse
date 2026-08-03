@@ -385,3 +385,44 @@ def test_format_long_date_matches_template_expectation():
     assert format_long_date(None) == ""
     # Unknown locale degrades to French, like _norm_locale everywhere else.
     assert format_long_date(d, "xx") == "mardi 4 août 2026"
+
+
+# ── Les trois derniers log_body réalignés sur les textes approuvés ───────────
+
+def test_realigned_log_bodies_match_the_approved_texts():
+    """Textes lus depuis l'API Content, recopiés mot pour mot. Seule divergence
+    consciente : l'espace finale du corps approuvé de provider_started_fr n'est
+    PAS reproduite — c'est du log, pas de l'envoi, et un caractère invisible
+    casse les greps (commenté dans CLIENT_TEMPLATES)."""
+    from shizuverse.utils.notifications import _render_client
+
+    assert _render_client("provider_started", "fr",
+                          client_name="Awa", provider_name="Koffi") == \
+        ("Bonjour Awa, Koffi a démarré votre mission Shizu. "
+         "En cas de problème, contactez-nous immédiatement.")
+    assert _render_client("provider_started", "en",
+                          client_name="Awa", provider_name="Koffi") == \
+        ("Hello Awa, Koffi has started your Shizu service. "
+         "If anything goes wrong, contact us right away.")
+
+    assert _render_client("booking_cancelled_client", "fr",
+                          client_name="Awa", booking_ref="SHZ-2026-80") == \
+        ("Bonjour Awa, votre réservation SHZ-2026-80 a été annulée. Notre "
+         "équipe vous contacte pour le point et des propositions de solutions.")
+    assert _render_client("booking_cancelled_client", "en",
+                          client_name="Awa", booking_ref="SHZ-2026-80") == \
+        ("Hello Awa, your booking SHZ-2026-80 has been cancelled. Our team "
+         "will contact you with an update and proposed solutions.")
+
+    assert _render_client("booking_rescheduled_client", "fr",
+                          client_name="Awa", booking_ref="SHZ-2026-80",
+                          new_date="mardi 4 août 2026", slot="Matin 8h–12h") == \
+        ("Bonjour Awa, votre réservation SHZ-2026-80 a été reprogrammée. "
+         "Nouvelle date : mardi 4 août 2026, Matin 8h–12h. Le prestataire "
+         "vous contactera avant son arrivée.")
+    assert _render_client("booking_rescheduled_client", "en",
+                          client_name="Awa", booking_ref="SHZ-2026-80",
+                          new_date="Tuesday 4 August 2026", slot="Morning 8am–12pm") == \
+        ("Hello Awa, your booking SHZ-2026-80 has been rescheduled. New date: "
+         "Tuesday 4 August 2026, Morning 8am–12pm. The provider will contact "
+         "you before arriving.")

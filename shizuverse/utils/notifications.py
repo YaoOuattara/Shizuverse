@@ -243,16 +243,6 @@ def _slot_fallback(locale) -> str:
     return _SLOT_LABELS["anytime"][loc]
 
 
-def _shizu_wa_link() -> str:
-    """wa.me link to Shizu support from env. Returns '' when the number is
-    unset — an absent link is safer than a wrong number sent to real clients."""
-    shizu_wa = os.environ.get("NEXT_PUBLIC_SHIZU_WHATSAPP", "").replace("+", "").strip()
-    if not shizu_wa:
-        logger.error("NEXT_PUBLIC_SHIZU_WHATSAPP is unset — no Shizu support link available")
-        return ""
-    return f"wa.me/{shizu_wa}"
-
-
 # ── Client-facing templates: {message_id: {locale: format_string}} ────────────
 # These no longer drive the send (the Twilio Content SID owns the real text);
 # they are realigned word-for-word to the approved Meta templates so the
@@ -308,32 +298,33 @@ CLIENT_TEMPLATES = {
     },
     # ── Still free-form (send_whatsapp) until their templates ship — emoji
     #    removed for consistency, wording otherwise unchanged. ──
+    # NOTE: the approved shizu_provider_started_fr body at Twilio ends with a
+    # TRAILING SPACE after the final period. NOT reproduced here, consciously:
+    # this string is a log, not the send (the SID owns the real text, trailing
+    # space included), and an invisible character in a log line breaks greps
+    # and future word-for-word comparisons for nothing.
     "provider_started": {
-        "fr": ("{provider_name} a démarré votre mission. "
-               "En cas de problème, contactez Shizu immédiatement : {wa_link}. "
-               "Nous restons disponibles pour vous."),
-        "en": ("{provider_name} has started your mission. "
-               "If anything goes wrong, contact Shizu right away: {wa_link}. "
-               "We're here for you."),
+        "fr": ("Bonjour {client_name}, {provider_name} a démarré votre mission "
+               "Shizu. En cas de problème, contactez-nous immédiatement."),
+        "en": ("Hello {client_name}, {provider_name} has started your Shizu "
+               "service. If anything goes wrong, contact us right away."),
     },
     "booking_cancelled_client": {
-        "fr": ("Votre réservation {booking_ref} a été annulée. "
-               "Raison : {reason}. "
-               "Pour toute question contactez-nous : {wa_link}"),
-        "en": ("Your booking {booking_ref} has been cancelled. "
-               "Reason: {reason}. "
-               "For any questions, contact us: {wa_link}"),
+        "fr": ("Bonjour {client_name}, votre réservation {booking_ref} a été "
+               "annulée. Notre équipe vous contacte pour le point et des "
+               "propositions de solutions."),
+        "en": ("Hello {client_name}, your booking {booking_ref} has been "
+               "cancelled. Our team will contact you with an update and "
+               "proposed solutions."),
     },
     "booking_rescheduled_client": {
-        "fr": ("Votre réservation {booking_ref} a été reprogrammée. "
-               "Nouvelle date : {new_date}{slot_part}. "
-               "Une question ? Contactez-nous : {wa_link}"),
-        "en": ("Your booking {booking_ref} has been rescheduled. "
-               "New date: {new_date}{slot_part}. "
-               "Any question? Contact us: {wa_link}"),
+        "fr": ("Bonjour {client_name}, votre réservation {booking_ref} a été "
+               "reprogrammée. Nouvelle date : {new_date}, {slot}. Le prestataire "
+               "vous contactera avant son arrivée."),
+        "en": ("Hello {client_name}, your booking {booking_ref} has been "
+               "rescheduled. New date: {new_date}, {slot}. The provider will "
+               "contact you before arriving."),
     },
-    # "Reason not specified" fallback for cancellations.
-    "reason_unspecified": {"fr": "Non précisée", "en": "Not specified"},
 }
 
 
@@ -425,10 +416,8 @@ def notify_provider_started(
     """
     loc = _norm_locale(locale)
     variables = {"1": client_name, "2": provider_name}
-    # log_body only — CLIENT_TEMPLATES still holds the pre-template wording (the
-    # approved v2 text was not provided); the Content SID owns what really goes out.
     body = _render_client("provider_started", loc,
-                          provider_name=provider_name, wa_link=_shizu_wa_link())
+                          client_name=client_name, provider_name=provider_name)
     return send_whatsapp_template(client_phone, f"shizu_provider_started_{loc}",
                                   variables, log_body=body, booking_id=booking_id)
 
@@ -446,10 +435,8 @@ def notify_booking_cancelled_client(
     """
     loc = _norm_locale(locale)
     variables = {"1": client_name, "2": booking_ref}
-    display_reason = (reason or "").strip() or CLIENT_TEMPLATES["reason_unspecified"][loc]
     body = _render_client("booking_cancelled_client", loc,
-                          booking_ref=booking_ref, reason=display_reason,
-                          wa_link=_shizu_wa_link())
+                          client_name=client_name, booking_ref=booking_ref)
     return send_whatsapp_template(client_phone, f"shizu_booking_cancelled_client_{loc}",
                                   variables, log_body=body, booking_id=booking_id)
 
@@ -471,8 +458,8 @@ def notify_booking_rescheduled_client(
     slot = (new_slot or "").strip() or _slot_fallback(loc)
     variables = {"1": client_name, "2": booking_ref, "3": new_date, "4": slot}
     body = _render_client("booking_rescheduled_client", loc,
-                          booking_ref=booking_ref, new_date=new_date,
-                          slot_part=f" ({slot})", wa_link=_shizu_wa_link())
+                          client_name=client_name, booking_ref=booking_ref,
+                          new_date=new_date, slot=slot)
     return send_whatsapp_template(client_phone, f"shizu_booking_rescheduled_client_{loc}",
                                   variables, log_body=body, booking_id=booking_id)
 
@@ -570,8 +557,8 @@ def notify_payment_instructions(
 # All three carry the same two positions: {{1}} client name, {{2}} booking ref.
 # No amount and no reason: the approved templates have no slot for them, and a
 # dispute message is a "we are handling it" signal, not a statement of account.
-# log_body is our own wording — the approved v2 texts were not supplied, and the
-# Content SID owns what actually goes out.
+# log_body is the approved wording, copied verbatim from the Content API — the
+# Content SID still owns what actually goes out.
 
 def notify_dispute_opened_client(
     *, client_name: str, client_phone: str, booking_ref: str,
