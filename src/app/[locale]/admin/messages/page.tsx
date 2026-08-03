@@ -11,6 +11,7 @@ import {
   ExternalLink, Check, Paperclip, ArrowDownLeft, ArrowUpRight,
 } from "lucide-react";
 import { adminApi } from "@/lib/api";
+import { waTemplateLabel } from "@/lib/waTemplateLabels";
 import { useToast } from "@/hooks/use-toast";
 
 // Mirrors WhatsAppMessage.to_dict() on the backend.
@@ -94,6 +95,10 @@ export default function AdminMessagesPage() {
         unmatched: which === "unmatched",
         limit: 200,
       });
+      // Aucun re-filtrage client : les onglets partagent la définition de leur
+      // badge CÔTÉ BACKEND (unread et unmatched filtrent direction='inbound' à
+      // la source). Un filtre client par-dessus serait une seconde définition
+      // du même prédicat — celle qui coïncide un temps, puis diverge.
       setItems(Array.isArray(data?.items) ? data.items : []);
       setUnreadCount(data?.unread_count ?? 0);
       setUnmatchedCount(data?.unmatched_count ?? 0);
@@ -240,9 +245,17 @@ export default function AdminMessagesPage() {
                         </span>
                       </CardTitle>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge className={role.cls} variant="outline">
-                          {role[isFr ? "fr" : "en"]}
-                        </Badge>
+                        {/* Rôle : INBOUND uniquement, calé sur direction — pas sur
+                            matched_role. Un sortant tracé (?b=) porte 'outbound'
+                            que ROLE_LABELS rendait « Non rattaché », et un sortant
+                            d'avant 6a89893 porte 'both' (résolu par téléphone) tout
+                            aussi trompeur. La flèche ↗, le libellé de template et le
+                            badge de statut disent déjà tout ce qu'un sortant a à dire. */}
+                        {inbound && (
+                          <Badge className={role.cls} variant="outline">
+                            {role[isFr ? "fr" : "en"]}
+                          </Badge>
+                        )}
                         <Badge variant="outline" className={failed ? "text-red-600 border-red-300" : ""}>
                           {status ? status[isFr ? "fr" : "en"] : m.status}
                         </Badge>
@@ -250,7 +263,7 @@ export default function AdminMessagesPage() {
                     </div>
                     <CardDescription className="text-xs">
                       {formatDate(m.received_at, isFr)}
-                      {m.matched_role === "both" && (
+                      {inbound && m.matched_role === "both" && (
                         <span className="ml-2 text-purple-700 dark:text-purple-300">
                           {isFr
                             ? "· ce numéro est prestataire ET client — rattaché à la mission"
@@ -270,8 +283,10 @@ export default function AdminMessagesPage() {
                         )}
                       </p>
                     ) : (
-                      <p className="text-xs font-mono text-muted-foreground break-all">
-                        {m.template_key || (isFr ? "message libre" : "free-form message")}
+                      <p className="text-xs text-muted-foreground break-all">
+                        {m.template_key
+                          ? waTemplateLabel(m.template_key, isFr)
+                          : (isFr ? "message libre" : "free-form message")}
                       </p>
                     )}
 

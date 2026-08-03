@@ -67,6 +67,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useAdminStore, type AdminBooking } from "@/data/adminStore";
 import { useAdminBookings, useAdminProviders, useAdminServices, type ApiBooking, type ApiProvider, type ApiService } from "@/hooks/useAdminApi";
 import { adminApi } from "@/lib/api";
+import { waTemplateLabel } from "@/lib/waTemplateLabels";
 import { useToast } from "@/hooks/use-toast";
 import ErrorBanner from "@/components/ErrorBanner";
 import { format, parseISO } from "date-fns";
@@ -494,8 +495,10 @@ function ConversationThread({ messages, loading, isFr }: {
                     )}
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground font-mono break-all">
-                    {m.template_key || (isFr ? "message libre" : "free-form message")}
+                  <p className="text-xs text-muted-foreground break-all">
+                    {m.template_key
+                      ? waTemplateLabel(m.template_key, isFr)
+                      : (isFr ? "message libre" : "free-form message")}
                   </p>
                 )}
 
