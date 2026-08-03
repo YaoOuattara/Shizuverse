@@ -78,9 +78,22 @@ function computeEarnings(bookings: ProviderBooking[]) {
     const base = b.final_amount ?? b.amount_xof ?? (typeof b.price === "number" ? b.price : 0);
     const effPayout = b.provider_payout != null ? b.provider_payout : Math.round(base * 0.85);
     if (!base) continue;
-    if (b.status === "completed" && (b.collection_status ?? b.payment_status) === "paid") gagne += effPayout;
+    // T-33 : un dossier remboursé ne doit RIEN au prestataire. L'ancien calcul
+    // les comptait dans « Gagné » (un remboursé garde collection_status='paid',
+    // l'argent est bien ENTRÉ — puis ressorti) : la tuile affichait comme
+    // acquis l'argent de dossiers clos « sans règlement » par WhatsApp.
+    if (b.payment_status === "refunded") continue;
+    // Une seule unité (le payout 85 %) et deux buckets qui partitionnent les
+    // missions terminées non remboursées — l'équation « cartes = Gagné +
+    // En attente » tient par construction, plus par coïncidence :
+    //   Gagné      = terminée ET soldée par le client
+    //   En attente = terminée, paiement client en cours (l'ancien bucket
+    //                comptait les missions futures en base 100 %, et une
+    //                terminée-impayée ne tombait NULLE part)
+    const settled = (b.collection_status ?? b.payment_status) === "paid";
+    if (b.status === "completed" && settled) gagne += effPayout;
+    if (b.status === "completed" && !settled) enAttente += effPayout;
     if (b.payout_status === "sent") verse += effPayout;
-    if (["confirmed", "accepted", "assigned"].includes(b.status as string) && (b.collection_status ?? b.payment_status) !== "paid") enAttente += base;
   }
   return { gagne, verse, enAttente, prochainVersement: enAttente };
 }
@@ -828,8 +841,8 @@ export default function ProviderDashboard() {
         {(() => {
           const { gagne, enAttente, verse, prochainVersement } = computeEarnings(bookings);
           const cards = [
-            { label: isFr ? "Gagné"              : "Earned",       value: gagne,             sub: isFr ? "réservations terminées"      : "completed bookings",          textColor: "text-green-700", bg: "bg-green-50",  border: "border-green-100" },
-            { label: isFr ? "En attente"         : "Pending",      value: enAttente,         sub: isFr ? "confirmé, paiement en cours" : "confirmed, awaiting payout",  textColor: "text-amber-700", bg: "bg-amber-50",  border: "border-amber-100" },
+            { label: isFr ? "Gagné"              : "Earned",       value: gagne,             sub: isFr ? "terminées et payées"          : "completed and paid",           textColor: "text-green-700", bg: "bg-green-50",  border: "border-green-100" },
+            { label: isFr ? "En attente"         : "Pending",      value: enAttente,         sub: isFr ? "terminées, paiement en cours" : "completed, payment pending",   textColor: "text-amber-700", bg: "bg-amber-50",  border: "border-amber-100" },
             { label: isFr ? "Versé"              : "Paid out",     value: verse,             sub: isFr ? "déjà reversé"                : "already disbursed",           textColor: "text-blue-700",  bg: "bg-blue-50",   border: "border-blue-100"  },
             { label: isFr ? "Prochain versement" : "Next payout",  value: prochainVersement, sub: isFr ? "estimation prochaine"        : "upcoming estimate",           textColor: "text-[#0D2B6B]", bg: "bg-white",     border: "border-[#B5D4F4]"  },
           ];

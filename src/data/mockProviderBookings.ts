@@ -25,6 +25,11 @@ export interface ProviderBooking {
   masked?: boolean;
   commune?: string;
   estimatedPayout?: number | null;
+  // Axes finance du dossier (présents au runtime via le spread de l'API ;
+  // T-33 : un dossier remboursé ne doit rien au prestataire).
+  payment_status?: string;
+  collection_status?: string;
+  payout_status?: string;
 }
 
 // todo: remove mock functionality - replace with API data
