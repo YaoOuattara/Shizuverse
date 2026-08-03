@@ -51,6 +51,26 @@ import { useTranslations } from "next-intl";
 // l'ancien Reprogrammer (qui ne persistait rien).
 const SHIZU_WA = (process.env.NEXT_PUBLIC_SHIZU_WHATSAPP ?? "").replace(/\D/g, "");
 
+// « 30 juil. 2026 » depuis le YYYY-MM-DD de l'API ; la valeur brute si illisible.
+function humanDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
+}
+
+// « Awa C. » — une mission close est un reçu, pas une fiche contact.
+function shortName(full: string): string {
+  const parts = (full || "").trim().split(/\s+/);
+  if (parts.length === 0 || !parts[0]) return "—";
+  return parts.length === 1 ? parts[0] : `${parts[0]} ${parts[1][0].toUpperCase()}.`;
+}
+
+// Date LOCALE du jour (pas toISOString : UTC décale la journée hors d'Abidjan).
+function todayLocalISO(): string {
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
+
 interface ProviderBookingCardProps {
   booking: ProviderBooking;
   conflictWarning?: string | null;
@@ -148,6 +168,7 @@ export default function ProviderBookingCard({
   };
 
   const StatusIcon = statusIcons[booking.status as ProviderBookingStatus] ?? CircleDashed;
+  const isCompleted = booking.status === "completed";
   const isPending = booking.status === "pending" || booking.status === "requested";
   const isAssigned = booking.status === "assigned";
   const isAccepted = booking.status === "accepted";
@@ -159,6 +180,50 @@ export default function ProviderBookingCard({
   const canStart = isConfirmed || isAccepted;
   const isActionable = canAcceptReject || isConfirmed || isAccepted || isInProgress;
   const isAnyLoading = isAccepting || isRejecting || isRescheduling || isStarting || isCompleting;
+
+  // ── Mission terminée : un REÇU, pas une mission à venir en gris ────────────
+  // Le montant est verrouillé et acquis — « estimée » sèmerait le doute sur de
+  // l'argent dû, la durée « 60 min » est une constante backend fabriquée, et le
+  // téléphone complet du client n'a plus d'usage sur une mission close. Une
+  // ligne de contexte suffit ; les cartes ACTIVES gardent la mise en page riche.
+  if (isCompleted) {
+    return (
+      <Card className="hover-elevate transition-all" data-testid={`provider-booking-card-${booking.id}`}>
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm text-muted-foreground truncate">{booking.serviceName}</p>
+              {booking.estimatedPayout != null && booking.estimatedPayout > 0 ? (
+                <p className="text-xl sm:text-2xl font-bold text-foreground mt-0.5"
+                   data-testid={`text-payout-${booking.id}`}>
+                  {formatMoney(booking.estimatedPayout)}
+                  <span className="ml-2 text-xs font-normal text-muted-foreground align-middle">
+                    Rémunération
+                  </span>
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-0.5">Montant à confirmer par Shizu</p>
+              )}
+            </div>
+            <Badge
+              variant="secondary"
+              className={`${statusStyles.completed} text-xs font-medium shrink-0`}
+              data-testid={`badge-status-${booking.id}`}
+            >
+              <Check className="mr-1 h-3 w-3" />
+              {statusLabels.completed}
+            </Badge>
+          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-2 truncate"
+             data-testid={`text-context-${booking.id}`}>
+            {shortName(booking.customerName)}
+            {(booking.commune || booking.location) && <> · {booking.commune || (booking.location ?? "").split(",")[0].trim()}</>}
+            {booking.date && <> · {humanDate(booking.date)}</>}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>
@@ -176,12 +241,16 @@ export default function ProviderBookingCard({
                 >
                   {booking.serviceName}
                 </h3>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                  {booking.duration}
-                  {booking.estimatedPayout != null && booking.estimatedPayout > 0 && (
-                    <> · {formatMoney(booking.estimatedPayout)} <span className="text-[11px]">(rémunération estimée)</span></>
-                  )}
-                </p>
+                {/* booking.duration n'est PAS affiché : c'est une constante
+                    backend fabriquée ('duration': 60 pour toutes les missions,
+                    api/admin.py:867) — une donnée inventée qui prétend informer.
+                    Dette consignée : vraie estimation par catégorie, ou
+                    suppression du champ. */}
+                {booking.estimatedPayout != null && booking.estimatedPayout > 0 && (
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                    {formatMoney(booking.estimatedPayout)} <span className="text-[11px]">(rémunération estimée)</span>
+                  </p>
+                )}
               </div>
               <Badge
                 variant="secondary"
@@ -259,24 +328,26 @@ export default function ProviderBookingCard({
             {/* Urgency + time preference chips */}
             {(booking.urgency || booking.time_preference) && (
               <div className="flex flex-wrap gap-1.5 pt-2 border-t">
+                {/* Le chip décrit le TYPE de demande (fait intemporel), jamais
+                    un compte à rebours : « 2h » affiché indéfiniment était une
+                    échéance morte. La priorisation survit, le chiffre meurt. */}
                 {booking.urgency === 'urgent_2h' && (
                   <span className="inline-flex items-center gap-1 text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-2 py-0.5 rounded-full">
                     <Zap className="h-3 w-3" />
-                    Urgence — 2h
+                    Demande urgente
                   </span>
                 )}
-                {booking.urgency === 'same_day' && (
+                {/* « Aujourd'hui » n'est vrai que le jour J : l'urgence same_day
+                    est figée à la demande, et le badge s'affichait des jours plus
+                    tard sur une mission datée d'ailleurs — un badge qui ment. */}
+                {booking.urgency === 'same_day' && booking.date === todayLocalISO() && (
                   <span className="inline-flex items-center gap-1 text-xs font-semibold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
                     <Clock className="h-3 w-3" />
                     Aujourd&apos;hui
                   </span>
                 )}
-                {booking.urgency === 'under_24h' && (
-                  <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                    <Clock className="h-3 w-3" />
-                    Moins de 24h
-                  </span>
-                )}
+                {/* under_24h : cas nominal — aucun chip. Un badge sur le cas
+                    normal n'est pas une information, c'est du bruit. */}
                 {booking.time_preference === 'morning' && (
                   <span className="inline-flex items-center gap-1 text-xs bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded-full">
                     🌅 Matin · 8h–12h
