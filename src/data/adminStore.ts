@@ -165,6 +165,7 @@ export interface AdminProvider {
   idDocumentUrl?: string;
   profilePhotoUrl?: string;
   experiencePhotoUrl?: string;
+  experienceText?: string;
 }
 
 export interface AdminService {

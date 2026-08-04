@@ -81,6 +81,7 @@ export interface ApiProvider {
   id_document_url?: string | null;
   profile_photo_url?: string | null;
   experience_photo_url?: string | null;
+  experience_text?: string | null;
 }
 
 export interface ApiReview {
