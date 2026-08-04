@@ -7,10 +7,6 @@ import {
   ShieldCheck, ShieldAlert, ShieldX, Clock, Upload, Eye, Star, Lock, ChevronDown, Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { normalizeCiMomo, isValidCiMomo } from '@/lib/momo'
 import {
@@ -292,7 +288,6 @@ export default function ProviderProfilePage() {
   const [services, setServices] = useState<string[]>([])
   const [profile, setProfile] = useState<ProfileState>(EMPTY)
   const [savedProfile, setSavedProfile] = useState<ProfileState>(EMPTY)
-  const [confirmMomoClearOpen, setConfirmMomoClearOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isImproving, setIsImproving] = useState(false)
@@ -390,27 +385,29 @@ export default function ProviderProfilePage() {
     profile.mobile_money_number.trim().length > 0 &&
     !isValidCiMomo(normalizeCiMomo(profile.mobile_money_number))
 
-  const doSave = async () => {
+  const handleSave = async () => {
+    if (isSaving) return
+    if (momoInvalid) {
+      toast({
+        title: isFr ? 'Numéro Mobile Money invalide' : 'Invalid Mobile Money number',
+        description: isFr ? 'Il doit contenir 10 chiffres (ex. 07 XX XX XX XX).' : 'It must have 10 digits (e.g. 07 XX XX XX XX).',
+        variant: 'destructive',
+      })
+      return
+    }
     setIsSaving(true)
     try {
       const token = localStorage.getItem('provider_token')
 
-      // TOUS les champs partent, vides compris. L'ancien payload sautait les
-      // champs falsy (« so backend doesn't clear existing data ») : chaque
-      // champ était un aller simple — remplissable, jamais vidable — et la
-      // suppression du numéro Mobile Money revenait au rechargement. Le
-      // backend fait le bon geste depuis toujours : clé présente + valeur
-      // vide → None (str_fields, update_provider_profile).
-      const body: Record<string, string> = {
-        bio:                   profile.bio,
-        experience_text:       profile.experience_text,
-        profile_photo_url:     profile.profile_photo_url,
-        id_document_url:       profile.id_document_url,
-        experience_photo_url:  profile.experience_photo_url,
-        mobile_money_number:   profile.mobile_money_number,
-        mobile_money_name:     profile.mobile_money_name,
-        mobile_money_operator: profile.mobile_money_operator,
-      }
+      // Build payload — only include non-empty values so backend doesn't clear existing data
+      const body: Record<string, string> = { bio: profile.bio }
+      if (profile.experience_text)       body.experience_text       = profile.experience_text
+      if (profile.profile_photo_url)     body.profile_photo_url     = profile.profile_photo_url
+      if (profile.id_document_url)       body.id_document_url       = profile.id_document_url
+      if (profile.experience_photo_url)  body.experience_photo_url  = profile.experience_photo_url
+      if (profile.mobile_money_number)   body.mobile_money_number   = profile.mobile_money_number
+      if (profile.mobile_money_name)     body.mobile_money_name     = profile.mobile_money_name
+      if (profile.mobile_money_operator) body.mobile_money_operator = profile.mobile_money_operator
 
       console.log('[handleSave] payload:', JSON.stringify(body, null, 2))
 
@@ -441,30 +438,6 @@ export default function ProviderProfilePage() {
     } finally {
       setIsSaving(false)
     }
-  }
-
-  const handleSave = async () => {
-    if (isSaving) return
-    if (momoInvalid) {
-      toast({
-        title: isFr ? 'Numéro Mobile Money invalide' : 'Invalid Mobile Money number',
-        description: isFr ? 'Il doit contenir 10 chiffres (ex. 07 XX XX XX XX).' : 'It must have 10 digits (e.g. 07 XX XX XX XX).',
-        variant: 'destructive',
-      })
-      return
-    }
-    // Seul champ dont le VIDAGE a une conséquence financière : sans numéro,
-    // Shizu ne peut pas verser (la vue versements le remonte en « Aucun moyen
-    // de payer »). On confirme ce vidage-là, et rien d'autre — la donnée
-    // appartient au prestataire, on rend juste la conséquence explicite.
-    const momoCleared =
-      (savedProfile.mobile_money_number ?? '').trim() !== '' &&
-      profile.mobile_money_number.trim() === ''
-    if (momoCleared) {
-      setConfirmMomoClearOpen(true)
-      return
-    }
-    await doSave()
   }
 
   const handleSubmit = async () => {
@@ -1095,30 +1068,6 @@ export default function ProviderProfilePage() {
           </Button>
         </div>
       )}
-
-      {/* Vider le momo = ne plus pouvoir être payé — on le dit avant d'enregistrer. */}
-      <AlertDialog open={confirmMomoClearOpen} onOpenChange={setConfirmMomoClearOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {isFr ? 'Supprimer votre numéro Mobile Money ?' : 'Remove your Mobile Money number?'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {isFr
-                ? 'Sans numéro Mobile Money, Shizu ne pourra pas vous verser vos gains. Continuer ?'
-                : 'Without a Mobile Money number, Shizu will not be able to pay out your earnings. Continue?'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{isFr ? 'Annuler' : 'Cancel'}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => { setConfirmMomoClearOpen(false); void doSave() }}
-            >
-              {isFr ? 'Continuer' : 'Continue'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
     </div>
   )
