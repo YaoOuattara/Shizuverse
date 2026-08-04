@@ -7,6 +7,7 @@ import AnalyticsProvider from '@/components/AnalyticsProvider';
 import { ProviderAuthProvider } from '@/context/ProviderAuthContext';
 import { Analytics } from '@vercel/analytics/react';
 import PwaRegistration from '@/components/PwaRegistration';
+import { Toaster } from "@/components/ui/toaster";
 import InstallPrompt from '@/components/InstallPrompt';
 
 export function generateStaticParams() {
@@ -43,6 +44,12 @@ export default async function RootLayout({children, params}: Props) {
             </AnalyticsProvider>
           </ProviderAuthProvider>
           <InstallPrompt />
+          {/* SANS ce montage, les 15 fichiers qui appellent useToast écrivent
+              dans un état mémoire que rien ne rend : chaque toast du projet
+              (sauvegardes, remboursements, erreurs réseau…) était un no-op
+              silencieux. Le viewport est z-[100], au-dessus de tout header
+              sticky (max z-50) — pas de conflit. */}
+          <Toaster />
         </NextIntlClientProvider>
         <Analytics />
         <PwaRegistration />

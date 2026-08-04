@@ -178,6 +178,7 @@ export default function AdminProviders() {
         idDocumentUrl: p.id_document_url || undefined,
         profilePhotoUrl: p.profile_photo_url || undefined,
         experiencePhotoUrl: p.experience_photo_url || undefined,
+        experienceText: p.experience_text || undefined,
       }))
     );
   }, [apiProviders]);
@@ -905,6 +906,20 @@ export default function AdminProviders() {
                               className="w-36 h-24 object-cover rounded-lg border border-border hover:opacity-80 transition-opacity cursor-pointer"
                             />
                           </a>
+                        ) : (
+                          <MissingBadge />
+                        )}
+                      </div>
+
+                      {/* Ce texte est saisi à l'inscription et sert au Gate 3
+                          (approbation) — l'API le renvoyait déjà, aucun écran
+                          ne le rendait. */}
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          📝 {isFr ? "Expérience déclarée" : "Stated experience"}
+                        </p>
+                        {selectedProvider.experienceText ? (
+                          <p className="text-sm whitespace-pre-wrap">{selectedProvider.experienceText}</p>
                         ) : (
                           <MissingBadge />
                         )}
