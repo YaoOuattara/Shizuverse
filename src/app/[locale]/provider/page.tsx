@@ -450,13 +450,24 @@ export default function ProviderDashboard() {
 
   // ── Profile completion ────────────────────────────────────────────────────
 
+  // QUATRE items, tous actionnables depuis « Compléter » (page profil). Deux
+  // pièges retirés — une jauge ne doit contenir que ce que le prestataire peut
+  // combler lui-même :
+  //   - « Téléphone WhatsApp » testait providerProfile.phone_number, une clé
+  //     que l'API n'envoie pas (elle envoie 'phone') : faux pour TOUT
+  //     prestataire, 100% inatteignable par construction. Et corriger la clé
+  //     l'aurait rendu toujours-vrai : le téléphone est l'identifiant de
+  //     compte, obligatoire à l'inscription, structurellement jamais manquant
+  //     — rien à mesurer. (Changer de numéro = chantier d'identité, dette.)
+  //   - « Zones d'intervention » : aucun champ sur la page profil, address
+  //     absent de str_fields backend — seul un admin peut le remplir
+  //     (update_provider_zones). Décision v7 : la couverture est pilotée par
+  //     l'offre, pas par l'auto-déclaration.
   const completionFields = [
-    { key: "photo", label: isFr ? "Photo de profil"      : "Profile photo",  done: !!providerProfile?.profile_photo_url },
-    { key: "id",    label: isFr ? "Pièce d'identité"     : "ID document",    done: !!providerProfile?.id_document_url },
-    { key: "bio",   label: isFr ? "Présentation"         : "Bio",            done: (providerProfile?.bio?.length ?? 0) > 50 },
-    { key: "mm",    label: isFr ? "Mobile Money"         : "Mobile Money",   done: !!providerProfile?.mobile_money_number },
-    { key: "zone",  label: isFr ? "Zones d'intervention" : "Service zones",  done: !!providerProfile?.address },
-    { key: "phone", label: isFr ? "Téléphone WhatsApp"   : "WhatsApp",       done: !!providerProfile?.phone_number },
+    { key: "photo", label: isFr ? "Photo de profil"  : "Profile photo",  done: !!providerProfile?.profile_photo_url },
+    { key: "id",    label: isFr ? "Pièce d'identité" : "ID document",    done: !!providerProfile?.id_document_url },
+    { key: "bio",   label: isFr ? "Présentation"     : "Bio",            done: (providerProfile?.bio?.length ?? 0) > 50 },
+    { key: "mm",    label: isFr ? "Mobile Money"     : "Mobile Money",   done: !!providerProfile?.mobile_money_number },
   ];
   const completedFieldCount = completionFields.filter(f => f.done).length;
   const missingFields       = completionFields.filter(f => !f.done);
