@@ -558,3 +558,126 @@ de sortie (motif obligatoire ? assignation rétroactive préalable ?) est
 
 Le dossier 75 n'est PAS rétro-corrigé : fait historique, rendu visible
 par le bloc ORPHELINS de la vue versements — pas maquillé.
+
+---
+2026-08-23 — DETTES : mise à niveau du journal (reprise après coupure de 2 semaines)
+
+Le journal ne portait que 2 dettes (REDIS_URL, traitée par 6da0a93 le
+2 août ; matrice de transition, toujours ouverte). L'investigation de
+reprise en a trouvé une dizaine d'autres, réelles et déjà identifiées
+par Yao, jamais consignées ici — donc invisibles à qui repart d'une
+coupure. Elles sont ajoutées ci-dessous, chacune avec sa cause et son
+propriétaire, pour que la prochaine coupure n'oblige pas à tout
+reconstruire de mémoire.
+
+## Bloquées sur Marie-Paule / Meta
+
+1. Les 4 textes Meta à soumettre : 2 alertes admin figées (anomalie
+   dossier, 5 variables · indicateur plateforme, 3 variables),
+   provider_approved repersonnalisé (nom + date), provider_rejected
+   avec motif.
+   Cause : templates jamais soumis à validation Meta. Sans eux, les
+   alertes admin n'arrivent à personne hors fenêtre 24h (WhatsApp exige
+   un template approuvé pour initier une conversation), et le refus
+   intelligent reste en free-form donc non délivrable.
+   Propriétaire : Marie-Paule (rédaction/validation du texte) → Yao
+   (soumission au compte Meta Business).
+
+2. deposit_received (shizuverse/utils/notifications.py:491) — même
+   famille que le point 1.
+   Cause : template shizu_deposit_received_{loc} pas encore soumis.
+   notify_deposit_received distingue déjà l'acompte partiel du paiement
+   complet (annoncer "confirmé" sur un acompte serait un bouton qui
+   ment — décision D) mais send_whatsapp_template log-et-retourne False
+   tant que le SID n'existe pas : aucun client ne reçoit la
+   confirmation d'acompte aujourd'hui.
+   Propriétaire : Marie-Paule (texte) → Yao (soumission Meta).
+
+3. 6 endpoints prestataire sans template (suspension, réintégration,
+   listing, activation, services, zones) — 6 approbations Meta
+   distinctes à obtenir.
+   Cause : jamais soumis, périmètre couvert en dernier après les flux
+   client/admin.
+   Propriétaire : Marie-Paule (textes) → Yao (soumission Meta).
+
+## Mécanismes qui tournent à vide
+
+4. retention_agent (shizuverse/utils/retention_agent.py) cible des
+   clients dormants et envoie via send_whatsapp (free-form, confirmé
+   ligne 189) — donc par définition hors fenêtre 24h. Structurellement
+   incapable de délivrer quoi que ce soit tant qu'il n'est pas migré
+   sur template.
+   Cause : conçu en free-form avant la contrainte de fenêtre WhatsApp
+   pleinement prise en compte pour une cible dormante.
+   Propriétaire : Yao (migrer sur template, ou retirer du discours —
+   il est aujourd'hui listé comme feature live ; si cité en externe,
+   prévenir Marie-Paule avant correction).
+
+5. Détecteur low_provider_acceptance (shizuverse/utils/anomaly_detector.py:137-165)
+   filtre sur ClientBooking.provider_name IS NOT NULL + status =
+   'declined' (7 derniers jours, ≥3 dossiers, taux < seuil). Ce chemin
+   ne peut plus rien attraper de neuf par les statuts actuels.
+   Cause : le vrai signal de refus prestataire est l'événement
+   BookingEvent(event_type='provider_declined') posé par
+   api/admin.py:1067, pas le champ status — le détecteur lit la mauvaise
+   source.
+   Propriétaire : Yao (fix technique, migrer la requête sur
+   BookingEvent.provider_declined).
+
+## Données fabriquées
+
+6. duration=60 codé en dur (shizuverse/api/admin.py:867 dans
+   get_bookings). Retiré de l'affichage admin, mais la détection de
+   conflits d'agenda côté prestataire (checkScheduleConflicts, appelée
+   à provider/page.tsx:301 et :396) raisonne toujours dessus.
+   Cause : aucune durée réelle par service n'existe encore en base.
+   Propriétaire : Yao — le jour où duration devient un champ réel (ou
+   disparaît), revoir ce consommateur ; dépend possiblement d'une
+   décision produit sur la durée par service (Marie-Paule) avant
+   d'exister côté données.
+
+## Hygiène
+
+7. Vocabulaire de créneaux en 3 exemplaires : _SLOT_LABELS
+   (shizuverse/routes/admin.py:755), lu en sens inverse par
+   notifications.py:242 (import de routes/admin.py depuis utils/ —
+   sens de dépendance à l'envers), et timeSlots.ts côté frontend.
+   Cause : jamais extrait en source unique au moment de la création.
+   Propriétaire : Yao — cible shizuverse/utils/time_slots.py partagé
+   côté backend + lib frontend qui le consomme (ou génère depuis une
+   API), refactor mécanique sans décision produit.
+
+8. mobile_money_operator porte deux vocabulaires jamais normalisés :
+   provider/register/page.tsx:916 écrit les libellés littéraux
+   "Orange"/"MTN"/"Wave", provider/profile/page.tsx:763 écrit des slugs
+   ("mtn_momo") pour le même champ backend (service_provider.py:34).
+   Cause : les deux formulaires ont été construits à des moments
+   différents sans vocabulaire partagé.
+   Propriétaire : Yao — normalisation triviale en soi mais traverse
+   2 formulaires frontend + le backend qui les lit tel quel.
+
+9. 6 fichiers frontend portent des copies du vocabulaire de statuts de
+   réservation : src/messages/fr.json, src/messages/en.json,
+   AdminBookings.tsx, AdminOverview.tsx, BookingCard.tsx,
+   src/data/adminStore.ts.
+   Cause : jamais centralisé ; chaque écran a dupliqué au moment de son
+   build.
+   Propriétaire : Yao — cible src/lib/bookingStatus.ts, trivial une
+   fois la matrice de transition tranchée (dette 2026-08-05 ci-dessus :
+   tant que le vocabulaire canonique bouge encore côté backend, un
+   regroupement frontend prématuré recopierait juste l'instabilité).
+
+10. Libellé "Prochain versement — estimation prochaine"
+    (provider/page.tsx:858) promet une échéance calculée alors que le
+    versement est aujourd'hui un geste manuel admin, sans calendrier.
+    Cause : dépend d'une décision produit non tranchée — rythme de
+    versement (manuel vs périodique).
+    Propriétaire : Marie-Paule (trancher le rythme) → Yao
+    (implémentation ou retrait du mot "estimation" si le geste reste
+    manuel).
+
+11. Traces gevent au boot (shizuverse/app.py:20 monkey-patch,
+    engineio_logger=True ligne 211) — bruit connu, pas un bug.
+    Cause : logging verbeux laissé actif par défaut.
+    Propriétaire : Yao — filtrer dans Sentry (règle d'ignore sur la
+    source), pas de changement de code applicatif nécessaire.
