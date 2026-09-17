@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useLocale } from "next-intl";
 import { useEffect, useState } from "react";
 import { Search, Zap, CalendarCheck, Wrench } from "lucide-react";
@@ -33,6 +34,7 @@ const CONTENT = {
     // changer QUE cette valeur.
     becomeProvider: "Proposer mes services",
     moreChips: (n: number) => `+ ${n} autres`,
+    heroImageAlt: "Prestataire Shizu arrivant chez un client à Abidjan",
     trust: ["Prestataires vérifiés", "Confirmé sous 2h", "Joignables 7j/7"],
   },
   en: {
@@ -49,6 +51,7 @@ const CONTENT = {
     // this value.
     becomeProvider: "Offer my services",
     moreChips: (n: number) => `+ ${n} more`,
+    heroImageAlt: "Shizu provider arriving at a client's home in Abidjan",
     trust: ["Vetted professionals", "Confirmed within 2h", "Reachable 7/7"],
   },
 };
@@ -96,7 +99,24 @@ export default function HomeHero() {
   const SKELETON_WIDTHS = ["w-16", "w-20", "w-24", "w-14", "w-16"];
 
   return (
-    <section id="hero-section" className="bg-[#EDF4FC]">
+    <section id="hero-section" className="relative overflow-hidden bg-[#EDF4FC]">
+      {/* ── Background photo (temporary) + legibility overlay ──────────
+          bg-[#EDF4FC] stays as the fallback while the image loads. The
+          gradient keeps the top (headline, subtext, form) on the light
+          palette the text colours are tuned for, then lets the photo show. */}
+      <Image
+        src="/images/hero/hero-provider-arrival.jpg"
+        alt={c.heroImageAlt}
+        fill
+        sizes="100vw"
+        priority
+        className="object-cover -z-20"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 -z-10 bg-gradient-to-b from-[#EDF4FC]/95 via-[#EDF4FC]/70 to-[#EDF4FC]/20"
+      />
+
       <div className="max-w-2xl mx-auto px-6 py-16 md:py-20 text-center">
 
         {/* Location badge */}
