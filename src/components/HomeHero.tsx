@@ -99,25 +99,53 @@ export default function HomeHero() {
   const SKELETON_WIDTHS = ["w-16", "w-20", "w-24", "w-14", "w-16"];
 
   return (
-    <section id="hero-section" className="relative overflow-hidden bg-[#EDF4FC]">
-      {/* ── Background photo (temporary) + legibility overlay ──────────
-          bg-[#EDF4FC] stays as the fallback while the image loads. The
-          gradient keeps the top (headline, subtext, form) on the light
-          palette the text colours are tuned for, then lets the photo show. */}
-      <Image
-        src="/images/hero/hero-provider-arrival.jpg"
-        alt={c.heroImageAlt}
-        fill
-        sizes="100vw"
-        priority
-        className="object-cover -z-20"
-      />
+    <section id="hero-section" className="relative isolate overflow-hidden bg-[#EDF4FC]">
+      {/* ── Background photo (temporary) — two regimes ─────────────────
+          < md : a banner in the normal flow at the top of the hero. Full
+          bleed behind a phone-width panel left the photo as a blurred frame
+          and dropped the human moment, which is the whole reason the photo
+          is here. Stacked instead: photo on top, content below on the flat
+          #EDF4FC. The image is 1672×941 and the banner is wider than that
+          ratio, so cover shows the FULL width — both people stay in frame
+          and only the vertical crop is steered. The crop window tightens as
+          the viewport widens (79% of the image at 393px, 41% at 767px), so
+          object-position is set for the WORST case: the provider's hair
+          starts at 7% of the image height, and 10% keeps it clear at 767px
+          while barely moving the 393px framing.
+          ≥ md : unchanged — absolute full bleed behind the panel.
+          `isolate` on the section is what makes the negative z-indexes paint
+          ABOVE the opaque bg-[#EDF4FC] fallback instead of under it. Note
+          -z-20 is md-only: on mobile the banner is in flow, and a negative
+          z-index there would bury it under that same opaque background. */}
+      <div className="relative h-44 w-full md:absolute md:inset-0 md:h-auto md:-z-20">
+        <Image
+          src="/images/hero/hero-provider-arrival.jpg"
+          alt={c.heroImageAlt}
+          fill
+          sizes="100vw"
+          priority
+          className="object-cover object-[50%_10%] md:object-center"
+        />
+      </div>
+      {/* Legibility overlay — md only. Below md nothing sits on the photo. */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 -z-10 bg-gradient-to-b from-[#EDF4FC]/95 via-[#EDF4FC]/70 to-[#EDF4FC]/20"
+        className="hidden md:block absolute inset-0 -z-10 bg-[radial-gradient(ellipse_70%_75%_at_50%_45%,rgba(237,244,252,0.50)_0%,rgba(237,244,252,0.26)_55%,rgba(237,244,252,0.04)_100%)]"
       />
 
-      <div className="max-w-2xl mx-auto px-6 py-16 md:py-20 text-center">
+      {/* ── Text column ────────────────────────────────────────────────
+          < md : plain, on the flat #EDF4FC under the banner. No panel — with
+          nothing behind the text there is nothing to defend against.
+          ≥ md : the translucent panel. The photo is a placeholder and the
+          real ones will have an unpredictable composition, so legibility
+          cannot depend on where the subject happens to sit. The panel gives
+          every line — including the two small links (browse-all,
+          already-a-provider) — a light ground of its own. Frosted rather than
+          opaque so the photo still reads through.
+          Text colours are untouched: the palette is locked.
+          md:w-[calc(100%-2rem)] is the gutter that keeps the panel's rounded
+          corners off the viewport edges between md and 2xl. */}
+      <div className="max-w-2xl mx-auto px-6 py-8 text-center md:w-[calc(100%-2rem)] md:my-10 md:py-12 md:rounded-3xl md:bg-white/80 md:backdrop-blur-lg md:ring-1 md:ring-white/60 md:shadow-[0_2px_32px_rgba(13,43,107,0.08)]">
 
         {/* Location badge */}
         <span className="inline-block rounded-full bg-white border border-[#B5D4F4] text-[#185FA5] text-xs px-3 py-1 mb-6">
