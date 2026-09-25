@@ -12,7 +12,7 @@ ENV=local  # or set to 'production' when ready
 LOCAL_DATABASE_URL=postgresql://postgres:password@localhost:5432/shizu_db
 
 # Remote Neon DB (used when ENV=production)
-REMOTE_DATABASE_URL=postgresql://neondb_owner:npg_SqFb7WtOIkg8@ep-green-sun-a55chftc-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+REMOTE_DATABASE_URL=postgresql://<user>:<password>@<host>.neon.tech/<db>?sslmode=require&channel_binding=require
 
 # Flask settings
 SECRET_KEY=your-secret-key
