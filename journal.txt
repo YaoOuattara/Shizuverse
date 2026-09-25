@@ -681,3 +681,91 @@ reconstruire de mémoire.
     Cause : logging verbeux laissé actif par défaut.
     Propriétaire : Yao — filtrer dans Sentry (règle d'ignore sur la
     source), pas de changement de code applicatif nécessaire.
+
+---
+2026-09-25 — SÉCURITÉ, INCIDENTS ET DETTES d'août-septembre (reprise sur clone frais)
+
+Reprise dans ~/Shizuverse-clean : l'ancien ~/Desktop/Shizuverse est
+abandonné (iCloud y provoquait des lectures qui expirent). Cette entrée
+consigne ce qui s'est passé entre le 4 août et aujourd'hui et n'était
+écrit nulle part.
+
+## Sécurité : fuite des identifiants Neon
+
+1. L'URL Neon complète (identifiant + mot de passe + hôte) était
+   versionnée en clair dans deux fichiers : test_db_connection.py
+   (en dur dans le script) et env_tbf.md (ligne REMOTE_DATABASE_URL).
+   Commit d'origine : a8d27a1 (2025-07-15, "Initial commit with
+   Supabase integration"), présent sur origin/main, origin/staging et
+   les branches YaoOuattara-patch-*. Exposition : ~14 mois.
+   Corrigé par le commit "fix(security): retire les identifiants Neon
+   versionnés depuis a8d27a1" : le script lit désormais l'URL depuis
+   l'environnement et n'affiche jamais l'URL ; env_tbf.md ne porte plus
+   que des placeholders. Scan des fichiers suivis (préfixe de mot de
+   passe Neon, rôle propriétaire, identifiant de l'endpoint exposé)
+   vide après correction.
+   Portée réelle : l'hôte exposé n'était PAS la production. C'est une
+   seconde branche Neon nommée « Shizuverse », dormante, archivée par
+   Neon le 2026-09-24, sans démarrage inexpliqué dans son historique.
+   La production tourne sur la branche Neon main (endpoint distinct).
+   Rotation : FAITE le 2026-09-25 sur les deux branches. DATABASE_URL
+   mise à jour sur Render ; la production a été coupée quelques minutes
+   puis rétablie.
+   Ce qui reste ouvert :
+   - Vérifier les variables d'environnement côté Vercel.
+   - Décider du sort de la branche Neon « Shizuverse » (suppression
+     ou conservation archivée).
+   - Historique git NON purgé : les anciennes valeurs restent lisibles
+     dans a8d27a1 (neutralisées par la rotation). Une réécriture
+     d'historique (force-push sur main et staging) reste à décider.
+   - Aucun scan de secrets avant commit. À mettre en place (hook
+     pre-commit : gitleaks ou équivalent).
+   Propriétaire : Yao.
+
+## Incidents
+
+2. 2026-08-04 : production frontend cassée pendant 1 h 40.
+   Cause : le Toaster était monté dans le layout racine sans
+   'use client' dans sa chaîne d'import. Un composant client rendu
+   depuis un Server Component sans frontière 'use client' fait casser
+   le rendu de toute l'application.
+   Leçon : tout composant à état ou à effets monté dans le layout
+   racine doit avoir une frontière 'use client' explicite dans sa
+   chaîne.
+
+## Règles de travail (issues des incidents ci-dessus)
+
+3. Jamais de `npm run build` pendant qu'un serveur de dev tourne sur le
+   même dossier : les deux écrivent dans .next, le build se corrompt et
+   la page sort sans CSS.
+
+4. Le mobile se valide sur un vrai téléphone ET sur WebKit. Le mode
+   conception réactive de Safari a rapporté 804 px de large pour un
+   iPhone de 402 px : il ne constitue pas une preuve.
+
+5. Aucun dépôt dans un dossier synchronisé par iCloud (Bureau,
+   Documents…) : lectures qui expirent.
+   Node 22 requis côté frontend.
+
+## Données : réservations sur le compte test
+
+6. Les réservations RÉELLES 82 et 85 sont assignées au compte test
+   uid=25. Elles ne doivent pas être supprimées avec les données de
+   test.
+   La 75 est conservée volontairement (fait historique, cf. entrée
+   ORPHELINS ci-dessus).
+   Les 76 à 81 sont des données de test à supprimer via
+   scripts/cleanup_test_data.py, APRÈS dry-run relu. Le script
+   n'est pas commité tant que ce dry-run n'a pas eu lieu.
+   Propriétaire : Yao (dry-run puis exécution).
+
+## Dettes frontend : chantier hero
+
+7. Le bandeau PWA s'affiche par-dessus « Besoin urgent ».
+8. Aucun repli si l'API des catégories échoue.
+9. Contraste insuffisant : texte en #888780.
+10. Le flou est faible sous Safari.
+11. Le bouton « Réserver » est absent en production.
+12. La base Browserslist (caniuse-lite) est obsolète.
+13. `npm audit` signale 23 vulnérabilités.
+Propriétaire : Yao, dépôt frontend.
