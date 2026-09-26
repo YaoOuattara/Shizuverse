@@ -769,3 +769,25 @@ consigne ce qui s'est passé entre le 4 août et aujourd'hui et n'était
 12. La base Browserslist (caniuse-lite) est obsolète.
 13. `npm audit` signale 23 vulnérabilités.
 Propriétaire : Yao, dépôt frontend.
+
+---
+2026-09-26 — DETTE FRONTEND : deux chemins de réservation morts
+
+Constaté pendant le lot hero (bandeau PWA « après une réservation ») :
+le seul chemin de réservation vivant est BookingForm (POST /api/bookings,
+succès au setSuccess(true) de BookingForm.tsx, qui écrit
+shizu_client_ref).
+
+1. src/components/BookingModal.tsx n'est importé par aucun fichier. Il
+   poste pourtant encore vers /api/bookings, avec son propre catalogue
+   ABIDJAN_SERVICES et un appel /api/booking-summary.
+2. src/app/[locale]/booking/success/page.tsx n'est atteint par aucun
+   lien vivant. Seule src/actions/submitBooking.ts y redirige, et cette
+   server action n'est elle-même appelée nulle part.
+   Cause : non établie (pas d'historique consulté).
+   Risque : quiconque modifie le flux de réservation peut corriger le
+   mauvais fichier, ou croire qu'un comportement (nudge de compte,
+   persistance de la référence) existe en prod alors qu'il vit dans un
+   chemin mort.
+   Propriétaire : Yao — décider : supprimer (BookingModal,
+   booking/success, actions/submitBooking) ou rebrancher.
