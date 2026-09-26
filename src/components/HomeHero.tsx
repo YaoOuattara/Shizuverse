@@ -108,29 +108,38 @@ export default function HomeHero() {
           #EDF4FC. The image is 1672×941 and the banner is wider than that
           ratio, so cover shows the FULL width — both people stay in frame
           and only the vertical crop is steered. The crop window tightens as
-          the viewport widens (79% of the image at 393px, 41% at 767px), so
+          the viewport widens (72% of the image at 393px, 37% at 767px), so
           object-position is set for the WORST case: the provider's hair
           starts at 7% of the image height, and 10% keeps it clear at 767px
-          while barely moving the 393px framing.
-          ≥ md : unchanged — absolute full bleed behind the panel.
+          (27px of offset for hair at 30px) while barely moving the 393px
+          framing. h-40, not taller: the search field, the chips and the
+          urgent button have to fit in a phone's visible area (390×664).
+          ≥ md : absolute full bleed behind the panel. From lg the panel sits
+          on the left, so the photo is pinned left too: whatever cover crops
+          comes off the right edge, which pushes the provider (41–60% of the
+          image width) away from the panel. The client (71–92%) stays in frame.
+          Vertically 20%, not centre: at 1920 the crop is ~290px tall and a
+          centred one takes the top of the provider's head with it.
           `isolate` on the section is what makes the negative z-indexes paint
           ABOVE the opaque bg-[#EDF4FC] fallback instead of under it. Note
           -z-20 is md-only: on mobile the banner is in flow, and a negative
           z-index there would bury it under that same opaque background. */}
-      <div className="relative h-44 w-full md:absolute md:inset-0 md:h-auto md:-z-20">
+      <div className="relative h-40 w-full md:absolute md:inset-0 md:h-auto md:-z-20">
         <Image
           src="/images/hero/hero-provider-arrival.jpg"
           alt={c.heroImageAlt}
           fill
           sizes="100vw"
           priority
-          className="object-cover object-[50%_10%] md:object-center"
+          className="object-cover object-[50%_10%] md:object-center lg:object-[0%_20%]"
         />
       </div>
-      {/* Legibility overlay — md only. Below md nothing sits on the photo. */}
+      {/* Legibility overlay — md only. Below md nothing sits on the photo.
+          From lg its centre follows the panel to the left, so the wash stays
+          behind the text instead of on the provider's face. Same stops. */}
       <div
         aria-hidden="true"
-        className="hidden md:block absolute inset-0 -z-10 bg-[radial-gradient(ellipse_70%_75%_at_50%_45%,rgba(237,244,252,0.50)_0%,rgba(237,244,252,0.26)_55%,rgba(237,244,252,0.04)_100%)]"
+        className="hidden md:block absolute inset-0 -z-10 bg-[radial-gradient(ellipse_70%_75%_at_50%_45%,rgba(237,244,252,0.50)_0%,rgba(237,244,252,0.26)_55%,rgba(237,244,252,0.04)_100%)] lg:bg-[radial-gradient(ellipse_45%_75%_at_20%_45%,rgba(237,244,252,0.50)_0%,rgba(237,244,252,0.26)_55%,rgba(237,244,252,0.04)_100%)]"
       />
 
       {/* ── Text column ────────────────────────────────────────────────
@@ -144,21 +153,24 @@ export default function HomeHero() {
           opaque so the photo still reads through.
           Text colours are untouched: the palette is locked.
           md:w-[calc(100%-2rem)] is the gutter that keeps the panel's rounded
-          corners off the viewport edges between md and 2xl. */}
-      <div className="max-w-2xl mx-auto px-6 py-8 text-center md:w-[calc(100%-2rem)] md:my-10 md:py-12 md:rounded-3xl md:bg-white/80 md:backdrop-blur-lg md:ring-1 md:ring-white/60 md:shadow-[0_2px_32px_rgba(13,43,107,0.08)]">
+          corners off the viewport edges between md and 2xl.
+          ≥ lg : anchored left and narrowed to 30rem so the provider (centre
+          of the photo) and the client (right) are both in view. Text stays
+          centred inside the panel. */}
+      <div className="max-w-2xl mx-auto px-6 pt-5 pb-8 text-center md:w-[calc(100%-2rem)] md:my-10 md:py-12 md:rounded-3xl md:bg-white/80 md:backdrop-blur-lg md:ring-1 md:ring-white/60 md:shadow-[0_2px_32px_rgba(13,43,107,0.08)] lg:max-w-[30rem] lg:ml-[max(2rem,5vw)] lg:mr-auto lg:pb-10">
 
         {/* Location badge */}
-        <span className="inline-block rounded-full bg-white border border-[#B5D4F4] text-[#185FA5] text-xs px-3 py-1 mb-6">
+        <span className="inline-block rounded-full bg-white border border-[#B5D4F4] text-[#185FA5] text-xs px-3 py-1 mb-5 sm:mb-6">
           {c.badge}
         </span>
 
         {/* Headline */}
-        <h1 className="text-4xl md:text-5xl font-bold leading-tight text-[#0D2B6B]">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight text-[#0D2B6B]">
           {c.headline}
         </h1>
 
         {/* Sub-headline */}
-        <p className="text-[#185FA5] text-lg mt-4 max-w-xl mx-auto leading-relaxed">
+        <p className="text-[#185FA5] text-lg mt-3 sm:mt-4 max-w-xl mx-auto leading-relaxed">
           {c.subtext}
         </p>
 
