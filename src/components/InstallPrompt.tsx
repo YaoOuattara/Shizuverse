@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Share, X } from 'lucide-react';
+import { BOOKING_SUCCESS_EVENT } from '@/lib/pwaInstall';
 
 // `BeforeInstallPromptEvent` is not part of the standard DOM lib types.
 // Minimal local declaration — Chromium-only, single-use.
@@ -13,6 +14,15 @@ interface BeforeInstallPromptEvent extends Event {
 
 const DISMISS_KEY = 'shizu_pwa_install_dismissed';
 const REVEAL_DELAY_MS = 2500; // starting value — tuned on the live deploy
+
+// Not on a first visit: the banner waits for the 2nd visit, or for a booking
+// (shizu_client_ref is written by BookingForm on success and by the /bookings
+// lookup). A visit is a browser session — the sessionStorage marker keeps a
+// reload or a page change from counting twice.
+const VISITS_KEY = 'shizu_visit_count';
+const VISIT_COUNTED_KEY = 'shizu_visit_counted';
+const CLIENT_REF_KEY = 'shizu_client_ref';
+const MIN_VISITS = 2;
 
 function isStandalone(): boolean {
   if (typeof window === 'undefined') return false;
@@ -53,6 +63,28 @@ function writeDismissed(value: boolean): void {
   }
 }
 
+// Counts this session once and returns the visit total. Storage unavailable
+// → 1: the banner then only comes back through a booking.
+function countVisit(): number {
+  try {
+    const seen = Number(window.localStorage.getItem(VISITS_KEY)) || 0;
+    if (window.sessionStorage.getItem(VISIT_COUNTED_KEY) === '1') return Math.max(seen, 1);
+    window.sessionStorage.setItem(VISIT_COUNTED_KEY, '1');
+    window.localStorage.setItem(VISITS_KEY, String(seen + 1));
+    return seen + 1;
+  } catch {
+    return 1;
+  }
+}
+
+function hasBooked(): boolean {
+  try {
+    return window.localStorage.getItem(CLIENT_REF_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export default function InstallPrompt() {
   const t = useTranslations('installPrompt');
   const [mounted, setMounted] = useState(false);
@@ -60,9 +92,11 @@ export default function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showIosHint, setShowIosHint] = useState(false);
   const [visible, setVisible] = useState(false); // drives the slide-up entrance
+  const [eligible, setEligible] = useState(false); // 2nd visit or a booking
 
   useEffect(() => {
     setMounted(true);
+    const visits = countVisit();
 
     // Installed users never see the banner.
     if (isStandalone()) return;
@@ -83,22 +117,32 @@ export default function InstallPrompt() {
       // Neutralize the flag: respect state, don't suppress forever.
       writeDismissed(false);
     };
+    // A booking made in this session unlocks the banner without a reload.
+    const onBookingSuccess = () => setEligible(true);
+
+    setEligible(visits >= MIN_VISITS || hasBooked());
 
     window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
     window.addEventListener('appinstalled', onAppInstalled);
+    window.addEventListener(BOOKING_SUCCESS_EVENT, onBookingSuccess);
 
     // iOS Safari fires no beforeinstallprompt — fall back to the manual hint.
     if (isIosSafari()) setShowIosHint(true);
 
-    // Timed reveal — slide up a moment after load, not instantly.
-    const revealTimer = window.setTimeout(() => setVisible(true), REVEAL_DELAY_MS);
-
     return () => {
       window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
       window.removeEventListener('appinstalled', onAppInstalled);
-      window.clearTimeout(revealTimer);
+      window.removeEventListener(BOOKING_SUCCESS_EVENT, onBookingSuccess);
     };
   }, []);
+
+  // Timed reveal — slide up a moment after the banner becomes eligible (page
+  // load on a return visit, or right after a booking), not instantly.
+  useEffect(() => {
+    if (!eligible) return;
+    const revealTimer = window.setTimeout(() => setVisible(true), REVEAL_DELAY_MS);
+    return () => window.clearTimeout(revealTimer);
+  }, [eligible]);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
@@ -114,8 +158,9 @@ export default function InstallPrompt() {
   };
 
   // Render nothing until mounted (avoids hydration mismatch), when dismissed,
-  // or when there's no actionable install path on this platform.
-  if (!mounted || dismissed) return null;
+  // before the 2nd visit or a booking, or when there's no actionable install
+  // path on this platform.
+  if (!mounted || dismissed || !eligible) return null;
   const showAndroid = deferredPrompt !== null;
   if (!showAndroid && !showIosHint) return null;
 

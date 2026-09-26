@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import PhoneInput from "@/components/PhoneInput";
 import { formatPrice, type CategoryPricing } from "@/lib/formatPrice";
+import { notifyBookingSuccess } from "@/lib/pwaInstall";
 
 interface Props {
   serviceId: string;
@@ -313,6 +314,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
       }
       setBookingId(data.id ?? null);
       setSuccess(true);
+      notifyBookingSuccess();
     } catch (err) {
       // Message HUMAIN : une panne (5xx / réseau) dit « réessayez », une
       // erreur de validation garde le message explicite du backend.
