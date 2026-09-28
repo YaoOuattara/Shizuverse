@@ -164,6 +164,15 @@ def create_booking():
     except Exception as e:
         current_app.logger.error(f"[create_booking] Unexpected error: {e}", exc_info=True)
 
+    # Admin: alert on every new request (e-mail now, WhatsApp template once
+    # Meta approves it). After the commit and in its own try: the booking is
+    # already saved, and nothing the alert does can undo it.
+    try:
+        from shizuverse.utils.admin_alerts import notify_admin_new_booking
+        notify_admin_new_booking(booking)
+    except Exception as e:
+        current_app.logger.error(f"[create_booking] admin alert error: {e}", exc_info=True)
+
     # T-26 — un prestataire n'est notifié qu'à l'assignation
     # (notify_provider_new_mission). Plus de diffusion au pool ouvert.
     # Bloc legacy désactivé : il notifiait tous les prestataires approuvés/actifs

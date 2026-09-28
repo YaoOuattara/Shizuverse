@@ -38,6 +38,13 @@ def _load_template_sids() -> dict:
 _TEMPLATE_SIDS = _load_template_sids()
 
 
+def is_template_registered(template_key: str) -> bool:
+    """True when WHATSAPP_TEMPLATE_SIDS holds a SID for this key — i.e. the
+    template is approved and wired. Lets a caller say « template en attente »
+    explicitly instead of relying on send_whatsapp_template's generic error."""
+    return bool(_TEMPLATE_SIDS.get(template_key))
+
+
 def is_twilio_enabled() -> bool:
     """Return True only when all three Twilio env vars are present and non-empty."""
     return all([
