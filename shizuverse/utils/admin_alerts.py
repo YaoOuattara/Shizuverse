@@ -26,6 +26,7 @@ scripts/send_test_admin_alert.py can run it against a fake booking.
 import logging
 import os
 import re
+from types import SimpleNamespace
 
 from shizuverse.utils.booking_ref import booking_ref as make_booking_ref
 from shizuverse.utils.mailer import send_email
@@ -173,6 +174,25 @@ def _email_content(booking, alert: dict, subject_prefix: str = "") -> tuple:
         "À traiter depuis l'espace admin, onglet Réservations.",
     ]
     return subject, "\n".join(lines)
+
+
+# ── Snapshot ──────────────────────────────────────────────────────────────────
+
+_SNAPSHOT_FIELDS = (
+    "id", "created_at", "appointment_date", "client_name", "client_phone",
+    "client_location", "service_name", "urgency", "time_preference",
+    "time_slot", "locale", "notes",
+)
+
+
+def alert_snapshot(booking) -> SimpleNamespace:
+    """Plain copy of every field the alert reads.
+
+    The alert runs in the background, after the response: the request's
+    session is closed by then and the ORM object is detached — reading an
+    expired attribute would raise. Take the copy inside the request.
+    """
+    return SimpleNamespace(**{f: getattr(booking, f, None) for f in _SNAPSHOT_FIELDS})
 
 
 # ── Send ──────────────────────────────────────────────────────────────────────

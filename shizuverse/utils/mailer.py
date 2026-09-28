@@ -16,7 +16,9 @@ from email.message import EmailMessage
 
 logger = logging.getLogger(__name__)
 
-SMTP_TIMEOUT_SECONDS = 15
+# Short on purpose: a dead SMTP server must not hold a worker (or a greenlet)
+# for long. Covers connect, TLS, login and send, each.
+SMTP_TIMEOUT_SECONDS = 10
 
 
 def is_smtp_enabled() -> bool:

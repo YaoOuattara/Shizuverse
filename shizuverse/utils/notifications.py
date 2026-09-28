@@ -38,6 +38,23 @@ def _load_template_sids() -> dict:
 _TEMPLATE_SIDS = _load_template_sids()
 
 
+# Explicit and short: Twilio's HTTP client has NO timeout by default, so a hung
+# connection would hold the caller indefinitely.
+TWILIO_TIMEOUT_SECONDS = 10
+
+
+def _twilio_client():
+    """Twilio REST client with an explicit request timeout. Imported lazily so
+    the app starts without twilio installed."""
+    from twilio.rest import Client
+    from twilio.http.http_client import TwilioHttpClient
+    return Client(
+        os.environ["TWILIO_ACCOUNT_SID"],
+        os.environ["TWILIO_AUTH_TOKEN"],
+        http_client=TwilioHttpClient(timeout=TWILIO_TIMEOUT_SECONDS),
+    )
+
+
 def is_template_registered(template_key: str) -> bool:
     """True when WHATSAPP_TEMPLATE_SIDS holds a SID for this key — i.e. the
     template is approved and wired. Lets a caller say « template en attente »
@@ -114,12 +131,7 @@ def send_whatsapp(to_phone: str, message: str, *, booking_id=None) -> bool:
         return False
 
     try:
-        from twilio.rest import Client  # imported lazily so app starts without twilio installed
-
-        client = Client(
-            os.environ["TWILIO_ACCOUNT_SID"],
-            os.environ["TWILIO_AUTH_TOKEN"],
-        )
+        client = _twilio_client()
         from_wa = os.environ["TWILIO_WHATSAPP_FROM"]  # e.g. "whatsapp:+14155238886"
         to_wa = f"whatsapp:{normalized}"
 
@@ -183,12 +195,7 @@ def send_whatsapp_template(to_phone: str, template_key: str, variables: dict,
         return False
 
     try:
-        from twilio.rest import Client  # imported lazily so app starts without twilio installed
-
-        client = Client(
-            os.environ["TWILIO_ACCOUNT_SID"],
-            os.environ["TWILIO_AUTH_TOKEN"],
-        )
+        client = _twilio_client()
         from_wa = os.environ["TWILIO_WHATSAPP_FROM"]  # e.g. "whatsapp:+14155238886"
         to_wa = f"whatsapp:{normalized}"
 

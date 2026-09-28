@@ -337,31 +337,119 @@ BOOKING_PAYLOAD = {
 }
 
 
-def test_create_booking_alerts_the_admin_after_the_commit(api, monkeypatch):
+@pytest.fixture()
+def background(monkeypatch):
+    """Keep a handle on every background task create_booking starts, so a test
+    can wait for it to finish (production code never waits)."""
+    import shizuverse.utils.background as bg
+    started = []
+    real = bg.run_in_background
+
+    def tracking(fn, *args, **kwargs):
+        t = real(fn, *args, **kwargs)
+        started.append(t)
+        return t
+
+    monkeypatch.setattr(bg, "run_in_background", tracking)
+    return started
+
+
+def test_create_booking_alerts_the_admin_after_the_commit(api, monkeypatch, background):
     seen = []
 
-    def spy(booking):
-        # Called AFTER the commit: the booking already has its id and is in base.
+    def spy(snapshot):
+        # Runs AFTER the commit, on a plain snapshot — not the ORM object.
         with api.app.app_context():
-            seen.append((booking.id,
-                         api.db.session.get(api.ClientBooking, booking.id) is not None))
+            in_base = api.db.session.get(api.ClientBooking, snapshot.id) is not None
+        seen.append((snapshot.id, in_base, type(snapshot).__name__, snapshot.notes))
 
     monkeypatch.setattr(alerts, "notify_admin_new_booking", spy)
     resp = api.client.post("/api/bookings/", json=BOOKING_PAYLOAD)
     assert resp.status_code == 201
-    assert seen == [(resp.get_json()["id"], True)]
+    assert len(background) == 1
+    background[0].join(timeout=5)
+    assert seen == [(resp.get_json()["id"], True, "SimpleNamespace",
+                     BOOKING_PAYLOAD["notes"])]
 
 
-def test_create_booking_survives_an_exploding_alert(api, monkeypatch, caplog):
-    def boom(booking):
+def test_create_booking_does_not_wait_for_a_slow_alert(api, monkeypatch, background):
+    """A dead SMTP server used to hold the response up to the proxy timeout:
+    the client saw an error for a booking that existed, and retried."""
+    import threading
+    import time
+    release, finished = threading.Event(), threading.Event()
+
+    def slow_alert(snapshot):
+        release.wait(timeout=10)          # stands in for a hung SMTP / Twilio call
+        finished.set()
+
+    monkeypatch.setattr(alerts, "notify_admin_new_booking", slow_alert)
+    t0 = time.monotonic()
+    resp = api.client.post("/api/bookings/", json=BOOKING_PAYLOAD)
+    elapsed = time.monotonic() - t0
+
+    assert resp.status_code == 201
+    assert elapsed < 2, f"the response waited {elapsed:.1f}s for the alert"
+    assert not finished.is_set(), "the alert is still running after the response"
+    release.set()
+    background[0].join(timeout=5)
+    assert finished.is_set()
+
+
+def test_create_booking_survives_an_exploding_alert(api, monkeypatch, background, caplog):
+    def boom(snapshot):
         raise RuntimeError("alert exploded")
 
     monkeypatch.setattr(alerts, "notify_admin_new_booking", boom)
     with caplog.at_level(logging.ERROR):
         resp = api.client.post("/api/bookings/", json=BOOKING_PAYLOAD)
+        background[0].join(timeout=5)
 
     assert resp.status_code == 201
     with api.app.app_context():
         assert api.db.session.get(api.ClientBooking, resp.get_json()["id"]) is not None
-    rec = [r for r in caplog.records if "admin alert error" in r.getMessage()]
+    # Raised in the background: logged there, with its traceback — not lost.
+    rec = [r for r in caplog.records if "background task failed" in r.getMessage()]
     assert len(rec) == 1 and rec[0].exc_info is not None
+    assert "admin-alert-" in rec[0].getMessage()
+
+
+def test_snapshot_copies_every_field_the_alert_reads():
+    b = fake_booking()
+    snap = alerts.alert_snapshot(b)
+    assert alerts.build_alert(snap) == alerts.build_alert(b)
+    assert alerts._email_content(snap, alerts.build_alert(snap)) == \
+        alerts._email_content(b, alerts.build_alert(b))
+
+
+# ── Timeouts ──────────────────────────────────────────────────────────────────
+
+def test_twilio_client_has_an_explicit_timeout(env, monkeypatch):
+    captured = {}
+
+    class FakeClient:
+        def __init__(self, *a, **k):
+            captured.update(k)
+
+    fake = types.ModuleType("twilio.rest")
+    fake.Client = FakeClient
+    monkeypatch.setitem(sys.modules, "twilio.rest", fake)
+    notif._twilio_client()
+    assert captured["http_client"].timeout == notif.TWILIO_TIMEOUT_SECONDS == 10
+
+
+def test_smtp_timeout_is_short(env, monkeypatch):
+    seen = []
+
+    class RecordingSMTP:
+        def __init__(self, host, port, timeout=None):
+            seen.append(timeout)
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def starttls(self): pass
+        def login(self, *a): pass
+        def send_message(self, msg): pass
+
+    monkeypatch.setattr(mailer.smtplib, "SMTP", RecordingSMTP)
+    assert mailer.send_email("coo@shizu.test", "s", "b") is True
+    assert seen == [10]

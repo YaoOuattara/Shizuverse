@@ -167,9 +167,15 @@ def create_booking():
     # Admin: alert on every new request (e-mail now, WhatsApp template once
     # Meta approves it). After the commit and in its own try: the booking is
     # already saved, and nothing the alert does can undo it.
+    # In the BACKGROUND: each recipient costs 1-2 s and a dead SMTP server up to
+    # its timeout — the client must not wait for it, see an error for a booking
+    # that exists, and retry into a duplicate. The snapshot is taken here, while
+    # the session is still open.
     try:
-        from shizuverse.utils.admin_alerts import notify_admin_new_booking
-        notify_admin_new_booking(booking)
+        from shizuverse.utils.admin_alerts import alert_snapshot, notify_admin_new_booking
+        from shizuverse.utils.background import run_in_background
+        run_in_background(notify_admin_new_booking, alert_snapshot(booking),
+                          name=f"admin-alert-{booking.id}")
     except Exception as e:
         current_app.logger.error(f"[create_booking] admin alert error: {e}", exc_info=True)
 
