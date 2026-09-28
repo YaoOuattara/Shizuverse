@@ -11,7 +11,10 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 ANOMALY_THRESHOLDS = {
-    'booking_pending_hours':      3,
+    # A request with no provider: warning at 1h30, critical at 2h — the site
+    # promises « Confirmé sous 2h », so 2h without a provider is already late.
+    'booking_pending_hours':      1.5,
+    'booking_critical_hours':     2,
     'provider_response_hours':    1,
     'payment_confirmation_hours': 24,
     'dispute_open_hours':         48,
@@ -36,7 +39,7 @@ def _run_checks() -> list:
     now = datetime.utcnow()
     t = ANOMALY_THRESHOLDS
 
-    # ── Check 1: Bookings stuck unassigned > 3h ───────────────
+    # ── Check 1: Bookings stuck unassigned ≥ 1h30 (critical ≥ 2h) ──
     cutoff1 = now - timedelta(hours=t['booking_pending_hours'])
     stuck_unassigned = ClientBooking.query.filter(
         ClientBooking.status == 'requested',
@@ -47,7 +50,7 @@ def _run_checks() -> list:
         hours = (now - b.created_at).total_seconds() / 3600
         anomalies.append({
             'type':            'booking_stuck_unassigned',
-            'severity':        'critical' if hours > 6 else 'warning',
+            'severity':        'critical' if hours >= t['booking_critical_hours'] else 'warning',
             'description':     (
                 f"Réservation #{b.id} ({b.service_name}) non assignée depuis "
                 f"{hours:.1f}h — client: {b.client_name}"
