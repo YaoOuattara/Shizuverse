@@ -819,3 +819,57 @@ d'une réservation (seul le client reçoit shizu_booking_created, avec son
 nom et la référence). L'admin ne découvre une nouvelle demande qu'en
 ouvrant le back-office. Une alerte admin hors fenêtre 24 h exigerait un
 template Meta (cf. dettes 2026-08-23, points 1 à 3).
+
+---
+2026-09-28 — DETTES : tests qui visent la production, CI, lot frontend
+
+Constaté en installant la suite locale (Python 3.11, .venv, base locale
+shizu_test) pour le chantier de l'alerte admin.
+
+## Priorité : tests qui appellent la production
+
+1. Trois fichiers de tests envoient de vraies requêtes HTTP à
+   https://shizu-verse.onrender.com :
+   - tests/test_e2e_flow.py : parcours complet, il CRÉERAIT DE VRAIES
+     RÉSERVATIONS en production (BASE = FLASK_API_URL, défaut Render) ;
+   - tests/test_admin_endpoints.py : endpoints admin, jeton ADMIN_TOKEN ;
+   - tests/test_provider_endpoints.py : URL Render codée en dur.
+   Aujourd'hui, ils ne sont évités que parce qu'on pense à les exclure
+   (--ignore). La suite locale de référence (199, puis 235) les exclut.
+   Action : les sortir de tests/ (ex. scripts/smoke/), ou les marquer et
+   les exclure par défaut dans la configuration pytest, pour qu'un simple
+   « pytest » ne puisse jamais écrire en production.
+   Propriétaire : Yao — en priorité.
+
+2. La CI plante probablement : ci.yml lance « pytest --maxfail=1 tests »
+   sans exclusion, et test_admin_endpoints.py fait sys.exit(1) à l'import
+   faute d'ADMIN_TOKEN (INTERNALERROR à la collecte, constaté en local).
+   Non vérifié sur GitHub. À vérifier : une CI toujours rouge ne protège
+   rien, et personne ne regarde plus ses résultats.
+   Propriétaire : Yao.
+
+## Frontend (petit lot à venir)
+
+3. « Cette semaine » est stocké en urgency=under_24h
+   (BookingForm.tsx, handleSubmit : this_week → under_24h). La donnée en
+   base est fausse ; l'alerte admin le compense en libellant under_24h
+   « cette semaine », mais tout autre lecteur (ai_matcher, statistiques)
+   lit « sous 24h ».
+4. « 17h–21h » encore affiché dans AdminBookings.tsx (TIME_SLOT, « Soir
+   (17h–21h, +10%) ») et utils/pricingEngine.ts (« Evening (5pm-9pm,
+   +10%) »). Le backend et le formulaire disent « Soirée · 17h–20h »
+   depuis cecc60f (horaires opérationnels 8h–20h).
+   Propriétaire : Yao.
+
+## Observation : démarrage en production non établi
+
+5. Le dépôt ne dit pas avec certitude comment Render lance l'app :
+   main.py est vide (la commande « gunicorn main:app » du README
+   échouerait), wsgi.py importe un module « app » inexistant, et le
+   Dockerfile lance « python -m shizuverse.app », c'est-à-dire
+   socketio.run(..., debug=True) — le mode debug en production.
+   shizuverse.app applique gevent.monkey.patch_all() dans tous les cas
+   (l'alerte admin en arrière-plan en dépend, cf. 6db109b).
+   À vérifier dans le tableau de bord Render : commande de démarrage
+   réelle, et si debug=True est actif en production.
+   Propriétaire : Yao.
