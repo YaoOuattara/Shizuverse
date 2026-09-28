@@ -60,6 +60,35 @@ function toDateStr(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+// The booking's `notes` — what the admin reads under "Notes du client" and
+// what the quote AI gets as description. Rule: the client's own words never
+// disappear. The original request, the client's edit of it, and their
+// "Précisions" each keep their own line; the AI's rewrite is only ever added,
+// labelled as such. Labels are French whatever the locale: the reader is the
+// admin.
+function buildNotes(p: {
+  originalDesc: string;
+  descIsCategory: boolean;
+  aiInput: string;
+  providerNote: string | null;
+  notes: string;
+  aiNotes: string | null;
+}): string | undefined {
+  const edited = p.aiInput.trim();
+  const lines = [
+    p.originalDesc && (p.descIsCategory
+      ? `Catégorie choisie : ${p.originalDesc}`
+      : `Demande du client : « ${p.originalDesc} »`),
+    edited && edited !== p.originalDesc && (p.originalDesc && !p.descIsCategory
+      ? `Demande modifiée par le client : « ${edited} »`
+      : `Demande du client : « ${edited} »`),
+    p.providerNote,
+    p.notes.trim() && `Précisions du client : ${p.notes.trim()}`,
+    p.aiNotes?.trim() && `Reformulation IA (non rédigée par le client) : ${p.aiNotes.trim()}`,
+  ].filter(Boolean);
+  return lines.length ? lines.join("\n") : undefined;
+}
+
 // ── API types ─────────────────────────────────────────────────────────────────
 
 interface ApiSubcategory { id: number; name: string; name_fr: string; name_en: string; service_id: number | null }
@@ -203,10 +232,19 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
 
   // ── AI intake ─────────────────────────────────────────────────────────────
   // Seeded from ?desc= — the text typed in the hero bar arrives here as the
-  // initial description of the request (concierge entry, T-21).
+  // initial description of the request (concierge entry, T-21). It is frozen
+  // in originalDesc: aiInput stays editable, and neither the client's edit
+  // nor the AI can make the original disappear from the booking (buildNotes).
+  // ?from=category marks a desc that is a category label (hero chip without
+  // a bookable service), not text the client typed.
+  const [originalDesc, setOriginalDesc] = useState(() => (searchParams?.get("desc") ?? "").trim());
+  const descIsCategory = searchParams?.get("from") === "category";
   const [aiInput, setAiInput]         = useState(() => searchParams?.get("desc") ?? "");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [dateHint, setDateHint]       = useState<string | null>(null);
+  // The AI's rewrite is kept apart from the client's own "Précisions": it is
+  // added to the booking, labelled as the AI's, and never replaces them.
+  const [aiNotes, setAiNotes]         = useState<string | null>(null);
 
   const handleAnalyze = async () => {
     if (!aiInput.trim() || isAnalyzing) return;
@@ -218,7 +256,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
         body: JSON.stringify({ user_input: aiInput, service_name: serviceName ?? "", locale }),
       });
       const data = await res.json();
-      if (data.suggested_notes) setNotes(data.suggested_notes);
+      if (data.suggested_notes) setAiNotes(data.suggested_notes);
       if (data.suggested_date_hint) setDateHint(data.suggested_date_hint);
       if (data.suggested_location_hint) {
         const hint = (data.suggested_location_hint as string).toLowerCase();
@@ -294,7 +332,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
           client_location:  location,
           appointment_date: appointmentIso,
           locale,   // capture the client's active UI language for all downstream messaging
-          notes:            [providerNote, notes.trim()].filter(Boolean).join('\n') || undefined,
+          notes:            buildNotes({ originalDesc, descIsCategory, aiInput, providerNote, notes, aiNotes }),
           // Canonical label for free requests (locale-independent: the admin
           // classifies it into a real service before assignment, T-28).
           service_name:     isFreeRequest ? "Demande libre" : (serviceName ?? ""),
@@ -389,7 +427,7 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
                 setSuccess(false); setBookingId(null); setStep(1);
                 setUrgencyChip(null); setTimeSlot(null); setNotes(""); setDate(null);
                 setName(""); setPhone(""); setCommune(""); setAddress("");
-                setAiInput(""); setDateHint(null);
+                setAiInput(""); setDateHint(null); setAiNotes(null); setOriginalDesc("");
               }}
               className="text-sm text-gray-400 hover:text-gray-600 transition-colors py-1"
             >
@@ -590,7 +628,17 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
             {isFr ? "Analyser" : "Analyze"}
           </button>
         </div>
-        {(dateHint || notes) && (
+        {aiNotes && (
+          // Shown as the AI's, not poured into "Précisions": the client's own
+          // text stays theirs, this is only added alongside it.
+          <p className="text-xs text-purple-700">
+            <span className="font-semibold">
+              {isFr ? "✓ Reformulation de l'IA, ajoutée à votre demande : " : "✓ AI rewrite, added to your request: "}
+            </span>
+            {aiNotes}
+          </p>
+        )}
+        {dateHint && !aiNotes && (
           <p className="text-xs text-purple-600">
             {isFr ? "✓ Champs pré-remplis — vous pouvez les modifier." : "✓ Fields pre-filled — you can still edit them."}
           </p>

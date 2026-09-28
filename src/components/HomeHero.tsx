@@ -88,7 +88,9 @@ export default function HomeHero() {
     const sid = cat.subcategories?.find((s) => s.service_id != null)?.service_id;
     if (sid != null) return `/${locale}/booking/${sid}`;
     const label = locale === "fr" ? (cat.name_fr || cat.name) : (cat.name_en || cat.name);
-    return `/${locale}/booking/demande?desc=${encodeURIComponent(label)}`;
+    // from=category: the booking records it as the chosen category, not as
+    // words the client typed.
+    return `/${locale}/booking/demande?desc=${encodeURIComponent(label)}&from=category`;
   };
 
   // 4 chips + "+ N autres" → the CTAs climb back above the fold (design lot).
