@@ -232,18 +232,22 @@ export default function HomeHero() {
             )}
         </div>
 
-        {/* ── Two urgency paths ──────────────────────────────────────── */}
-        <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center max-w-lg mx-auto">
+        {/* ── Two urgency paths ──────────────────────────────────────────
+            lg+ : the panel is a fixed 30rem, so each button is ~210px at every
+            desktop width. px-3 / gap-2 there give each label ~34px of spare
+            room (vs ~16px with px-5 / gap-3) — enough that a wider fallback
+            font or Safari's rendering keeps both on one line. */}
+        <div className="mt-6 flex flex-col sm:flex-row gap-3 lg:gap-2 justify-center max-w-lg mx-auto">
           <Link
             href={`/${locale}/booking/demande?urgency=urgent_2h`}
-            className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-3 rounded-xl transition-colors text-sm"
+            className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-5 lg:px-3 py-3 rounded-xl transition-colors text-sm"
           >
             <Zap className="h-4 w-4 shrink-0" />
             {c.urgentBtn}
           </Link>
           <Link
             href={`/${locale}/services`}
-            className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-3 rounded-xl transition-colors text-sm"
+            className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-5 lg:px-3 py-3 rounded-xl transition-colors text-sm"
           >
             <CalendarCheck className="h-4 w-4 shrink-0" />
             {c.planBtn}
