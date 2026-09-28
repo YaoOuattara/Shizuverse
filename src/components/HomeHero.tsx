@@ -26,7 +26,7 @@ const CONTENT = {
     subtext:
       "Décrivez votre besoin. On vous envoie le bon professionnel, vérifié par nos soins.",
     searchPlaceholder: "Quel est votre besoin ?",
-    searchBtn: "Envoyer",
+    searchBtn: "Demander",
     urgentBtn: "Besoin urgent — 2h",
     planBtn: "Planifier un service",
     browseAll: "Parcourir toutes les catégories →",
@@ -43,7 +43,9 @@ const CONTENT = {
     subtext:
       "Tell us what you need. We send you the right professional, vetted by our team.",
     searchPlaceholder: "What do you need?",
-    searchBtn: "Send",
+    // Echoes the page tagline "You ask. We handle it." (fr: « Vous demandez.
+    // On gère. »).
+    searchBtn: "Ask",
     urgentBtn: "Urgent — within 2h",
     planBtn: "Plan a service",
     browseAll: "Browse all categories →",
@@ -73,9 +75,10 @@ export default function HomeHero() {
       .finally(() => setChipsLoading(false));
   }, []);
 
-  // Concierge entry (T-21/T-28): the typed text becomes the initial
-  // description of a FREE booking request — not a catalog search. This is what
-  // makes the "Envoyer" button true.
+  // Concierge entry (T-21/T-28): the typed text opens a FREE booking request
+  // as its initial description — not a catalog search. Nothing is sent or
+  // saved here: the client still completes the form, and the text reaches the
+  // admin only when the booking is confirmed (BookingForm → buildNotes).
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const q = searchValue.trim();
