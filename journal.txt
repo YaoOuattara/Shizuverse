@@ -791,3 +791,31 @@ shizu_client_ref).
    chemin mort.
    Propriétaire : Yao — décider : supprimer (BookingModal,
    booking/success, actions/submitBooking) ou rebrancher.
+
+---
+2026-09-28 — ÉVOLUTION : champ client_request dédié (option B, différée)
+
+Contexte : le texte tapé dans la barre du hero n'arrivait jamais à
+l'admin (corrigé côté frontend par efb7ee1, option A). Il passe
+désormais par ClientBooking.notes, une ligne étiquetée par source :
+« Demande du client », « Demande modifiée par le client », « Catégorie
+choisie », « Précisions du client », « Reformulation IA (non rédigée par
+le client) ». Aucun changement de schéma.
+
+Limite de l'option A : la demande d'origine est mêlée à du texte libre.
+Un programme ne peut la relire qu'en analysant les étiquettes.
+
+Évolution proposée (option B) : colonne ClientBooking.client_request
+(Text), la demande d'origine intacte, exposée par to_dict() et par les
+API admin, envoyée par BookingForm.
+Utile au matcher : il disposerait du besoin exprimé par le client, sans
+les précisions logistiques ni la reformulation de l'IA.
+Coût : migration à appliquer en production, backend puis frontend
+(AdminBookings, AdminOverview, BookingForm).
+Propriétaire : Yao — à décider quand le matcher en aura besoin.
+
+Constat annexe : aucun WhatsApp n'est envoyé à l'admin à la création
+d'une réservation (seul le client reçoit shizu_booking_created, avec son
+nom et la référence). L'admin ne découvre une nouvelle demande qu'en
+ouvrant le back-office. Une alerte admin hors fenêtre 24 h exigerait un
+template Meta (cf. dettes 2026-08-23, points 1 à 3).
