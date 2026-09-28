@@ -122,7 +122,8 @@ def send_whatsapp(to_phone: str, message: str, *, booking_id=None) -> bool:
         return True
 
     except Exception as exc:  # noqa: BLE001
-        logger.error("WHATSAPP send failed to %s: %s", normalized, exc)
+        logger.error("WHATSAPP send failed to %s: %s", normalized, exc,
+                     exc_info=True)
         return False
 
 
@@ -197,7 +198,7 @@ def send_whatsapp_template(to_phone: str, template_key: str, variables: dict,
 
     except Exception as exc:  # noqa: BLE001
         logger.error("WHATSAPP TEMPLATE '%s' send failed to %s: %s",
-                     template_key, normalized, exc)
+                     template_key, normalized, exc, exc_info=True)
         return False
 
 
