@@ -256,12 +256,17 @@ export default function BookingForm({ serviceId, locale, serviceName }: Props) {
         body: JSON.stringify({ user_input: aiInput, service_name: serviceName ?? "", locale }),
       });
       const data = await res.json();
+      // Pre-fill rule: the AI fills EMPTY fields only, it never replaces a
+      // value the client already chose (commune picked at step 4 before
+      // coming back, or carried by a rebook link). The commune is the only
+      // form field it sets — the date hint is only displayed (step 3), and
+      // its rewrite goes to aiNotes, alongside the client's own text.
       if (data.suggested_notes) setAiNotes(data.suggested_notes);
       if (data.suggested_date_hint) setDateHint(data.suggested_date_hint);
       if (data.suggested_location_hint) {
         const hint = (data.suggested_location_hint as string).toLowerCase();
         const match = LAUNCH_ZONES.find((c) => hint.includes(c.toLowerCase()));
-        if (match) setCommune(match);
+        if (match) setCommune((current) => (current.trim() ? current : match));
       }
     } catch (err) {
       console.error("[booking-intake] error:", err);
