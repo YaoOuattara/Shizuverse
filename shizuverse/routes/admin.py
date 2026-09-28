@@ -751,11 +751,13 @@ def cancel_booking(booking_id):
     return jsonify({'message': 'Booking cancelled', 'booking_id': booking_id})
 
 
-# Slot labels for reschedule notifications (client = locale, provider = FR).
+# Slot labels for reschedule notifications (client = locale, provider = FR) and
+# the admin new-booking alert. Operating hours are 8h–20h: the evening slot is
+# the one the client picks in BookingForm, « Soirée · 17h–20h ».
 _SLOT_LABELS = {
-    'morning':   {'fr': 'Matin 8h–12h',     'en': 'Morning 8am–12pm'},
+    'morning':   {'fr': 'Matin 8h–12h',      'en': 'Morning 8am–12pm'},
     'afternoon': {'fr': 'Après-midi 12h–17h','en': 'Afternoon 12pm–5pm'},
-    'evening':   {'fr': 'Soir 17h–21h',      'en': 'Evening 5pm–9pm'},
+    'evening':   {'fr': 'Soirée · 17h–20h',  'en': 'Evening 5pm–8pm'},
     'anytime':   {'fr': 'Flexible',          'en': 'Anytime'},
 }
 
