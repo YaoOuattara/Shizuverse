@@ -9,6 +9,7 @@ import { Analytics } from '@vercel/analytics/react';
 import PwaRegistration from '@/components/PwaRegistration';
 import { Toaster } from "@/components/ui/toaster";
 import InstallPrompt from '@/components/InstallPrompt';
+import NativePlatformBridge from '@/components/NativePlatformBridge';
 
 export function generateStaticParams() {
   return locales.map((locale) => ({locale}));
@@ -53,6 +54,7 @@ export default async function RootLayout({children, params}: Props) {
         </NextIntlClientProvider>
         <Analytics />
         <PwaRegistration />
+        <NativePlatformBridge />
       </body>
     </html>
   );

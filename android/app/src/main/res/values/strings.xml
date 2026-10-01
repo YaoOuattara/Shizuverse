@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Shizu</string>
+    <string name="title_activity_main">Shizu</string>
+    <string name="package_name">pro.shizu.app</string>
+    <string name="custom_url_scheme">pro.shizu.app</string>
+</resources>
