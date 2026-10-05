@@ -152,7 +152,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
     <div className="flex flex-col lg:flex-row min-h-[100dvh]">
       <TokenRefresher kind="admin" />
       {/* Mobile header with drawer trigger */}
-      <div className="lg:hidden flex items-center justify-between p-3 border-b bg-background sticky top-0 z-40">
+      <div className="lg:hidden flex items-center justify-between p-3 border-b bg-background sticky top-0 z-40 mt-[calc(-1*env(safe-area-inset-top))] pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <div className="flex items-center gap-2">
           <Shield className="h-5 w-5 text-primary" />
           <span className="font-semibold text-sm">{title}</span>

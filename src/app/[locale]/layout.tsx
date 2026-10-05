@@ -11,6 +11,22 @@ import { Toaster } from "@/components/ui/toaster";
 import InstallPrompt from '@/components/InstallPrompt';
 import NativePlatformBridge from '@/components/NativePlatformBridge';
 
+const NATIVE_VIEWPORT_SCRIPT = `(function () {
+  try {
+    var C = window.Capacitor;
+    if (!C || !C.isNativePlatform || !C.isNativePlatform()) return;
+    var m = document.createElement('meta');
+    m.name = 'viewport';
+    m.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
+    var head = document.head;
+    head.appendChild(m);
+    new MutationObserver(function () {
+      var all = head.querySelectorAll('meta[name="viewport"]');
+      if (all[all.length - 1] !== m) head.appendChild(m);
+    }).observe(head, { childList: true });
+  } catch (e) {}
+})();`;
+
 export function generateStaticParams() {
   return locales.map((locale) => ({locale}));
 }
@@ -26,6 +42,13 @@ export default async function RootLayout({children, params}: Props) {
   return (
     <html lang={locale}>
       <head>
+        {/* App Capacitor uniquement : viewport-fit=cover pour que les env(safe-area-inset-*)
+            aient une valeur. Le pont natif est injecté avant ce script ; sur le web
+            window.Capacitor n'existe pas et rien ne change (Safari paysage, PWA inclus).
+            On ajoute notre propre balise (la dernière l'emporte) sans toucher à celle de
+            Next — React 19 en réinsérerait une — et on la garde en dernier quand Next en
+            rajoute une lors d'une navigation client. */}
+        <script dangerouslySetInnerHTML={{ __html: NATIVE_VIEWPORT_SCRIPT }} />
         <link rel="icon" type="image/png" href="https://res.cloudinary.com/ddilgv5ir/image/upload/v1779646648/shizu_icon_square_hkmm06.png" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <meta name="theme-color" content="#0D2B6B" />

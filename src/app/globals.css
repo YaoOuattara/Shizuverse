@@ -27,4 +27,11 @@
   }
   * { @apply border-border; }
   body { @apply bg-background text-foreground; }
+  /* Encoche / barre d'état de l'app native. Les insets valent 0 sur le web :
+     viewport-fit=cover n'est posé que dans la coquille Capacitor (layout.tsx).
+     Les headers collés en haut annulent ce padding et peignent eux-mêmes la zone. */
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }

@@ -81,7 +81,7 @@ export default function Navbar() {
   );
 
   return (
-    <nav className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-50">
+    <nav className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-50 mt-[calc(-1*env(safe-area-inset-top))] pt-[env(safe-area-inset-top)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
 
         {/* Logo */}

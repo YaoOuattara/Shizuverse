@@ -283,7 +283,7 @@ export default function BookingsPage() {
   if (phase === "lookup") {
     return (
       <div className="min-h-screen bg-[#EDF4FC]">
-        <header className="sticky top-0 z-50 border-b border-[#0D2B6B] bg-[#0D2B6B]">
+        <header className="sticky top-0 z-50 border-b border-[#0D2B6B] bg-[#0D2B6B] mt-[calc(-1*env(safe-area-inset-top))] pt-[env(safe-area-inset-top)]">
           <div className="mx-auto max-w-2xl px-4 py-4">
             <button
               onClick={() => showGuestForm ? setShowGuestForm(false) : router.push(`/${locale}`)}
@@ -405,7 +405,7 @@ export default function BookingsPage() {
 
   return (
     <div className="min-h-screen bg-[#EDF4FC]">
-      <header className="sticky top-0 z-50 border-b border-[#0D2B6B] bg-[#0D2B6B]">
+      <header className="sticky top-0 z-50 border-b border-[#0D2B6B] bg-[#0D2B6B] mt-[calc(-1*env(safe-area-inset-top))] pt-[env(safe-area-inset-top)]">
         <div className="mx-auto max-w-2xl px-4 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5 text-white" />

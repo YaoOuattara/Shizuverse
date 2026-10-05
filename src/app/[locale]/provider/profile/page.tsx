@@ -1080,7 +1080,7 @@ export default function ProviderProfilePage() {
 
       {/* Sticky save bar — mobile only, shown when profile has unsaved changes */}
       {isDirty && (
-        <div className="sm:hidden fixed bottom-0 inset-x-0 z-50 bg-background border-t border-border px-4 py-3 flex items-center gap-3 shadow-lg">
+        <div className="sm:hidden fixed bottom-0 inset-x-0 z-50 bg-background border-t border-border px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex items-center gap-3 shadow-lg">
           <p className="flex-1 text-sm text-muted-foreground">
             {isFr ? 'Modifications non sauvegardées' : 'Unsaved changes'}
           </p>
