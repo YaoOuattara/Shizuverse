@@ -93,6 +93,22 @@ export default function InstallPrompt() {
   const [showIosHint, setShowIosHint] = useState(false);
   const [visible, setVisible] = useState(false); // drives the slide-up entrance
   const [eligible, setEligible] = useState(false); // 2nd visit or a booking
+  // App Capacitor : pas d'« Ajouter à l'écran d'accueil ». null = pas encore vérifié.
+  const [isNative, setIsNative] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    import('@capacitor/core')
+      .then(({ Capacitor }) => {
+        if (!cancelled) setIsNative(Capacitor.isNativePlatform());
+      })
+      .catch(() => {
+        if (!cancelled) setIsNative(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -159,8 +175,8 @@ export default function InstallPrompt() {
 
   // Render nothing until mounted (avoids hydration mismatch), when dismissed,
   // before the 2nd visit or a booking, or when there's no actionable install
-  // path on this platform.
-  if (!mounted || dismissed || !eligible) return null;
+  // path on this platform, or inside the native app (and until that is known).
+  if (!mounted || dismissed || !eligible || isNative !== false) return null;
   const showAndroid = deferredPrompt !== null;
   if (!showAndroid && !showIosHint) return null;
 

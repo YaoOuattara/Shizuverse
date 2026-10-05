@@ -640,7 +640,7 @@ export default function ProviderDashboard() {
       )}
 
       {/* Sticky header */}
-      <header className="sticky top-0 z-40 bg-[#0D2B6B] border-b border-[#0D2B6B] px-4 sm:px-6 py-3">
+      <header className="sticky top-[env(safe-area-inset-top)] z-40 bg-[#0D2B6B] border-b border-[#0D2B6B] px-4 sm:px-6 py-3">
         <div className="flex items-center justify-between gap-3 mb-2.5">
           <h1 className="text-lg font-semibold text-white" data-testid="text-header">{t("title")}</h1>
           <div className="flex items-center gap-2">
